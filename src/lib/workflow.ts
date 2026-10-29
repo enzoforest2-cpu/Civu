@@ -84,6 +84,8 @@ export type EstadoDef = {
   avancos: Transicao[];
   devolucoes: Transicao[];
   final?: boolean;
+  /** Etapa de pagamento: sair dela fora da ordem cronológica da fonte exige justificativa (Lei 14.133, art. 141). */
+  filaCronologica?: boolean;
 };
 
 export type WorkflowDef = {
@@ -96,6 +98,57 @@ export type WorkflowDef = {
 export function getEstado(def: WorkflowDef, chave: string): EstadoDef | undefined {
   return def.estados.find((e) => e.chave === chave);
 }
+
+// ---------------------------------------------------------------------------
+// Classificações usadas pelas regras de conformidade
+// ---------------------------------------------------------------------------
+
+/** Natureza do objeto: base para somar despesas de mesma natureza no exercício (Lei 14.133, art. 75, §1º). */
+export const NATUREZAS: Record<string, { nome: string; engenharia?: boolean }> = {
+  MATERIAL_EXPEDIENTE: { nome: "Material de expediente e escritório" },
+  MATERIAL_LIMPEZA: { nome: "Material de limpeza e higiene" },
+  GENEROS_ALIMENTICIOS: { nome: "Gêneros alimentícios" },
+  MEDICAMENTOS: { nome: "Medicamentos e insumos de saúde" },
+  COMBUSTIVEIS: { nome: "Combustíveis e lubrificantes" },
+  EQUIPAMENTOS: { nome: "Equipamentos e mobiliário" },
+  SERVICOS_TI: { nome: "Serviços e sistemas de TI" },
+  TRANSPORTE: { nome: "Transporte e locação de veículos" },
+  SERVICOS_GERAIS: { nome: "Outros serviços comuns" },
+  SERVICO_ENGENHARIA: { nome: "Obras e serviços de engenharia", engenharia: true },
+  OUTROS: { nome: "Outros bens" },
+};
+
+export const MODALIDADES: Record<string, string> = {
+  DISPENSA_VALOR: "Dispensa por valor (art. 75, I ou II)",
+  LICITACAO: "Licitação (pregão ou concorrência)",
+  OUTRA_DIRETA: "Outra contratação direta (inexigibilidade, emergência, adesão a ata)",
+  A_DEFINIR: "Ainda não sei (compras define)",
+};
+
+/** Fonte de recurso: a ordem cronológica de pagamentos é separada por fonte (art. 141). */
+export const FONTES: Record<string, string> = {
+  ORDINARIOS: "Recursos ordinários (livres)",
+  SAUDE: "Saúde (vinculados)",
+  EDUCACAO: "Educação e FUNDEB (vinculados)",
+  ASSISTENCIA: "Assistência social (vinculados)",
+  CONVENIOS: "Convênios e transferências",
+  OUTRAS: "Outras vinculadas",
+};
+
+/** Limites de dispensa por valor em 2026 (Decreto 12.807/2025). */
+export const LIMITES_DISPENSA = { comum: 65492.11, engenharia: 130984.2, ano: 2026 };
+
+/** Rótulos legíveis para opções de campos. */
+export const ROTULO_OPCAO: Record<string, string> = {
+  BAIXA: "Baixa",
+  MEDIA: "Média",
+  ALTA: "Alta",
+  SIM: "Sim",
+  NAO: "Não",
+  NAO_SEI: "Não sei",
+  ...Object.fromEntries(Object.entries(NATUREZAS).map(([k, v]) => [k, v.nome])),
+  ...MODALIDADES,
+};
 
 // ---------------------------------------------------------------------------
 // Workflow 1: COMPRA — do DFD ao pagamento (18 estados, 2 decisões, retornos)
@@ -111,6 +164,8 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
   estadoInicial: "DEMANDA",
   camposAbertura: [
     { chave: "objeto", rotulo: "Objeto (o que precisa ser contratado)", tipo: "texto", obrigatorio: true },
+    { chave: "natureza", rotulo: "Natureza do objeto", tipo: "opcao", opcoes: Object.keys(NATUREZAS), obrigatorio: true },
+    { chave: "modalidade", rotulo: "Forma de contratação prevista", tipo: "opcao", opcoes: Object.keys(MODALIDADES), obrigatorio: true },
     { chave: "justificativa", rotulo: "Justificativa da necessidade", tipo: "longo", obrigatorio: true },
     { chave: "quantidade", rotulo: "Quantidade estimada", tipo: "texto", obrigatorio: true },
     { chave: "valorEstimado", rotulo: "Valor estimado (R$)", tipo: "numero", obrigatorio: true },
@@ -250,6 +305,7 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
         doc("CONTRATO", ["ORDENADOR"], "Contrato ou ordem de compra assinado"),
         doc("PORTARIA_FISCAL", undefined, "Portaria nomeando gestor e fiscal com suplente"),
         doc("PUBLICACAO_PNCP", undefined, "Publicação no PNCP (20 dias úteis licitação / 10 direta)"),
+        { tipo: "campo", campo: "contratacao", descricao: "Fornecedor, CNPJ, valor contratado e fonte de recurso informados" },
       ],
       avancos: [{ para: "EMPENHADO", rotulo: "Enviar para empenho" }],
       devolucoes: [],
@@ -298,6 +354,7 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
       setor: "TES",
       papeis: ["TESOURARIA"],
       slaDiasUteis: 20,
+      filaCronologica: true,
       gates: [doc("ORDEM_PAGAMENTO", ["ORDENADOR", "TESOURARIA"], "Ordem de pagamento assinada pelo ordenador e pela tesouraria")],
       avancos: [{ para: "PAGO", rotulo: "Registrar pagamento" }],
       devolucoes: [],

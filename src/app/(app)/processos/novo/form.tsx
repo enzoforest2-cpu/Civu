@@ -1,23 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileStack, ShoppingCart } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { abrirProcessoAction } from "@/app/actions";
-import type { WorkflowDef } from "@/lib/workflow";
+import { LimiteDispensa } from "@/components/limite-dispensa";
+import { abrirProcessoAction, checarFracionamentoAction } from "@/app/actions";
+import { ROTULO_OPCAO, type WorkflowDef } from "@/lib/workflow";
+import type { AnaliseFracionamento } from "@/lib/conformidade";
 
 type Tipo = { id: string; chave: string; nome: string; descricao: string | null; campos: NonNullable<WorkflowDef["camposAbertura"]>; primeiroEstado?: string };
 
-const ROTULO_OPCAO: Record<string, string> = { BAIXA: "Baixa", MEDIA: "Média", ALTA: "Alta", SIM: "Sim", NAO: "Não", NAO_SEI: "Não sei" };
+const DICA: Record<string, string> = {
+  noPCA: "Se não souber, escolha “Não sei”: o setor de compras confere.",
+  natureza: "O sistema soma as compras da mesma natureza no ano para checar o limite de dispensa.",
+  modalidade: "Se não souber, escolha “Ainda não sei”: compras define.",
+};
 
 export function NovoProcessoForm({ tipos, ugs, setor }: { tipos: Tipo[]; ugs: { id: string; nome: string }[]; setor: string }) {
   const [tipoId, setTipoId] = useState(tipos[0]?.id ?? "");
   const tipo = tipos.find((t) => t.id === tipoId);
+  const [campos, setCampos] = useState({ ug: ugs[0]?.id ?? "", natureza: "", modalidade: "", valor: "" });
+  const [analise, setAnalise] = useState<AnaliseFracionamento | null>(null);
+  const checar = tipo?.chave === "COMPRA" && !!campos.natureza && (campos.modalidade === "DISPENSA_VALOR" || campos.modalidade === "A_DEFINIR");
+
+  useEffect(() => {
+    if (!checar) return;
+    let vivo = true;
+    const t = setTimeout(async () => {
+      const r = await checarFracionamentoAction({ unidadeGestoraId: campos.ug, natureza: campos.natureza, valor: Number(campos.valor) || 0 }).catch(() => null);
+      if (vivo) setAnalise(r);
+    }, 350);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [checar, campos.ug, campos.natureza, campos.valor]);
+
+  function aoMudar(e: React.FormEvent<HTMLDivElement>) {
+    const el = e.target as HTMLInputElement | HTMLSelectElement;
+    const mapa: Record<string, keyof typeof campos> = { unidadeGestoraId: "ug", "meta.natureza": "natureza", "meta.modalidade": "modalidade", "meta.valorEstimado": "valor" };
+    const k = mapa[el.name];
+    if (k) setCampos((c) => ({ ...c, [k]: el.value }));
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
       <ActionForm action={abrirProcessoAction} resetOnOk={false}>
         <input type="hidden" name="tipoId" value={tipoId} />
-        <div className="space-y-6">
+        <div className="space-y-6" onChange={aoMudar}>
           <Secao numero={1} titulo="Que tipo de processo é?">
             <div className="grid gap-3 sm:grid-cols-2">
               {tipos.map((t) => {
@@ -116,10 +146,18 @@ export function NovoProcessoForm({ tipos, ugs, setor }: { tipos: Tipo[]; ugs: { 
                         required={c.obrigatorio}
                       />
                     )}
-                    {c.chave === "noPCA" && <p className="hint">Se não souber, escolha “Não sei” — o setor de compras confere.</p>}
+                    {DICA[c.chave] && <p className="hint">{DICA[c.chave]}</p>}
                   </div>
                 ))}
               </div>
+              {checar && analise && (
+                <div className="mt-5" aria-live="polite">
+                  <LimiteDispensa a={analise} ug={ugs.find((g) => g.id === campos.ug)?.nome} />
+                  {campos.modalidade === "A_DEFINIR" && analise.situacao !== "ok" && (
+                    <p className="hint mt-2">Se compras optar por dispensa, esta conta vale. Por licitação, não há limite.</p>
+                  )}
+                </div>
+              )}
             </Secao>
           )}
 

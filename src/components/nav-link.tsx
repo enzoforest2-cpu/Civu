@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Globe, Inbox, LayoutGrid, Settings2, FolderOpen } from "lucide-react";
+import { BookOpen, Globe, Inbox, LayoutGrid, Settings2, FolderOpen, ShieldCheck, ListOrdered } from "lucide-react";
 
-const ICONES = { painel: LayoutGrid, caixa: Inbox, processos: FolderOpen, fluxos: BookOpen, config: Settings2, publico: Globe };
+const ICONES = { painel: LayoutGrid, caixa: Inbox, processos: FolderOpen, fluxos: BookOpen, config: Settings2, publico: Globe, obrigacoes: ShieldCheck, fila: ListOrdered };
 
 export function NavLink({ href, children, icone }: { href: string; children: React.ReactNode; icone: keyof typeof ICONES }) {
   const path = usePathname();

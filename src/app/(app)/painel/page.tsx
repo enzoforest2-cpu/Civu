@@ -1,13 +1,15 @@
 /* eslint-disable react-hooks/purity -- painel depende da hora atual; renderizado a cada requisição */
 import Link from "next/link";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { AlertTriangle, ArrowUpRight, Hourglass, Inbox, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Hourglass, Inbox, Undo2, ListOrdered } from "lucide-react";
 import { db } from "@/db";
-import { processos } from "@/db/schema";
+import { processos, unidadesGestoras } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { painel } from "@/lib/metricas";
+import { obrigacoes, usoDoLimite } from "@/lib/conformidade";
+import { filaDePagamentos } from "@/lib/pagamentos";
 import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
-import { relativo } from "@/lib/dates";
+import { fmtData, fmtMoeda, relativo } from "@/lib/dates";
 import { Panel, Vazio, NumeroProcesso, Chip, UrgenciaChip } from "@/components/ui";
 
 function saudacao() {
@@ -19,14 +21,22 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 
 export default async function PainelPage() {
   const u = await requireUser();
-  const [m, abertos] = await Promise.all([
+  const [m, abertos, obrigs, limites, filas, ugs] = await Promise.all([
     painel(u.municipioId),
     db.query.processos.findMany({
       where: and(eq(processos.municipioId, u.municipioId), isNull(processos.encerradoEm)),
       with: { setorAtual: true, tipo: true },
       orderBy: [asc(processos.prazoEtapaEm)],
     }),
+    obrigacoes(u.municipioId),
+    usoDoLimite(u.municipioId),
+    filaDePagamentos(u.municipioId),
+    db.query.unidadesGestoras.findMany({ where: eq(unidadesGestoras.municipioId, u.municipioId) }),
   ]);
+  const obrigAbertas = obrigs.filter((o) => o.situacao !== "cumprida");
+  const obrigVencidas = obrigs.filter((o) => o.situacao === "vencida").length;
+  const nomeUg = (id: string) => ugs.find((g) => g.id === id)?.nome ?? "";
+  const naFila = filas.reduce((s, f) => s + f.fila.length, 0);
   const agora = Date.now();
   const atrasados = abertos.filter((p) => p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora);
   const semReceber = abertos.filter((p) => !p.recebidoEm);
@@ -123,6 +133,98 @@ export default async function PainelPage() {
           </ul>
         )}
       </Panel>
+
+      {/* Conformidade: o que o sistema vigia sozinho */}
+      <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-3">
+        <Panel
+          title="Obrigações legais"
+          action={
+            <Link href="/obrigacoes" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+              Ver todas <ArrowUpRight size={14} />
+            </Link>
+          }
+        >
+          <p className="text-[14px] text-ink-2">
+            <span className={`display tnum text-[26px] font-semibold ${obrigVencidas ? "text-bad" : "text-ink"}`}>{obrigVencidas}</span> com prazo vencido ·{" "}
+            <span className="tnum font-semibold text-ink">{obrigAbertas.length}</span> em aberto
+          </p>
+          {obrigAbertas.length === 0 ? (
+            <p className="mt-3 text-[13.5px] text-ok">PNCP e Tribunal de Contas em dia.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {obrigAbertas.slice(0, 4).map((o) => (
+                <li key={o.processoId + o.chave} className="text-[13.5px] leading-snug">
+                  <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand hover:underline">
+                    {o.numero}
+                  </Link>{" "}
+                  <span className="text-ink">{o.chave === "PNCP" ? "PNCP" : "Tribunal de Contas"}</span>
+                  <span className={o.situacao === "vencida" ? "text-bad" : "text-ink-3"}>
+                    {" "}
+                    · {o.prazo ? (o.situacao === "vencida" ? `venceu ${relativo(o.prazo)}` : `até ${fmtData(o.prazo)}`) : "sem prazo"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Limite de dispensa no ano">
+          {limites.length === 0 ? (
+            <Vazio>Nenhuma dispensa por valor registrada neste ano.</Vazio>
+          ) : (
+            <ul className="space-y-3">
+              {limites.slice(0, 4).map((l) => (
+                <li key={l.ugId + l.natureza}>
+                  <div className="flex items-baseline justify-between gap-2 text-[13.5px]">
+                    <span className="truncate text-ink" title={`${l.naturezaNome} · ${nomeUg(l.ugId)}`}>
+                      {l.naturezaNome}
+                    </span>
+                    <span className={`tnum shrink-0 font-semibold ${l.situacao === "excede" ? "text-bad" : l.situacao === "atencao" ? "text-warn" : "text-ink-2"}`}>
+                      {Math.round(l.pct * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-sunken">
+                    <div
+                      className={`h-2 rounded-full ${l.situacao === "excede" ? "bg-bad" : l.situacao === "atencao" ? "bg-warn" : "bg-brand"}`}
+                      style={{ width: `${Math.min(100, Math.max(3, l.pct * 100))}%` }}
+                    />
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-ink-3">
+                    {fmtMoeda(l.soma)} de {fmtMoeda(l.limite)} · {nomeUg(l.ugId)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel
+          title="Fila de pagamentos"
+          action={
+            <Link href="/fila-de-pagamentos" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+              Página pública <ArrowUpRight size={14} />
+            </Link>
+          }
+        >
+          {naFila === 0 ? (
+            <Vazio icon={<ListOrdered size={22} className="text-ink-3" />}>Nenhum pagamento aguardando.</Vazio>
+          ) : (
+            <ul className="space-y-2.5">
+              {filas.map((f) => (
+                <li key={f.fonte} className="text-[13.5px]">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-ink">{f.fonteNome}</span>
+                    <span className="tnum shrink-0 text-ink-2">{f.fila.length}</span>
+                  </div>
+                  <div className="text-[12px] text-ink-3">
+                    Próximo: <span className="tnum">{f.fila[0].numero}</span> · {fmtMoeda(f.fila[0].valor)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <Panel

@@ -10,9 +10,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
-    "db:reset": "tsx src/db/reset.ts && drizzle-kit migrate && tsx src/db/seed.ts",
-    "db:setup": "drizzle-kit migrate && tsx src/db/seed.ts",
-    "test:engine": "tsx src/db/test-engine.ts"
+    "db:reset": "tsx src/db/reset.ts && drizzle-kit migrate && tsx src/db/seed.ts && tsx src/db/valor-cli.ts",
+    "db:setup": "drizzle-kit migrate && tsx src/db/seed.ts && tsx src/db/valor-cli.ts",
+    "test:engine": "tsx src/db/test-engine.ts",
+    "db:valor": "tsx src/db/valor-cli.ts",
+    "vercel-build": "tsx src/db/valor-cli.ts --opcional && next build"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

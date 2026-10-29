@@ -29,10 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/painel" icone="painel">Painel</NavLink>
           <NavLink href="/caixa" icone="caixa">Minha caixa</NavLink>
           <NavLink href="/processos" icone="processos">Processos</NavLink>
+          <NavLink href="/obrigacoes" icone="obrigacoes">Obrigações</NavLink>
           <NavLink href="/fluxos" icone="fluxos">Fluxos</NavLink>
           <NavLink href="/configuracoes" icone="config">Cadastros</NavLink>
           <div className="my-3 border-t border-line" />
           <NavLink href="/consulta" icone="publico">Consulta pública</NavLink>
+          <NavLink href="/fila-de-pagamentos" icone="fila">Fila de pagamentos</NavLink>
         </nav>
         <div className="border-t border-line p-4">
           <div className="flex items-center gap-3">
@@ -58,6 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ["/painel", "Painel"],
             ["/caixa", "Minha caixa"],
             ["/processos", "Processos"],
+            ["/obrigacoes", "Obrigações"],
             ["/fluxos", "Fluxos"],
             ["/configuracoes", "Cadastros"],
           ].map(([h, r]) => (

@@ -1,20 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileText, Lock, PenLine, Send, ShieldCheck, ShieldAlert, Undo2, Plus } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileText, Lock, PenLine, Send, ShieldCheck, ShieldAlert, Undo2, Plus, ListOrdered } from "lucide-react";
 import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { carregarProcesso, avaliarGates, podeAgir, verificarCadeia } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, PAPEL_NOME, caminhoPrincipal, nomeEtapa, type Papel } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, caminhoPrincipal, nomeEtapa, type Papel } from "@/lib/workflow";
+import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
+import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
+import { LimiteDispensa } from "@/components/limite-dispensa";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { Chip, Panel, Prazo, UrgenciaChip, Avatar } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction } from "@/app/actions";
+import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction, contratacaoAction, remessaTceAction } from "@/app/actions";
 import { Timeline } from "./timeline";
 
-const ROTULO_OPCAO: Record<string, string> = { BAIXA: "Baixa", MEDIA: "Média", ALTA: "Alta", SIM: "Sim", NAO: "Não", NAO_SEI: "Não sabe" };
+const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; texto: string }> = {
+  cumprida: { tone: "ok", texto: "Cumprida" },
+  vencida: { tone: "bad", texto: "Prazo vencido" },
+  vence: { tone: "warn", texto: "Vence em breve" },
+  pendente: { tone: "neutral", texto: "Pendente" },
+};
 
 export default async function ProcessoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ doc?: string }> }) {
   const u = await requireUser();
@@ -44,6 +52,28 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const tipoDocPadrao =
     docSugerido && DOCUMENTO_TIPOS[docSugerido] ? docSugerido : primeiroDocPendente && primeiroDocPendente.tipo === "documento" ? primeiroDocPendente.documentoTipo : "DESPACHO";
   const etapaAtual = nomeEtapa(p.estado.nome);
+
+  // Conformidade: limite de dispensa, dados da contratação, fila cronológica e obrigações
+  const tipoCompra = p.tipo.chave === "COMPRA";
+  const contratacao = meta.contratacao as Contratacao | undefined;
+  const idxContratado = principal.indexOf("CONTRATADO");
+  const chegouContratacao = tipoCompra && idxContratado >= 0 && (principal.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
+  const podeContratacao = !p.encerradoEm && chegouContratacao && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
+  const [analise, posFila, obrigs] = await Promise.all([
+    tipoCompra && meta.natureza && meta.modalidade === "DISPENSA_VALOR"
+      ? analisarFracionamento({
+          municipioId: u.municipioId,
+          unidadeGestoraId: p.unidadeGestoraId,
+          natureza: String(meta.natureza),
+          valorNovo: Number(contratacao?.valor ?? meta.valorEstimado) || 0,
+          ano: p.ano,
+          excluirProcessoId: p.id,
+        })
+      : null,
+    p.estado.filaCronologica && !p.encerradoEm ? aFrenteNaFila(u.municipioId, p.id) : null,
+    chegouContratacao ? obrigacoes(u.municipioId).then((l) => l.filter((o) => o.processoId === p.id)) : [],
+  ]);
 
   return (
     <>
@@ -119,6 +149,11 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                               <Plus size={14} /> Juntar
                             </Link>
                           )}
+                          {!g.ok && g.gate.tipo === "campo" && (
+                            <a href={`#${g.gate.campo}`} className="btn btn-quiet !px-3 !py-1.5 text-[13px]">
+                              <PenLine size={14} /> Preencher
+                            </a>
+                          )}
                           {!g.ok && g.gate.tipo === "documento" && g.motivo !== "Documento não juntado" && (
                             <a href="#documentos" className="btn btn-quiet !px-3 !py-1.5 text-[13px]">
                               <PenLine size={14} /> Assinar
@@ -128,6 +163,30 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       );
                     })}
                   </ul>
+                )}
+
+                {posFila && (
+                  <div className={`mt-4 flex items-start gap-3 rounded-xl border px-4 py-3.5 ${posFila.aFrente.length ? "border-warn/30 bg-warn-soft" : "border-ok/20 bg-ok-soft/60"}`}>
+                    <ListOrdered size={19} className={`mt-0.5 shrink-0 ${posFila.aFrente.length ? "text-warn" : "text-ok"}`} />
+                    <div className="text-[14px] text-ink">
+                      <strong className="font-semibold">
+                        {posFila.eu.posicao}º de {posFila.fila.fila.length} na fila de {posFila.fila.fonteNome}
+                      </strong>
+                      , liquidado em {fmtData(posFila.eu.liquidadoEm)}.{" "}
+                      {posFila.aFrente.length ? (
+                        <>
+                          Há {posFila.aFrente.length === 1 ? "1 pagamento" : `${posFila.aFrente.length} pagamentos`} à frente ({posFila.aFrente.map((x) => x.numero).join(", ")}). Para pagar este
+                          antes, escreva a justificativa na observação: ela fica pública na{" "}
+                          <Link href="/fila-de-pagamentos" className="font-semibold text-brand hover:underline">
+                            fila de pagamentos
+                          </Link>{" "}
+                          (Lei 14.133, art. 141, §1º).
+                        </>
+                      ) : (
+                        "É o próximo a pagar nesta fonte."
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {pode ? (
@@ -356,6 +415,121 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   );
                 })}
               </dl>
+            </Panel>
+          )}
+
+          {analise && (
+            <Panel title="Limite de dispensa">
+              <LimiteDispensa a={analise} ug={p.unidadeGestora.nome} />
+            </Panel>
+          )}
+
+          {chegouContratacao && (
+            <section id="contratacao" className="scroll-mt-24">
+              <Panel title="Dados da contratação">
+                {contratacao ? (
+                  <dl className="space-y-3">
+                    <div>
+                      <dt className="text-[12.5px] text-ink-3">Fornecedor</dt>
+                      <dd className="text-[14.5px] text-ink">{contratacao.fornecedor}</dd>
+                      <dd className="tnum text-[13px] text-ink-2">CNPJ {fmtCnpj(contratacao.cnpj)}</dd>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <dt className="text-[12.5px] text-ink-3">Valor contratado</dt>
+                        <dd className="display tnum text-[18px] font-semibold text-ink">{fmtMoeda(contratacao.valor ?? null)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[12.5px] text-ink-3">Fonte de recurso</dt>
+                        <dd className="text-[14px] text-ink">{nomeFonte(contratacao.fonte ?? "")}</dd>
+                      </div>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="text-[14px] text-ink-2">Ainda não informados. Eles definem a fila de pagamento e a remessa ao Tribunal de Contas.</p>
+                )}
+                {podeContratacao && (
+                  <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={!contratacao}>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">{contratacao ? "Corrigir dados" : "Informar dados"}</summary>
+                    <ActionForm action={contratacaoAction} className="space-y-3 px-4 pb-4" resetOnOk={false}>
+                      <input type="hidden" name="processoId" value={p.id} />
+                      <div>
+                        <label className="label" htmlFor="fornecedor">
+                          Razão social do fornecedor
+                        </label>
+                        <input id="fornecedor" name="fornecedor" className="input" defaultValue={contratacao?.fornecedor ?? ""} required />
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="cnpj">
+                          CNPJ
+                        </label>
+                        <input id="cnpj" name="cnpj" className="input tnum" inputMode="numeric" placeholder="00.000.000/0000-00" defaultValue={contratacao?.cnpj ? fmtCnpj(contratacao.cnpj) : ""} required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label" htmlFor="valor">
+                            Valor (R$)
+                          </label>
+                          <input id="valor" name="valor" className="input tnum" inputMode="decimal" defaultValue={contratacao?.valor ? String(contratacao.valor).replace(".", ",") : ""} required />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="fonte">
+                            Fonte
+                          </label>
+                          <select id="fonte" name="fonte" className="input" defaultValue={contratacao?.fonte ?? ""} required>
+                            <option value="" disabled>
+                              Escolha
+                            </option>
+                            {Object.entries(FONTES).map(([k, v]) => (
+                              <option key={k} value={k}>
+                                {v}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <SubmitButton className="btn btn-primary" pendingText="Salvando…">
+                        Salvar
+                      </SubmitButton>
+                    </ActionForm>
+                  </details>
+                )}
+              </Panel>
+            </section>
+          )}
+
+          {obrigs.length > 0 && (
+            <Panel title="Obrigações legais">
+              <ul className="space-y-3">
+                {obrigs.map((o) => (
+                  <li key={o.chave} className="rounded-xl border border-line px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-[14px] font-medium text-ink">{o.titulo}</div>
+                      <Chip tone={SITUACAO_OBRIG[o.situacao].tone}>{SITUACAO_OBRIG[o.situacao].texto}</Chip>
+                    </div>
+                    <div className="mt-1 text-[12.5px] leading-snug text-ink-3">{o.base}</div>
+                    <div className="mt-1.5 text-[13px] text-ink-2">
+                      {o.situacao === "cumprida" ? `${o.detalhe ?? "Cumprida"} em ${fmtData(o.cumpridaEm)}` : o.prazo ? `Prazo: ${fmtData(o.prazo)}` : "Sem prazo configurado"}
+                    </div>
+                    {o.chave === "TCE" && o.situacao !== "cumprida" && podeRemessa && (
+                      <ActionForm action={remessaTceAction} className="mt-3">
+                        <input type="hidden" name="processoId" value={p.id} />
+                        <div className="flex gap-2">
+                          <input name="recibo" className="input !py-2" placeholder="Nº do recibo do envio" required aria-label="Número do recibo do envio ao Tribunal de Contas" />
+                          <SubmitButton className="btn btn-quiet shrink-0 !px-3 !py-2 text-[13px]" pendingText="Salvando…">
+                            Registrar
+                          </SubmitButton>
+                        </div>
+                      </ActionForm>
+                    )}
+                    {o.chave === "PNCP" && o.situacao !== "cumprida" && (
+                      <Link href="?doc=PUBLICACAO_PNCP#juntar" scroll={false} className="mt-2 inline-flex text-[13px] font-semibold text-brand hover:underline">
+                        Juntar comprovante do PNCP
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </Panel>
           )}
 

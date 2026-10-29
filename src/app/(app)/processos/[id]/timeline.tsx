@@ -1,6 +1,6 @@
-import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, Send, Undo2, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, Send, Undo2, CheckCircle2, Landmark, Building2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { fmtDataHora } from "@/lib/dates";
+import { fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { DOCUMENTO_TIPOS, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
 
 type Ev = {
@@ -26,6 +26,8 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   ANEXO: { icon: Paperclip, cor: "bg-sunken text-ink-2" },
   ASSINATURA: { icon: PenLine, cor: "bg-ok-soft text-ok" },
   DESPACHO: { icon: MessageSquare, cor: "bg-sunken text-ink-2" },
+  DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand" },
+  REMESSA_TCE: { icon: Landmark, cor: "bg-ok-soft text-ok" },
 };
 
 export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) {
@@ -39,12 +41,30 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
         let titulo = "";
         let detalhe: string | undefined;
         switch (e.tipo) {
-          case "ABERTURA":
+          case "ABERTURA": {
             titulo = "Processo aberto";
+            const al = (e.dados as { alertaFracionamento?: { situacao: string; total: number; limite: number } } | null)?.alertaFracionamento;
+            if (al)
+              detalhe =
+                al.situacao === "excede"
+                  ? `Alerta de fracionamento: dispensas da mesma natureza somariam ${fmtMoeda(al.total)}, acima do limite de ${fmtMoeda(al.limite)}.`
+                  : `Atenção: dispensas da mesma natureza somariam ${fmtMoeda(al.total)}, perto do limite de ${fmtMoeda(al.limite)}.`;
             break;
-          case "MUDANCA_ESTADO":
+          }
+          case "MUDANCA_ESTADO": {
             titulo = `Avançou para “${nome(e.paraEstado)}”`;
             detalhe = d.despacho ?? undefined;
+            const q = (e.dados as { quebraOrdem?: { aFrente: string[] } } | null)?.quebraOrdem;
+            if (q) titulo += ` fora da ordem cronológica (${q.aFrente.length} à frente)`;
+            break;
+          }
+          case "DADOS_CONTRATACAO":
+            titulo = "Registrou os dados da contratação";
+            detalhe = `${d.fornecedor ?? ""} · ${fmtMoeda(d.valor)}`;
+            break;
+          case "REMESSA_TCE":
+            titulo = `Enviado ao ${d.sistema ?? "Tribunal de Contas"}`;
+            detalhe = d.recibo ? `Recibo ${d.recibo}` : undefined;
             break;
           case "ENCERRAMENTO":
             titulo = "Processo concluído e arquivado";

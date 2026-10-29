@@ -6,7 +6,9 @@ import { assinaturas, documentos, eventos, feriados, processos, setores, tiposPr
 import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
-import { getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { FONTES, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { analisarFracionamento, sistemaTce } from "./conformidade";
+import { aFrenteNaFila, cnpjValido } from "./pagamentos";
 
 export class ErroFluxo extends Error {}
 
@@ -106,6 +108,20 @@ export async function abrirProcesso(
     if (c.obrigatorio && !input.metadados?.[c.chave]) throw new ErroFluxo(`Preencha o campo "${c.rotulo}".`);
   }
 
+  // Limite de dispensa: registra no processo a situação no momento da abertura (art. 75, §1º)
+  const meta: Record<string, unknown> = { ...(input.metadados ?? {}) };
+  let alertaFracionamento: Record<string, unknown> | null = null;
+  if (meta.natureza && meta.modalidade === "DISPENSA_VALOR") {
+    const a = await analisarFracionamento({
+      municipioId: u.municipioId,
+      unidadeGestoraId: input.unidadeGestoraId,
+      natureza: String(meta.natureza),
+      valorNovo: Number(meta.valorEstimado),
+    });
+    meta.fracionamento = { comprometido: a.comprometido, limite: a.limite, total: a.total, situacao: a.situacao, verificadoEm: new Date().toISOString() };
+    if (a.situacao !== "ok") alertaFracionamento = { situacao: a.situacao, total: a.total, limite: a.limite, natureza: a.natureza };
+  }
+
   return db.transaction(async (tx) => {
     const ano = new Date().getFullYear();
     // numeração sequencial por município e ano, com lock da linha do município
@@ -134,10 +150,14 @@ export async function abrirProcesso(
         recebidoEm: new Date(),
         prazoEtapaEm: inicial.slaDiasUteis > 0 ? addDiasUteis(new Date(), inicial.slaDiasUteis, fer) : null,
         abertoPorId: u.id,
-        metadados: input.metadados ?? null,
+        metadados: Object.keys(meta).length ? meta : null,
       })
       .returning();
-    await registrarEvento(tx, p.id, u.id, "ABERTURA", { paraEstado: inicial.chave, paraSetorId: setorAtualId, dados: { numero, tipo: tipo.chave } });
+    await registrarEvento(tx, p.id, u.id, "ABERTURA", {
+      paraEstado: inicial.chave,
+      paraSetorId: setorAtualId,
+      dados: alertaFracionamento ? { numero, tipo: tipo.chave, alertaFracionamento } : { numero, tipo: tipo.chave },
+    });
     return p;
   });
 }
@@ -210,6 +230,22 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
   const destino = getEstado(p.def, paraEstado)!;
   const fer = await feriadosDo(u.municipioId);
 
+  // Ordem cronológica (art. 141): pagar antes de quem foi liquidado primeiro exige justificativa, que fica pública
+  let quebraOrdem: { aFrente: string[]; justificativa: string } | null = null;
+  if (p.estado.filaCronologica && p.estado.avancos[0]?.para === paraEstado) {
+    const pos = await aFrenteNaFila(u.municipioId, p.id);
+    if (pos && pos.aFrente.length > 0) {
+      const just = despacho?.trim() ?? "";
+      const nums = pos.aFrente.map((x) => x.numero);
+      if (just.length < 20)
+        throw new ErroFluxo(
+          `Há ${nums.length === 1 ? "1 pagamento liquidado" : `${nums.length} pagamentos liquidados`} antes deste na fonte ${pos.fila.fonteNome} (${nums.join(", ")}). ` +
+            "Pagar fora da ordem exige justificativa de pelo menos 20 caracteres no campo de observação (Lei 14.133, art. 141, §1º). A justificativa fica pública na fila de pagamentos.",
+        );
+      quebraOrdem = { aFrente: nums, justificativa: just };
+    }
+  }
+
   return db.transaction(async (tx) => {
     const setorDestinoId = await setorDoEstado(tx, u.municipioId, destino, p.abertoPor.setorId, p.setorAtualId);
     const mudaSetor = setorDestinoId !== p.setorAtualId;
@@ -228,7 +264,7 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
       paraEstado: destino.chave,
       deSetorId: p.setorAtualId,
       paraSetorId: setorDestinoId,
-      dados: { rotulo: trans.rotulo, despacho: despacho?.trim() || null },
+      dados: quebraOrdem ? { rotulo: trans.rotulo, despacho: despacho?.trim() || null, quebraOrdem } : { rotulo: trans.rotulo, despacho: despacho?.trim() || null },
     });
   });
 }
@@ -330,6 +366,41 @@ export async function despachar(u: SessaoUsuario, processoId: string, texto: str
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   return db.transaction(async (tx) => {
     await registrarEvento(tx, p.id, u.id, "DESPACHO", { dados: { texto: texto.trim() } });
+  });
+}
+
+/** Dados da contratação: alimentam a fila cronológica de pagamentos e a remessa ao Tribunal de Contas. */
+export async function registrarContratacao(u: SessaoUsuario, processoId: string, input: { fornecedor: string; cnpj: string; valor: string; fonte: string }) {
+  if (!temPapel(u, "COMPRAS", "CONTABILIDADE", "ADMIN")) throw new ErroFluxo("Só compras ou contabilidade registram os dados da contratação.");
+  const p = await carregarProcesso(u.municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
+  const fornecedor = input.fornecedor.trim();
+  const cnpj = input.cnpj.replace(/\D/g, "");
+  const valor = Number(String(input.valor).replace(/\./g, "").replace(",", "."));
+  if (fornecedor.length < 3) throw new ErroFluxo("Informe a razão social do fornecedor.");
+  if (!cnpjValido(cnpj)) throw new ErroFluxo("CNPJ inválido. Confira os 14 dígitos.");
+  if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo("Informe o valor contratado.");
+  if (!FONTES[input.fonte]) throw new ErroFluxo("Escolha a fonte de recurso.");
+  const contratacao = { fornecedor, cnpj, valor: valor.toFixed(2), fonte: input.fonte };
+  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>), contratacao };
+  return db.transaction(async (tx) => {
+    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    await registrarEvento(tx, p.id, u.id, "DADOS_CONTRATACAO", { dados: contratacao });
+  });
+}
+
+/** Registra o envio da contratação ao sistema do Tribunal de Contas, com o número do recibo. */
+export async function registrarRemessaTce(u: SessaoUsuario, processoId: string, recibo: string) {
+  if (!temPapel(u, "COMPRAS", "CONTROLE_INTERNO", "ADMIN")) throw new ErroFluxo("Só compras ou controle interno registram a remessa ao TCE.");
+  const p = await carregarProcesso(u.municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  if (!recibo.trim()) throw new ErroFluxo("Informe o número do recibo ou protocolo do envio.");
+  if (p.eventos.some((e) => e.tipo === "REMESSA_TCE")) throw new ErroFluxo("A remessa deste processo já foi registrada.");
+  const mun = await db.query.municipios.findFirst({ where: (m, { eq }) => eq(m.id, u.municipioId) });
+  const sistema = sistemaTce(mun?.uf ?? "", mun?.tce).nome;
+  return db.transaction(async (tx) => {
+    await registrarEvento(tx, p.id, u.id, "REMESSA_TCE", { dados: { sistema, recibo: recibo.trim() } });
   });
 }
 

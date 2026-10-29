@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { login, logout, requireUser, confirmarSenha } from "@/lib/auth";
-import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarDocumento, assinarDocumento, despachar } from "@/lib/engine";
+import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarDocumento, assinarDocumento, despachar, registrarContratacao, registrarRemessaTce } from "@/lib/engine";
+import { analisarFracionamento, type AnaliseFracionamento } from "@/lib/conformidade";
 import type { Papel } from "@/lib/workflow";
 
 export type ActionState = { erro?: string; ok?: string } | null;
@@ -128,4 +129,35 @@ export async function despacharAction(_: ActionState, fd: FormData): Promise<Act
   }
   revalidatePath(`/processos/${str(fd, "processoId")}`);
   return { ok: "Despacho registrado." };
+}
+
+
+export async function contratacaoAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requireUser();
+    await registrarContratacao(u, str(fd, "processoId"), { fornecedor: str(fd, "fornecedor"), cnpj: str(fd, "cnpj"), valor: str(fd, "valor"), fonte: str(fd, "fonte") });
+  } catch (e) {
+    return trata(e);
+  }
+  revalidatePath(`/processos/${str(fd, "processoId")}`);
+  return { ok: "Dados da contratação registrados." };
+}
+
+export async function remessaTceAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requireUser();
+    await registrarRemessaTce(u, str(fd, "processoId"), str(fd, "recibo"));
+  } catch (e) {
+    return trata(e);
+  }
+  revalidatePath("/obrigacoes");
+  revalidatePath(`/processos/${str(fd, "processoId")}`);
+  return { ok: "Remessa registrada." };
+}
+
+/** Consulta ao vivo do limite de dispensa, usada pelo formulário de abertura. */
+export async function checarFracionamentoAction(input: { unidadeGestoraId: string; natureza: string; valor: number }): Promise<AnaliseFracionamento | null> {
+  const u = await requireUser();
+  if (!input.natureza || !input.unidadeGestoraId) return null;
+  return analisarFracionamento({ municipioId: u.municipioId, unidadeGestoraId: input.unidadeGestoraId, natureza: input.natureza, valorNovo: Number(input.valor) || 0 });
 }
