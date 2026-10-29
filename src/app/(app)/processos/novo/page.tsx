@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tiposProcesso, unidadesGestoras } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { PageHeader } from "@/components/ui";
+import { Cabecalho } from "@/components/ui";
 import { NovoProcessoForm } from "./form";
 import type { WorkflowDef } from "@/lib/workflow";
 
@@ -24,7 +24,7 @@ export default async function NovoProcessoPage() {
     }));
   return (
     <>
-      <PageHeader title="Abrir processo" subtitle="O protocolo gera o número único e o processo começa na primeira etapa do fluxo escolhido." />
+      <Cabecalho titulo="Abrir processo" sub="Preencha o pedido. O protocolo dá o número e o processo começa a andar." />
       <NovoProcessoForm tipos={tiposUi} ugs={ugs.map((x) => ({ id: x.id, nome: x.nome }))} setor={u.setor?.nome ?? "sem setor"} />
     </>
   );

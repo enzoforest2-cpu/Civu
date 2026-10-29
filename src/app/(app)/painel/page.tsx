@@ -1,169 +1,219 @@
+/* eslint-disable react-hooks/purity -- painel depende da hora atual; renderizado a cada requisição */
 import Link from "next/link";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { AlertTriangle, ArrowUpRight, Hourglass, Inbox, Undo2 } from "lucide-react";
+import { db } from "@/db";
+import { processos } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { painel } from "@/lib/metricas";
-import { Card, Stat, PageHeader, Badge, Prazo, NumeroProcesso, Empty, UrgenciaBadge } from "@/components/ui";
+import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { relativo } from "@/lib/dates";
+import { Panel, Vazio, NumeroProcesso, Chip, UrgenciaChip } from "@/components/ui";
+
+function saudacao() {
+  const h = Number(new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", hour12: false }));
+  return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+}
+
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 export default async function PainelPage() {
   const u = await requireUser();
-  const m = await painel(u.municipioId);
-  const maxSetor = Math.max(1, ...m.porSetor.map((s) => s.n));
-  const maxEstado = Math.max(1, ...m.porEstado.map((s) => s.n));
+  const [m, abertos] = await Promise.all([
+    painel(u.municipioId),
+    db.query.processos.findMany({
+      where: and(eq(processos.municipioId, u.municipioId), isNull(processos.encerradoEm)),
+      with: { setorAtual: true, tipo: true },
+      orderBy: [asc(processos.prazoEtapaEm)],
+    }),
+  ]);
+  const agora = Date.now();
+  const atrasados = abertos.filter((p) => p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora);
+  const semReceber = abertos.filter((p) => !p.recebidoEm);
+  const atencao = abertos.filter((p) => (p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora) || !p.recebidoEm);
+
+  // fila por setor
+  const setoresMap = new Map<string, { nome: string; itens: typeof abertos }>();
+  for (const p of abertos) {
+    const k = p.setorAtualId ?? "—";
+    const cur = setoresMap.get(k) ?? { nome: p.setorAtual?.nome ?? "Sem setor", itens: [] };
+    cur.itens.push(p);
+    setoresMap.set(k, cur);
+  }
+  const fila = [...setoresMap.values()].sort((a, b) => b.itens.length - a.itens.length);
+  const maxTempo = Math.max(1, ...m.tempoPorEstado.map((t) => t.mediaDias));
+  const primeiroNome = u.nome.replace(/^(Dr|Dra)\.?\s+/i, "").split(" ")[0];
 
   return (
     <>
-      <PageHeader title="Painel" subtitle={`O que está parado, onde e há quanto tempo — ${u.municipio.nome}`} />
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat label="Em andamento" value={m.totais.abertos} hint={`${m.totais.abertos30d} abertos nos últimos 30 dias`} />
-        <Stat label="Com prazo estourado" value={m.totais.atrasados} tone={m.totais.atrasados ? "bad" : "ok"} hint="SLA da etapa vencido" />
-        <Stat
-          label="Enviados sem recebimento"
-          value={m.totais.naoRecebidos}
-          tone={m.totais.naoRecebidos ? "warn" : "ok"}
-          hint="setor de destino ainda não confirmou"
-        />
-        <Stat label="Encerrados (30 dias)" value={m.totais.encerrados30d} />
-        <Stat
-          label="Tempo médio até encerrar"
-          value={m.totais.tempoMedioEncerradosDias == null ? "—" : `${m.totais.tempoMedioEncerradosDias.toFixed(0)} d`}
-          hint="abertura → arquivamento"
-        />
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card title="Processos por setor" className="xl:col-span-1">
-          {m.porSetor.length === 0 ? (
-            <Empty>Nenhum processo em andamento.</Empty>
+      {/* Resumo em uma frase — a primeira coisa que o gestor lê */}
+      <section className="mb-10">
+        <p className="text-[15px] text-ink-2">
+          {saudacao()}, {primeiroNome}.
+        </p>
+        <h1 className="display mt-1 max-w-4xl text-[30px] leading-[1.1] sm:text-[40px] font-semibold text-ink">
+          {abertos.length === 0 ? (
+            "Nenhum processo em andamento."
           ) : (
-            <ul className="space-y-3">
-              {m.porSetor.map((s) => (
-                <li key={s.setorId ?? "none"}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="truncate font-medium">{s.nome}</span>
-                    <span className="ml-3 tabular-nums text-ink-2">{s.n}</span>
-                  </div>
-                  <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100">
-                    <div className="h-1.5 rounded-full bg-brand" style={{ width: `${(s.n / maxSetor) * 100}%` }} />
-                  </div>
-                  <div className="mt-1 flex gap-2 text-[11px] text-ink-3">
-                    {s.atrasados > 0 && <span className="text-bad">{s.atrasados} atrasado(s)</span>}
-                    {s.naoRecebidos > 0 && <span className="text-warn">{s.naoRecebidos} sem recebimento</span>}
-                    {s.urgentes > 0 && <span>{s.urgentes} urgente(s)</span>}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              {plural(abertos.length, "processo em andamento", "processos em andamento")}
+              {atrasados.length > 0 ? (
+                <span className="text-bad">, {plural(atrasados.length, "com prazo estourado", "com prazo estourado")}</span>
+              ) : (
+                ", todos dentro do prazo"
+              )}
+              {semReceber.length > 0 && <> e {plural(semReceber.length, "esperando alguém receber", "esperando alguém receber")}</>}.
+            </>
           )}
-        </Card>
+        </h1>
+        <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-[14px] text-ink-2">
+          <div>
+            <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.abertos30d}</span> abertos nos últimos 30 dias
+          </div>
+          <div>
+            <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.encerrados30d}</span> concluídos nos últimos 30 dias
+          </div>
+          <div>
+            <span className="display tnum text-[22px] font-semibold text-ink">
+              {m.totais.tempoMedioEncerradosDias == null ? "—" : Math.round(m.totais.tempoMedioEncerradosDias)}
+            </span>{" "}
+            dias, em média, da abertura ao arquivamento
+          </div>
+        </div>
+      </section>
 
-        <Card title="Processos por etapa" className="xl:col-span-1">
-          {m.porEstado.length === 0 ? (
-            <Empty>Nenhum processo em andamento.</Empty>
-          ) : (
-            <ul className="space-y-2.5">
-              {m.porEstado.map((e) => (
-                <li key={e.nome} className="flex items-center gap-3 text-sm">
-                  <span className="w-44 shrink-0 truncate" title={e.nome}>
-                    {e.nome}
-                  </span>
-                  <div className="h-1.5 flex-1 rounded-full bg-slate-100">
-                    <div className="h-1.5 rounded-full bg-info" style={{ width: `${(e.n / maxEstado) * 100}%` }} />
-                  </div>
-                  <span className="w-6 text-right tabular-nums text-ink-2">{e.n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+      {/* Onde os processos estão agora */}
+      <Panel
+        title="Onde os processos estão agora"
+        action={
+          <div className="hidden items-center gap-4 text-[12.5px] text-ink-3 sm:flex">
+            <Legenda cor="bg-brand" texto="No prazo" />
+            <Legenda cor="bg-warn" texto="Não recebido" />
+            <Legenda cor="bg-bad" texto="Atrasado" />
+          </div>
+        }
+        className="mb-6"
+      >
+        {fila.length === 0 ? (
+          <Vazio>Nenhum processo em andamento.</Vazio>
+        ) : (
+          <ul className="divide-y divide-line">
+            {fila.map((s) => (
+              <li key={s.nome} className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2 py-3.5 md:grid-cols-[240px_1fr_auto]">
+                <span className="truncate font-medium text-ink">{s.nome}</span>
+                <div className="order-3 col-span-2 flex flex-wrap gap-1.5 md:order-none md:col-span-1">
+                  {s.itens.map((p) => {
+                    const atrasado = p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora;
+                    const cor = atrasado ? "bg-bad hover:bg-bad/80" : !p.recebidoEm ? "bg-warn hover:bg-warn/80" : "bg-brand hover:bg-brand-2";
+                    return (
+                      <Link
+                        key={p.id}
+                        href={`/processos/${p.id}`}
+                        title={`${p.numero} — ${p.assunto}`}
+                        className={`tnum h-7 rounded-md px-2 text-[11.5px] leading-7 font-semibold text-white transition-colors ${cor}`}
+                      >
+                        {p.numero.slice(-4)}
+                      </Link>
+                    );
+                  })}
+                </div>
+                <span className="display tnum w-8 text-right text-[18px] font-semibold text-ink">{s.itens.length}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
-        <Card title="Tempo médio em cada etapa" className="xl:col-span-1">
-          {m.tempoPorEstado.length === 0 ? (
-            <Empty>Ainda não há histórico suficiente.</Empty>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Etapa</th>
-                  <th className="text-right">Média (dias)</th>
-                  <th className="text-right">n</th>
-                </tr>
-              </thead>
-              <tbody>
-                {m.tempoPorEstado.slice(0, 10).map((t) => (
-                  <tr key={t.nome}>
-                    <td className="truncate">{t.nome}</td>
-                    <td className="text-right tabular-nums">{t.mediaDias.toFixed(1)}</td>
-                    <td className="text-right tabular-nums text-ink-3">{t.n}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card
-          title="Prazos estourados"
-          className="xl:col-span-2"
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <Panel
+          title="Precisa de atenção"
           action={
-            <Link href="/processos?atrasados=1" className="text-xs font-semibold text-brand hover:underline">
-              ver todos
+            <Link href="/processos?situacao=atrasados" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+              Ver todos <ArrowUpRight size={14} />
             </Link>
           }
         >
-          {m.parados.length === 0 ? (
-            <Empty>Nenhum processo com prazo vencido.</Empty>
+          {atencao.length === 0 ? (
+            <Vazio>Tudo em dia. Nenhum processo atrasado ou parado sem recebimento.</Vazio>
           ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Número</th>
-                  <th>Assunto</th>
-                  <th>Etapa</th>
-                  <th>Setor</th>
-                  <th>Prazo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {m.parados.map((p) => (
-                  <tr key={p.id} className="row-link">
-                    <td>
-                      <NumeroProcesso id={p.id} numero={p.numero} />
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">{p.assunto}</span>
-                        <UrgenciaBadge u={p.urgencia} />
+            <ul className="divide-y divide-line">
+              {atencao.slice(0, 8).map((p) => {
+                const atrasado = p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora;
+                const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
+                return (
+                  <li key={p.id} className="flex items-start gap-4 py-3.5">
+                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${atrasado ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
+                      {atrasado ? <AlertTriangle size={17} /> : <Inbox size={17} />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <NumeroProcesso id={p.id} numero={p.numero} />
+                        <UrgenciaChip u={p.urgencia} />
                       </div>
-                    </td>
-                    <td className="text-ink-2">{p.estado}</td>
-                    <td className="text-ink-2">{p.setor}</td>
-                    <td>
-                      <Prazo prazo={p.prazoEtapaEm} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
-
-        <Card title="Devoluções (30 dias)">
-          {m.devolucoes.length === 0 ? (
-            <Empty>Nenhuma devolução no período.</Empty>
-          ) : (
-            <ul className="space-y-2">
-              {m.devolucoes.map((d) => (
-                <li key={d.rotulo} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{d.rotulo}</span>
-                  <Badge tone="warn">{d.n}</Badge>
-                </li>
-              ))}
+                      <div className="truncate text-[14.5px] text-ink">{p.assunto}</div>
+                      <div className="text-[13px] text-ink-3">
+                        {etapa ? nomeEtapa(etapa.nome) : p.estadoAtual} · {p.setorAtual?.nome ?? "—"}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[13px]">
+                      {atrasado ? (
+                        <Chip tone="bad">Atrasado {relativo(p.prazoEtapaEm)}</Chip>
+                      ) : (
+                        <Chip tone="warn">Não recebido</Chip>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
-        </Card>
+        </Panel>
+
+        <div className="space-y-6">
+          <Panel title="Quanto tempo cada etapa leva">
+            {m.tempoPorEstado.length === 0 ? (
+              <Vazio icon={<Hourglass size={22} className="text-ink-3" />}>Ainda não há histórico suficiente.</Vazio>
+            ) : (
+              <ul className="space-y-2.5">
+                {m.tempoPorEstado.slice(0, 8).map((t) => (
+                  <li key={t.nome} className="grid grid-cols-[150px_1fr_52px] items-center gap-3 text-[13.5px]">
+                    <span className="truncate text-ink-2" title={nomeEtapa(t.nome)}>
+                      {nomeEtapa(t.nome)}
+                    </span>
+                    <span className="h-2 rounded-full bg-sunken">
+                      <span className="block h-2 rounded-full bg-brand" style={{ width: `${Math.max(4, (t.mediaDias / maxTempo) * 100)}%` }} />
+                    </span>
+                    <span className="tnum text-right font-semibold text-ink">{t.mediaDias.toFixed(1)} d</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <Panel title="Devoluções nos últimos 30 dias">
+            {m.devolucoes.length === 0 ? (
+              <Vazio icon={<Undo2 size={22} className="text-ink-3" />}>Nenhum processo foi devolvido.</Vazio>
+            ) : (
+              <ul className="space-y-2">
+                {m.devolucoes.map((d) => (
+                  <li key={d.rotulo} className="flex items-center justify-between gap-3 text-[14px]">
+                    <span className="text-ink-2">{d.rotulo}</span>
+                    <span className="display tnum font-semibold">{d.n}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </div>
       </div>
     </>
+  );
+}
+
+function Legenda({ cor, texto }: { cor: string; texto: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`h-2.5 w-2.5 rounded-sm ${cor}`} />
+      {texto}
+    </span>
   );
 }

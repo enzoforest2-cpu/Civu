@@ -380,3 +380,19 @@ export const WORKFLOWS_PADRAO = [
   },
   { chave: "REQUERIMENTO", nome: "Requerimento / ofício", descricao: "Processo de tramitação livre entre setores.", definicao: WORKFLOW_REQUERIMENTO },
 ];
+
+/** Nome da etapa para exibição, sem o número de ordem interno ("4. Em instrução" → "Em instrução"). */
+export function nomeEtapa(nome: string): string {
+  return nome.replace(/^\d+[a-z]?\.\s*/i, "");
+}
+
+/** Caminho principal do fluxo: segue sempre o primeiro avanço a partir do estado inicial. Estados fora dele são desvios opcionais. */
+export function caminhoPrincipal(def: WorkflowDef): string[] {
+  const out: string[] = [];
+  let atual: string | undefined = def.estadoInicial;
+  while (atual && !out.includes(atual)) {
+    out.push(atual);
+    atual = getEstado(def, atual)?.avancos[0]?.para;
+  }
+  return out;
+}

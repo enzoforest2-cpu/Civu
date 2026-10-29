@@ -1,85 +1,125 @@
 /* eslint-disable react-hooks/purity -- prazos dependem da hora atual; renderizado no servidor a cada requisição */
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, Clock, Flame, Inbox } from "lucide-react";
 import { fmtData, relativo } from "@/lib/dates";
 
-export function Card({ children, className = "", title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
+export function Panel({
+  children,
+  className = "",
+  title,
+  action,
+  pad = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: ReactNode;
+  action?: ReactNode;
+  pad?: boolean;
+}) {
   return (
-    <section className={`card ${className}`}>
+    <section className={`panel ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <header className="flex items-center justify-between gap-3 px-6 pt-5 pb-1">
+          <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
           {action}
         </header>
       )}
-      <div className="p-5">{children}</div>
+      <div className={pad ? "px-6 pt-3 pb-6" : ""}>{children}</div>
     </section>
   );
 }
 
-export function Stat({ label, value, hint, tone = "neutral" }: { label: string; value: ReactNode; hint?: string; tone?: "neutral" | "bad" | "warn" | "ok" }) {
-  const color = tone === "bad" ? "text-bad" : tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : "text-ink";
-  return (
-    <div className="card px-5 py-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-ink-3">{label}</div>
-      <div className={`mt-1 text-3xl font-semibold tabular-nums ${color}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-ink-2">{hint}</div>}
-    </div>
-  );
-}
-
-const TONES: Record<string, string> = {
-  neutral: "bg-slate-100 text-slate-700",
+const TONES = {
+  neutral: "bg-sunken text-ink-2",
   brand: "bg-brand-soft text-brand-ink",
   ok: "bg-ok-soft text-ok",
   warn: "bg-warn-soft text-warn",
   bad: "bg-bad-soft text-bad",
-  info: "bg-info-soft text-info",
-};
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: keyof typeof TONES }) {
-  return <span className={`badge ${TONES[tone]}`}>{children}</span>;
+} as const;
+export type Tone = keyof typeof TONES;
+
+export function Chip({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+  return <span className={`chip ${TONES[tone]}`}>{children}</span>;
 }
 
-export function UrgenciaBadge({ u }: { u: string }) {
-  if (u === "URGENTE") return <Badge tone="bad">Urgente</Badge>;
-  if (u === "PRIORITARIO") return <Badge tone="warn">Prioritário</Badge>;
+export function UrgenciaChip({ u }: { u: string }) {
+  if (u === "URGENTE")
+    return (
+      <Chip tone="bad">
+        <Flame size={12} strokeWidth={2.5} /> Urgente
+      </Chip>
+    );
+  if (u === "PRIORITARIO") return <Chip tone="warn">Prioritário</Chip>;
   return null;
 }
 
+/** Situação do prazo da etapa, em linguagem simples. */
+export function situacaoPrazo(prazo: Date | null, encerrado?: Date | null): { tone: Tone; texto: string } {
+  if (encerrado) return { tone: "ok", texto: "Concluído" };
+  if (!prazo) return { tone: "neutral", texto: "Sem prazo" };
+  const ms = prazo.getTime() - Date.now();
+  if (ms < 0) return { tone: "bad", texto: `Atrasado ${relativo(prazo).replace("há ", "há ")}` };
+  if (ms < 2 * 86400_000) return { tone: "warn", texto: `Vence ${relativo(prazo)}` };
+  return { tone: "ok", texto: `Prazo ${fmtData(prazo)}` };
+}
+
 export function Prazo({ prazo, encerrado }: { prazo: Date | null; encerrado?: Date | null }) {
-  if (encerrado) return <Badge tone="ok">Encerrado</Badge>;
-  if (!prazo) return <span className="text-ink-3">—</span>;
-  const atrasado = prazo.getTime() < Date.now();
-  const dias = Math.ceil((prazo.getTime() - Date.now()) / 86400_000);
-  if (atrasado) return <Badge tone="bad">Atrasado {relativo(prazo)}</Badge>;
-  if (dias <= 1) return <Badge tone="warn">Vence {relativo(prazo)}</Badge>;
+  const s = situacaoPrazo(prazo, encerrado);
+  const Icon = s.tone === "bad" ? AlertTriangle : s.tone === "ok" && encerrado ? CheckCircle2 : Clock;
   return (
-    <span className="text-ink-2">
-      {fmtData(prazo)} <span className="text-ink-3">({relativo(prazo)})</span>
-    </span>
+    <Chip tone={s.tone}>
+      <Icon size={12} strokeWidth={2.5} />
+      {s.texto}
+    </Chip>
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-line-2 px-4 py-8 text-center text-sm text-ink-3">{children}</div>;
-}
-
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: ReactNode; action?: ReactNode }) {
+export function Vazio({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-2">{subtitle}</p>}
-      </div>
-      {action}
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 px-6 py-10 text-center text-sm text-ink-3">
+      {icon ?? <Inbox size={22} className="text-ink-3" />}
+      <div>{children}</div>
     </div>
   );
 }
 
-export function NumeroProcesso({ id, numero }: { id: string; numero: string }) {
+export function Cabecalho({ titulo, sub, acao }: { titulo: string; sub?: ReactNode; acao?: ReactNode }) {
   return (
-    <Link href={`/processos/${id}`} className="font-mono text-[13px] font-semibold text-brand hover:underline">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="max-w-3xl">
+        <h1 className="display text-[28px] leading-[1.1] font-semibold text-ink sm:text-[34px]">{titulo}</h1>
+        {sub && <p className="mt-2 text-[15px] text-ink-2">{sub}</p>}
+      </div>
+      {acao}
+    </div>
+  );
+}
+
+export function NumeroProcesso({ id, numero, className = "" }: { id: string; numero: string; className?: string }) {
+  return (
+    <Link href={`/processos/${id}`} className={`tnum font-semibold text-brand hover:text-brand-2 hover:underline ${className}`}>
       {numero}
     </Link>
+  );
+}
+
+/** Iniciais para o avatar de pessoa. */
+export function Avatar({ nome, size = 32 }: { nome: string; size?: number }) {
+  const ini = nome
+    .replace(/^(Dr|Dra)\.?\s+/i, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-brand-soft font-semibold text-brand-ink"
+      style={{ width: size, height: size, fontSize: size * 0.38 }}
+      aria-hidden
+    >
+      {ini}
+    </span>
   );
 }

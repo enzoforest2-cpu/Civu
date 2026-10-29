@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { feriados, setores, unidadesGestoras, usuarios } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Avatar, Cabecalho, Chip, Panel } from "@/components/ui";
 import { PAPEL_NOME, type Papel } from "@/lib/workflow";
 import { fmtData } from "@/lib/dates";
 
@@ -16,88 +16,84 @@ export default async function ConfiguracoesPage() {
   ]);
   return (
     <>
-      <PageHeader
-        title="Configurações"
-        subtitle={`${u.municipio.nome} · ${u.municipio.uf}. Cadastros base do município (edição entra na próxima iteração; hoje via seed).`}
-      />
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card title={`Setores (${s.length})`}>
-          <table className="tbl">
+      <Cabecalho titulo="Cadastros" sub={`Pessoas, setores e calendário de ${u.municipio.nome}. A edição pela tela chega na próxima versão.`} />
+
+      <Panel title={`Pessoas · ${us.length}`} className="mb-6" pad={false}>
+        <div className="overflow-x-auto px-6 pb-2">
+          <table className="lista">
             <thead>
               <tr>
-                <th>Sigla</th>
-                <th>Nome</th>
-                <th>SLA padrão</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.map((x) => (
-                <tr key={x.id}>
-                  <td className="font-mono text-xs">{x.sigla}</td>
-                  <td>{x.nome}</td>
-                  <td className="tabular-nums">{x.slaPadraoDias} d.ú.</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card title={`Unidades gestoras (${ugs.length})`}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Nome</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ugs.map((x) => (
-                <tr key={x.id}>
-                  <td className="font-mono text-xs">{x.codigo}</td>
-                  <td>{x.nome}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-6 text-xs font-semibold uppercase tracking-wide text-ink-3">Feriados cadastrados</div>
-          <ul className="mt-2 space-y-1 text-sm">
-            {fer.map((f) => (
-              <li key={f.id} className="flex justify-between">
-                <span>{f.nome}</span>
-                <span className="tabular-nums text-ink-2">{fmtData(f.data + "T12:00:00Z")}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card title={`Usuários (${us.length})`} className="xl:col-span-2">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Cargo</th>
+                <th className="!pl-0">Nome</th>
                 <th>Setor</th>
-                <th>Papéis</th>
-                <th>CPF</th>
+                <th>O que pode fazer</th>
+                <th className="!pr-0">CPF</th>
               </tr>
             </thead>
             <tbody>
               {us.map((x) => (
                 <tr key={x.id}>
-                  <td className="font-medium">{x.nome}</td>
-                  <td className="text-ink-2">{x.cargo ?? "—"}</td>
-                  <td className="text-ink-2">{x.setor?.nome ?? "—"}</td>
-                  <td className="space-x-1">
-                    {(x.papeis as Papel[]).map((p) => (
-                      <Badge key={p}>{PAPEL_NOME[p]}</Badge>
-                    ))}
+                  <td className="!pl-0">
+                    <div className="flex items-center gap-3">
+                      <Avatar nome={x.nome} size={34} />
+                      <div>
+                        <div className="font-medium text-ink">{x.nome}</div>
+                        <div className="text-[12.5px] text-ink-3">{x.cargo ?? "—"}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td className="font-mono text-xs text-ink-3">
+                  <td className="text-ink-2">{x.setor?.nome ?? "—"}</td>
+                  <td>
+                    <div className="flex flex-wrap gap-1">
+                      {(x.papeis as Papel[]).map((p) => (
+                        <Chip key={p} tone={p === "ADMIN" ? "brand" : "neutral"}>
+                          {PAPEL_NOME[p]}
+                        </Chip>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="tnum !pr-0 text-[13px] text-ink-3">
                     ***.{x.cpf.slice(3, 6)}.{x.cpf.slice(6, 9)}-**
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </Card>
+        </div>
+      </Panel>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Panel title={`Setores · ${s.length}`} className="lg:col-span-2">
+          <ul className="grid gap-x-8 sm:grid-cols-2">
+            {s.map((x) => (
+              <li key={x.id} className="flex items-center justify-between gap-3 border-b border-line py-2.5 text-[14px]">
+                <span className="text-ink">{x.nome}</span>
+                <span className="tnum shrink-0 text-[12.5px] text-ink-3">prazo padrão {x.slaPadraoDias} d.ú.</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+        <div className="space-y-6">
+          <Panel title="Órgãos">
+            <ul className="space-y-2 text-[14px]">
+              {ugs.map((x) => (
+                <li key={x.id} className="flex justify-between gap-3">
+                  <span className="text-ink">{x.nome}</span>
+                  <span className="tnum text-ink-3">{x.codigo}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          <Panel title="Feriados (não contam no prazo)">
+            <ul className="space-y-2 text-[14px]">
+              {fer.map((f) => (
+                <li key={f.id} className="flex justify-between gap-3">
+                  <span className="text-ink">{f.nome}</span>
+                  <span className="tnum text-ink-2">{fmtData(f.data + "T12:00:00Z")}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </div>
       </div>
     </>
   );
