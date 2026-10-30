@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { sessoes, usuarios, setores, municipios } from "@/db/schema";
 import type { Papel } from "./workflow";
 
-const COOKIE = "tramite_sessao";
+const COOKIE = "civu_sessao";
 const DIAS = 7;
 
 export type SessaoUsuario = {

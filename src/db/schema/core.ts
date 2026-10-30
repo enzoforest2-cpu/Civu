@@ -1,9 +1,10 @@
-// Trâmite — esquema do banco (Postgres, Drizzle ORM)
+// Civu — esquema do banco (Postgres, Drizzle ORM)
 // Protocolo, tramitação, motor de workflow, documentos, assinaturas e trilha de auditoria.
 import { pgSchema, text, integer, boolean, timestamp, jsonb, date, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
-/** Todas as tabelas ficam no schema "tramite", isoladas de outros sistemas no mesmo banco. */
+/** Todas as tabelas ficam no schema Postgres "tramite" (nome técnico herdado do projeto que deu origem à Civu),
+ *  isoladas de outros sistemas no mesmo banco. Renomear exige migração do banco de produção. */
 export const tramite = pgSchema("tramite");
 
 const id = () =>
