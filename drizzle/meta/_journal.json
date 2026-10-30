@@ -15,6 +15,13 @@
       "when": 1793328412821,
       "tag": "0001_civu_portais",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793330442409,
+      "tag": "0002_civu_modulos",
+      "breakpoints": true
     }
   ]
 }
