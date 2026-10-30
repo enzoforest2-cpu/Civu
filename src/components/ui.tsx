@@ -20,12 +20,12 @@ export function Panel({
   return (
     <section className={`panel ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 px-6 pt-5 pb-1">
-          <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
-          {action}
+        <header className="flex min-h-[52px] items-center justify-between gap-3 px-5 pt-4 pb-1">
+          <h2 className="titulo-secao text-ink">{title}</h2>
+          {action && <div className="shrink-0 text-[13.5px]">{action}</div>}
         </header>
       )}
-      <div className={pad ? "px-6 pt-3 pb-6" : ""}>{children}</div>
+      <div className={pad ? "px-5 pt-2 pb-5" : ""}>{children}</div>
     </section>
   );
 }
@@ -75,30 +75,60 @@ export function Prazo({ prazo, encerrado }: { prazo: Date | null; encerrado?: Da
   );
 }
 
+/** Estado vazio: mantém o lugar do bloco e diz em uma frase o que acontece ou o que fazer. */
 export function Vazio({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 px-6 py-10 text-center text-sm text-ink-3">
-      {icon ?? <Inbox size={22} className="text-ink-3" />}
+    <div className="flex items-center gap-3 rounded-md border border-dashed border-line-2 px-4 py-3.5 text-[14px] text-ink-2">
+      <span className="shrink-0 text-ink-3">{icon ?? <Inbox size={17} />}</span>
       <div>{children}</div>
     </div>
   );
 }
 
-export function Cabecalho({ titulo, sub, acao }: { titulo: string; sub?: ReactNode; acao?: ReactNode }) {
+/**
+ * Título da tela: um substantivo (h1 de 24-26px), uma linha cinza com o achado ou o escopo,
+ * e à direita só ações reais. `volta` mostra o caminho de onde a tela vem.
+ */
+export function Cabecalho({ titulo, sub, acao, volta }: { titulo: ReactNode; sub?: ReactNode; acao?: ReactNode; volta?: { href: string; rotulo: string } }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="max-w-3xl">
-        <h1 className="display text-[28px] leading-[1.1] font-semibold text-ink sm:text-[34px]">{titulo}</h1>
-        {sub && <p className="mt-2 text-[15px] text-ink-2">{sub}</p>}
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0 max-w-3xl">
+        {volta && (
+          <Link href={volta.href} className="mb-2 inline-block text-[13.5px] text-ink-3 hover:text-ink">
+            {volta.rotulo}
+          </Link>
+        )}
+        <h1 className="titulo-pagina text-ink">{titulo}</h1>
+        {sub && <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">{sub}</p>}
       </div>
-      {acao}
+      {acao && <div className="flex shrink-0 flex-wrap items-center gap-2">{acao}</div>}
+    </div>
+  );
+}
+
+/** Números de cabeçalho num só container dividido por fios. O primeiro pode liderar (`lider`). */
+export function Quadro({ itens, lider = false }: { itens: { rotulo: ReactNode; valor: ReactNode; nota?: ReactNode; tom?: "bad" | "ok" | "warn" }[]; lider?: boolean }) {
+  return (
+    <div className="quadro" style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}>
+      {itens.map((i, n) => (
+        <div key={n}>
+          <div className="quadro-rotulo">{i.rotulo}</div>
+          <div
+            className={`quadro-valor ${i.tom === "bad" ? "text-bad" : i.tom === "warn" ? "text-warn" : "text-ink"}`}
+            style={lider && n === 0 ? { fontSize: "1.95rem", fontWeight: 600 } : undefined}
+          >
+            {i.valor}
+          </div>
+          {i.nota && <div className="quadro-nota">{i.nota}</div>}
+        </div>
+      ))}
     </div>
   );
 }
 
 export function NumeroProcesso({ id, numero, className = "" }: { id: string; numero: string; className?: string }) {
   return (
-    <Link href={`/processos/${id}`} className={`tnum font-semibold text-brand hover:text-brand-2 hover:underline ${className}`}>
+    <Link href={`/processos/${id}`} className={`tnum font-medium text-brand-ink hover:text-brand hover:underline ${className}`}>
       {numero}
     </Link>
   );

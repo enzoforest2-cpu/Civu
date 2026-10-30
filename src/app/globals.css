@@ -5,35 +5,41 @@
 @import "@fontsource/ibm-plex-sans/600.css";
 
 /*
-  Civu — gestão municipal integrada. "A cidade conectada."
-  Verde Cívico para ação e identidade; Azul Institucional para texto e navegação;
-  Verde Suave para superfícies de apoio; Branco Quente para fundos. Cor nunca informa situação sozinha.
-  O "trilho" continua como elemento-assinatura do andamento de cada processo.
+  Civu — sistema visual "livro-razão municipal".
+  O cromo é tinta e papel: menu no próprio chão da página, painéis brancos com borda fina, nenhuma sombra em repouso.
+  O Verde Cívico tem duas funções e só elas: a ação principal da tela e o dado principal (a barra do mês atual,
+  a fila que importa). Situação (prazo, risco) usa os pares claros de status. Cor nunca informa sozinha.
+  Tipos: Manrope só na marca, títulos de página e de seção; IBM Plex Sans em todo o resto, com algarismos tabulares.
+  Raios apertados: 8 nos painéis, 6 nos controles, 4 nas etiquetas.
 */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Manrope Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-bg: #f7f9f8;
+  --color-bg: #f4f7f6;
   --color-surface: #ffffff;
-  --color-sunken: #eef3f1;
+  --color-sunken: #edf1ef;
+  --color-active: #e3e9e6;
   --color-ink: #172d36;
-  --color-ink-2: #4b5f68;
-  --color-ink-3: #82949b;
-  --color-line: #e1e8e5;
-  --color-line-2: #c9d5d0;
+  --color-ink-2: #46585f;
+  --color-ink-3: #5e7076;
+  --color-line: #e1e7e4;
+  --color-rule: #edf1ef;
+  --color-line-2: #c7d2cd;
 
   --color-brand: #168779;
   --color-brand-2: #106b60;
   --color-brand-soft: #e5f3ee;
   --color-brand-ink: #0d564d;
 
-  --color-ok: #2e7d32;
-  --color-ok-soft: #e6f2e3;
-  --color-warn: #b86e00;
+  --color-ok: #247b50;
+  --color-ok-soft: #dff3e6;
+  --color-warn: #8a4a00;
   --color-warn-soft: #fff1d6;
-  --color-bad: #d22f3a;
-  --color-bad-soft: #fde6e8;
+  --color-bad: #c4242a;
+  --color-bad-soft: #ffeceb;
+
+  --radius-panel: 8px;
 }
 
 html,
@@ -46,13 +52,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.tnum {
+.tnum,
+td,
+.num {
   font-variant-numeric: tabular-nums;
 }
 
 .display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 ::selection {
@@ -65,21 +73,22 @@ body {
   border-radius: 6px;
 }
 
-/* Superfícies: um nível de container claro; o resto é espaço e tipografia */
+/* Painel: branco sobre o chão, borda fina, sem sombra */
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
 }
 
-/* Campos */
+/* Campos: 38px, borda um passo mais forte que a dos painéis */
 .input {
   width: 100%;
+  min-height: 38px;
   border: 1px solid var(--color-line-2);
-  border-radius: 10px;
+  border-radius: 6px;
   background: #fff;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.94rem;
   color: var(--color-ink);
   outline: none;
   transition:
@@ -89,19 +98,22 @@ body {
 .input::placeholder {
   color: var(--color-ink-3);
 }
+.input:hover {
+  border-color: #b3c1bb;
+}
 .input:focus {
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 4px var(--color-brand-soft);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
 }
 textarea.input {
   resize: vertical;
 }
 .label {
   display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
   color: var(--color-ink);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 .hint {
   font-size: 0.8rem;
@@ -109,30 +121,31 @@ textarea.input {
   margin-top: 0.3rem;
 }
 
-/* Botões */
+/* Botões: 36px, raio 6. Um só primário por tela. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  border-radius: 10px;
-  padding: 0.62rem 1.05rem;
-  font-size: 0.92rem;
-  font-weight: 600;
+  gap: 0.45rem;
+  min-height: 36px;
+  border-radius: 6px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 500;
   border: 1px solid transparent;
   cursor: pointer;
   transition:
     background 0.15s,
     border-color 0.15s,
     color 0.15s,
-    transform 0.05s;
+    transform 0.06s;
   white-space: nowrap;
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 .btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .btn-primary {
@@ -149,60 +162,145 @@ textarea.input {
 }
 .btn-quiet:hover:not(:disabled) {
   background: var(--color-sunken);
+  border-color: #b3c1bb;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink-2);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-active);
+  color: var(--color-ink);
 }
 .btn-danger {
   background: #fff;
   color: var(--color-bad);
-  border-color: #f4b9be;
+  border-color: #efc0bd;
 }
 .btn-danger:hover:not(:disabled) {
   background: var(--color-bad-soft);
 }
 .btn-lg {
-  padding: 0.85rem 1.3rem;
-  font-size: 1rem;
-  border-radius: 12px;
+  min-height: 44px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.97rem;
+}
+.btn-sm {
+  min-height: 30px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.84rem;
 }
 
-/* Etiquetas */
+/* Etiquetas de situação: par claro com tinta escura do mesmo tom */
 .chip {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 0.35rem;
-  border-radius: 999px;
-  padding: 0.18rem 0.6rem;
-  font-size: 0.78rem;
-  font-weight: 600;
+  gap: 0.3rem;
+  border-radius: 4px;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.76rem;
+  font-weight: 500;
   white-space: nowrap;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-/* Tabela de lista */
+/* Tabela: cabeçalho cinza em caixa normal, sem faixa; linhas por fio claro; números à direita */
 table.lista {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 table.lista th {
   text-align: left;
   font-size: 0.8rem;
   color: var(--color-ink-3);
-  font-weight: 600;
-  padding: 0.7rem 1rem;
+  font-weight: 400;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--color-line);
   white-space: nowrap;
 }
 table.lista td {
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid var(--color-line);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-rule);
   vertical-align: middle;
+}
+table.lista th.text-right,
+table.lista td.text-right {
+  text-align: right;
 }
 table.lista tbody tr:last-child td {
   border-bottom: none;
 }
 table.lista tbody tr.linha:hover td {
-  background: #f4f8f6;
+  background: #f7faf9;
+}
+
+/* Título de página e de seção (use os componentes Cabecalho e Panel) */
+.titulo-pagina {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.titulo-secao {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  line-height: 1.3;
+}
+
+/* Quadro de números: um container dividido por fios, rótulo acima do valor */
+.quadro {
+  display: grid;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+.quadro > * {
+  padding: 1rem 1.25rem;
+  min-width: 0;
+}
+.quadro > * + * {
+  border-left: 1px solid var(--color-line);
+}
+@media (max-width: 640px) {
+  .quadro {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .quadro > * {
+    border-left: none !important;
+    border-top: 1px solid var(--color-line);
+  }
+  .quadro > *:nth-child(-n + 2) {
+    border-top: none;
+  }
+  .quadro > *:nth-child(2n) {
+    border-left: 1px solid var(--color-line) !important;
+  }
+  .quadro > *:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+.quadro-rotulo {
+  font-size: 0.82rem;
+  color: var(--color-ink-3);
+}
+.quadro-valor {
+  margin-top: 0.15rem;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.quadro-nota {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-ink-3);
 }
 
 /* Texto de documento */
@@ -225,10 +323,10 @@ details > summary::-webkit-details-marker {
 /* A estação atual do trilho pulsa uma única vez ao abrir a página */
 @keyframes estacao-chega {
   0% {
-    box-shadow: 0 0 0 0 rgb(61 58 240 / 0.45);
+    box-shadow: 0 0 0 0 rgb(22 135 121 / 0.4);
   }
   100% {
-    box-shadow: 0 0 0 14px rgb(61 58 240 / 0);
+    box-shadow: 0 0 0 14px rgb(22 135 121 / 0);
   }
 }
 .estacao-atual {
