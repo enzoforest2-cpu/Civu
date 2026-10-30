@@ -53,6 +53,9 @@ export type AvisoDispensa = { publicadoEm?: string; justificativaSemAviso?: stri
 export type RetornoBancario = { aceito: boolean; autenticacao?: string; motivo?: string; em: string };
 export type ResultadoRegra = { ok: boolean; motivo: string };
 
+/** Tamanho mínimo de justificativa aceito (pesquisa de preços e dispensa sem aviso). */
+export const MIN_JUSTIFICATIVA = 30;
+
 const ok = (motivo: string): ResultadoRegra => ({ ok: true, motivo });
 const falha = (motivo: string): ResultadoRegra => ({ ok: false, motivo });
 
@@ -86,10 +89,10 @@ export function diaUtil(iso: string, feriados: Set<string>): boolean {
 export function regraPesquisaPrecos(p: PesquisaPrecos | undefined): ResultadoRegra {
   const n = p?.fontes?.length ?? 0;
   if (n >= 3) return ok(`Pesquisa de preços com ${n} fontes.`);
-  if ((p?.justificativa ?? "").trim().length > 0) {
+  if ((p?.justificativa ?? "").trim().length >= MIN_JUSTIFICATIVA) {
     return ok(`Pesquisa com ${n} fonte(s) e justificativa registrada.`);
   }
-  return falha(`A pesquisa de preços tem ${n} fonte(s). Registre ao menos 3 fontes ou justifique por que não há mais fornecedores.`);
+  return falha(`A pesquisa de preços tem ${n} fonte(s). Registre ao menos 3 fontes ou justifique por que não há mais fornecedores (justificativa com no mínimo ${MIN_JUSTIFICATIVA} caracteres).`);
 }
 
 export function aberturaMinima(publicadoEm: string, tipo: TipoObjetoEdital, feriados: Set<string>): string {
@@ -99,6 +102,9 @@ export function aberturaMinima(publicadoEm: string, tipo: TipoObjetoEdital, feri
 export function regraPrazoEdital(e: Edital | undefined, feriados: Set<string>): ResultadoRegra {
   if (!e) return falha("Registre o edital com data de publicação e de abertura.");
   if (!e.publicadoEm || !e.aberturaEm) return falha("Informe a data de publicação e a data de abertura do edital.");
+  if (!(e.tipoObjeto in PRAZO_MINIMO_EDITAL)) {
+    return falha(`Tipo de objeto do edital inválido: "${String(e.tipoObjeto)}". Escolha um dos tipos previstos no art. 55.`);
+  }
   if (!diaUtil(e.aberturaEm, feriados)) {
     return falha(`A abertura em ${br(e.aberturaEm)} não é dia útil. Escolha um dia útil.`);
   }
@@ -163,9 +169,9 @@ export function regraAvisoDispensa(
   feriados: Set<string>,
 ): ResultadoRegra {
   if (modalidade !== "DISPENSA_VALOR") return ok("Aviso de contratação direta não se aplica a esta modalidade.");
-  if ((a?.justificativaSemAviso ?? "").trim().length >= 30) return ok("Dispensa sem aviso, com justificativa registrada.");
+  if ((a?.justificativaSemAviso ?? "").trim().length >= MIN_JUSTIFICATIVA) return ok("Dispensa sem aviso, com justificativa registrada.");
   if (!a?.publicadoEm) {
-    return falha("Publique o aviso de contratação direta (3 dias úteis) ou registre justificativa de ao menos 30 caracteres.");
+    return falha(`Publique o aviso de contratação direta (3 dias úteis) ou registre justificativa de ao menos ${MIN_JUSTIFICATIVA} caracteres.`);
   }
   const fim = somaUteis(a.publicadoEm, 3, feriados);
   if (hoje <= fim) {

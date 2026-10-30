@@ -58,3 +58,30 @@ test("recursos, resultado, aviso de dispensa, retorno bancário e modalidade", (
   assert.equal(R.regraRetornoBancario({ aceito: false, motivo: "Conta encerrada", em: "2026-11-05" }).ok, false);
   assert.equal(R.regraModalidadeDefinida("A_DEFINIR").ok, false);
 });
+
+test("pesquisa de preços: justificativa curta (< 30 caracteres) não basta", () => {
+  const fontes = [{ fonte: "F0", data: "2026-10-01", valor: 10 }, { fonte: "F1", data: "2026-10-01", valor: 10 }];
+  const r = R.regraPesquisaPrecos({ fontes, justificativa: "Poucos fornecedores." });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /30 caracteres/);
+  assert.equal(R.regraPesquisaPrecos({ fontes, justificativa: "x".repeat(30) }).ok, true);
+});
+
+test("prazos mínimos do edital por tipo de objeto (art. 55)", () => {
+  assert.deepEqual(R.PRAZO_MINIMO_EDITAL, {
+    BENS_MENOR_PRECO: 8, BENS_OUTROS: 15, SERVICOS_COMUNS: 10, SERVICOS_ESPECIAIS: 25,
+    OBRA_SEMI_INTEGRADA: 35, TECNICA_E_PRECO: 35, OBRA_INTEGRADA: 60,
+  });
+  for (const [tipo, dias] of Object.entries(R.PRAZO_MINIMO_EDITAL)) {
+    const t = tipo as R.TipoObjetoEdital;
+    const minima = R.aberturaMinima("2026-10-30", t, new Set());
+    assert.equal(R.diaUtil(minima, new Set()), true);
+    assert.equal(R.regraPrazoEdital({ numero: "1/2026", tipoObjeto: t, publicadoEm: "2026-10-30", aberturaEm: minima, plataforma: "BLL" }, new Set()).ok, true, `${tipo} (${dias})`);
+  }
+});
+
+test("edital com tipo de objeto inválido falha com mensagem clara", () => {
+  const r = R.regraPrazoEdital({ numero: "1/2026", tipoObjeto: "XYZ" as R.TipoObjetoEdital, publicadoEm: "2026-10-30", aberturaEm: "2026-11-12", plataforma: "BLL" }, fer);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /Tipo de objeto/);
+});
