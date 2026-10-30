@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import {
   ErroFluxo,
+  carregarProcesso,
+  podeAgir,
   decidirRecurso,
   definirModalidade,
   feriadosDo,
@@ -16,20 +18,20 @@ import {
   registrarRetornoBancario,
   responderImpugnacao,
 } from "@/lib/engine";
-import { PRAZO_MINIMO_EDITAL, aberturaMinima, type ResultadoSessao, type TipoObjetoEdital } from "@/lib/regras-fluxo";
+import { PRAZO_MINIMO_EDITAL, aberturaMinima, tipoObjetoValido, type ResultadoSessao, type TipoObjetoEdital } from "@/lib/regras-fluxo";
+import { numeroBr } from "@/lib/numeros";
 import type { ActionState } from "@/app/actions";
 
-/** Estado do formulário do edital: além de erro/ok, a abertura mínima calculada no servidor com os feriados do município. */
-export type EditalState = (ActionState & { abertura?: string; valores?: Record<string, string> }) | null;
+/**
+ * Estado dos formulários que precisam manter o que foi digitado quando há erro (o React limpa o formulário depois da action):
+ * `valores` volta com os campos enviados. No edital, `abertura` traz a abertura mínima calculada com os feriados do município.
+ */
+export type FormState = (ActionState & { abertura?: string; valores?: Record<string, string> }) | null;
+export type EditalState = FormState;
+
+const valoresDe = (fd: FormData, campos: string[]) => Object.fromEntries(campos.map((k) => [k, str(fd, k)]));
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
-
-/** Valor digitado no padrão brasileiro (1.234,56) ou com ponto decimal (1234.56). */
-function numero(v: string): number {
-  const s = v.replace(/[R$\s]/g, "");
-  if (!s) return NaN;
-  return Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s);
-}
 
 function trata(e: unknown): { erro: string } {
   if (e instanceof ErroFluxo) return { erro: e.message };
@@ -61,7 +63,7 @@ export async function pesquisaPrecosAction(_: ActionState, fd: FormData): Promis
   const fontes = nomes
     .map((fonte, i) => ({ fonte: fonte.trim(), data: (datas[i] ?? "").trim(), valorTxt: (valores[i] ?? "").trim() }))
     .filter((f) => f.fonte || f.data || f.valorTxt)
-    .map((f) => ({ fonte: f.fonte, data: f.data, valor: numero(f.valorTxt) }));
+    .map((f) => ({ fonte: f.fonte, data: f.data, valor: numeroBr(f.valorTxt) }));
   return executar(fd, "Pesquisa de preços salva.", (u, id) => registrarPesquisaPrecos(u, id, { fontes, justificativa: str(fd, "justificativa") }));
 }
 
@@ -69,15 +71,18 @@ export async function publicarEditalAction(_: EditalState, fd: FormData): Promis
   const u = await requireUser();
   const tipoObjeto = str(fd, "tipoObjeto") as TipoObjetoEdital;
   const publicadoEm = str(fd, "publicadoEm");
+  const valores = valoresDe(fd, ["numero", "tipoObjeto", "publicadoEm", "aberturaEm", "plataforma"]);
+  // Só quem pode agir na etapa recebe o cálculo; os demais recebem a recusa do motor
+  const p = await carregarProcesso(u.municipioId, str(fd, "processoId"));
+  if (!p || !podeAgir(u, p)) return { erro: "Você não tem papel para agir nesta etapa.", valores };
   let abertura: string | undefined;
-  if (tipoObjeto in PRAZO_MINIMO_EDITAL && /^\d{4}-\d{2}-\d{2}$/.test(publicadoEm)) {
+  if (tipoObjetoValido(tipoObjeto) && /^\d{4}-\d{2}-\d{2}$/.test(publicadoEm)) {
     const [a, m, d] = aberturaMinima(publicadoEm, tipoObjeto, await feriadosDo(u.municipioId)).split("-");
     abertura = `Abertura a partir de ${d}/${m}/${a}: ${PRAZO_MINIMO_EDITAL[tipoObjeto]} dias úteis (art. 55)`;
   }
   const r = await executar(fd, "Edital publicado.", (u2, id) =>
     publicarEdital(u2, id, { numero: str(fd, "numero"), tipoObjeto, publicadoEm, aberturaEm: str(fd, "aberturaEm"), plataforma: str(fd, "plataforma") }),
   );
-  const valores = Object.fromEntries(["numero", "tipoObjeto", "publicadoEm", "aberturaEm", "plataforma"].map((k) => [k, str(fd, k)]));
   return { ...r, abertura, valores };
 }
 
@@ -91,11 +96,13 @@ export async function responderImpugnacaoAction(_: ActionState, fd: FormData): P
   );
 }
 
-export async function resultadoSessaoAction(_: ActionState, fd: FormData): Promise<ActionState> {
+export async function resultadoSessaoAction(_: FormState, fd: FormData): Promise<FormState> {
   const situacao = str(fd, "situacao") as ResultadoSessao["situacao"];
-  return executar(fd, "Resultado da sessão registrado.", (u, id) =>
-    registrarResultadoSessao(u, id, { situacao, fornecedor: str(fd, "fornecedor"), cnpj: str(fd, "cnpj"), valor: numero(str(fd, "valor")), ataEm: str(fd, "ataEm") }),
+  const r = await executar(fd, "Resultado da sessão registrado.", (u, id) =>
+    registrarResultadoSessao(u, id, { situacao, fornecedor: str(fd, "fornecedor"), cnpj: str(fd, "cnpj"), valor: numeroBr(str(fd, "valor")), ataEm: str(fd, "ataEm") }),
   );
+  // Com sucesso o formulário volta vazio para um novo registro; com erro, mantém o que foi digitado
+  return r?.erro ? { ...r, valores: valoresDe(fd, ["situacao", "fornecedor", "cnpj", "valor", "ataEm"]) } : r;
 }
 
 export async function registrarRecursoAction(_: ActionState, fd: FormData): Promise<ActionState> {

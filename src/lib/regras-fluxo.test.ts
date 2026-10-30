@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as R from "./regras-fluxo";
+import { numeroBr } from "./numeros";
 const fer = new Set(["2026-11-02", "2026-11-15", "2026-11-20"]);
 
 test("pesquisa de preços: 3 fontes passa, 2 sem justificativa falha, 2 com justificativa passa", () => {
@@ -84,4 +85,35 @@ test("edital com tipo de objeto inválido falha com mensagem clara", () => {
   const r = R.regraPrazoEdital({ numero: "1/2026", tipoObjeto: "XYZ" as R.TipoObjetoEdital, publicadoEm: "2026-10-30", aberturaEm: "2026-11-12", plataforma: "BLL" }, fer);
   assert.equal(r.ok, false);
   assert.match(r.motivo, /Tipo de objeto/);
+});
+
+test("tipo de objeto do edital: só as chaves da tabela do art. 55 valem", () => {
+  for (const t of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+    const r = R.regraPrazoEdital({ numero: "1/2026", tipoObjeto: t as never, publicadoEm: "2026-10-30", aberturaEm: "2027-06-01", plataforma: "BLL" }, fer);
+    assert.equal(r.ok, false, t);
+    assert.equal(R.tipoObjetoValido(t), false, t);
+  }
+  assert.equal(R.tipoObjetoValido("BENS_MENOR_PRECO"), true);
+});
+
+test("mediana e fim do aviso de dispensa", () => {
+  assert.equal(R.mediana([1000, 1200, 1100]), 1100);
+  assert.equal(R.mediana([1000, 1201]), 1100.5);
+  assert.equal(R.mediana([]), null);
+  // publicado sexta 30/10/2026, Finados em 02/11: 03, 04, 05/11
+  assert.equal(R.fimAvisoDispensa("2026-10-30", fer), "2026-11-05");
+});
+
+test("número digitado no padrão brasileiro", () => {
+  assert.equal(numeroBr("1.500"), 1500);
+  assert.equal(numeroBr("8.500"), 8500);
+  assert.equal(numeroBr("1.234.567"), 1234567);
+  assert.equal(numeroBr("1.500,25"), 1500.25);
+  assert.equal(numeroBr("R$ 1.500,00"), 1500);
+  assert.equal(numeroBr("1500"), 1500);
+  assert.equal(numeroBr("1500.5"), 1500.5);
+  assert.equal(numeroBr("8,5"), 8.5);
+  assert.ok(Number.isNaN(numeroBr("abc")));
+  assert.ok(Number.isNaN(numeroBr("")));
+  assert.ok(Number.isNaN(numeroBr("1,2,3")));
 });

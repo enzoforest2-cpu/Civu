@@ -1,18 +1,9 @@
 import { Chip, Panel } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { addDiasUteis } from "@/lib/dates";
 import { hojeIso } from "@/lib/engine";
-import { MIN_JUSTIFICATIVA, type AvisoDispensa } from "@/lib/regras-fluxo";
+import { MIN_JUSTIFICATIVA, fimAvisoDispensa, type AvisoDispensa } from "@/lib/regras-fluxo";
 import { avisoDispensaAction } from "./acoes";
 import { SoConsulta, dataBr, metaDe, type PropsEtapa } from "./util";
-
-/** Fim do prazo de propostas do aviso: 3 dias úteis após a publicação (art. 75, §3º). */
-function propostasAte(publicadoEm: string, feriados: Set<string>): string {
-  // Mesmo cálculo da regra (calendário local, meio-dia para não cair no dia anterior por fuso)
-  const d = addDiasUteis(new Date(publicadoEm + "T12:00:00"), 3, feriados);
-  const z = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
-}
 
 /** Aviso de contratação direta por dispensa de valor, ou justificativa de por que não houve aviso. */
 export function PainelAvisoDispensa({ p, pode, feriados }: PropsEtapa) {
@@ -24,7 +15,7 @@ export function PainelAvisoDispensa({ p, pode, feriados }: PropsEtapa) {
       </p>
       {aviso?.publicadoEm && (
         <p className="mt-3 text-[14.5px] text-ink">
-          Aviso publicado em {dataBr(aviso.publicadoEm)}. <strong className="font-semibold">Propostas até {dataBr(propostasAte(aviso.publicadoEm, feriados))}</strong>
+          Aviso publicado em {dataBr(aviso.publicadoEm)}. <strong className="font-semibold">Propostas até {dataBr(fimAvisoDispensa(aviso.publicadoEm, feriados))}</strong>
         </p>
       )}
       {aviso?.justificativaSemAviso && (

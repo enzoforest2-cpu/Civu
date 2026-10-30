@@ -3,24 +3,15 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { fmtMoeda } from "@/lib/dates";
+import { numeroBr as numero } from "@/lib/numeros";
+import { mediana } from "@/lib/regras-fluxo";
 
 type Linha = { k: number; fonte: string; data: string; valor: string };
 
-function numero(v: string): number {
-  const s = v.replace(/[R$\s]/g, "");
-  if (!s) return NaN;
-  return Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s);
-}
-
-function mediana(vs: number[]): number | null {
-  if (!vs.length) return null;
-  const v = [...vs].sort((a, b) => a - b);
-  const m = Math.floor(v.length / 2);
-  return Math.round((v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2) * 100) / 100;
-}
-
 /** Tabela editável de fontes da pesquisa de preços, com contador e mediana ao vivo. O servidor recalcula ao salvar. */
-export function FontesPrecos({ inicial }: { inicial: { fonte: string; data: string; valor: number }[] }) {
+export function FontesPrecos({ inicial, justificativaInicial }: { inicial: { fonte: string; data: string; valor: number }[]; justificativaInicial: string }) {
+  // Campos controlados: o React limpa o formulário depois da action, mas o que está no estado continua (inclusive quando há erro)
+  const [justificativa, setJustificativa] = useState(justificativaInicial);
   const [linhas, setLinhas] = useState<Linha[]>(() =>
     inicial.length ? inicial.map((f, i) => ({ k: i, fonte: f.fonte, data: f.data, valor: String(f.valor).replace(".", ",") })) : [{ k: 0, fonte: "", data: "", valor: "" }],
   );
@@ -79,6 +70,20 @@ export function FontesPrecos({ inicial }: { inicial: { fonte: string; data: stri
             Mediana: <strong className="tnum font-semibold text-ink">{med === null ? "—" : fmtMoeda(med)}</strong>
           </span>
         </div>
+      </div>
+      <div className="mt-4">
+        <label className="label" htmlFor="pesquisa-just">
+          Justificativa (se houver menos de 3 fontes)
+        </label>
+        <textarea
+          id="pesquisa-just"
+          name="justificativa"
+          className="input"
+          rows={2}
+          value={justificativa}
+          onChange={(e) => setJustificativa(e.target.value)}
+          placeholder="Ex.: Só dois fornecedores atendem a região; o terceiro consultado não respondeu."
+        />
       </div>
     </div>
   );

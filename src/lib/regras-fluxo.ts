@@ -95,6 +95,24 @@ export function regraPesquisaPrecos(p: PesquisaPrecos | undefined): ResultadoReg
   return falha(`A pesquisa de preços tem ${n} fonte(s). Registre ao menos 3 fontes ou justifique por que não há mais fornecedores (justificativa com no mínimo ${MIN_JUSTIFICATIVA} caracteres).`);
 }
 
+/** Tipo de objeto previsto no art. 55 (só as chaves próprias da tabela: "toString" e afins não valem). */
+export function tipoObjetoValido(t: unknown): t is TipoObjetoEdital {
+  return typeof t === "string" && Object.hasOwn(PRAZO_MINIMO_EDITAL, t);
+}
+
+/** Mediana dos valores, arredondada a centavos; null sem valores. É o valor estimado da pesquisa de preços. */
+export function mediana(valores: number[]): number | null {
+  if (!valores.length) return null;
+  const v = [...valores].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return Math.round((v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2) * 100) / 100;
+}
+
+/** Último dia para propostas no aviso de contratação direta: 3 dias úteis após a publicação (art. 75, §3º). */
+export function fimAvisoDispensa(publicadoEm: string, feriados: Set<string>): string {
+  return somaUteis(publicadoEm, 3, feriados);
+}
+
 export function aberturaMinima(publicadoEm: string, tipo: TipoObjetoEdital, feriados: Set<string>): string {
   return somaUteis(publicadoEm, PRAZO_MINIMO_EDITAL[tipo], feriados);
 }
@@ -102,7 +120,7 @@ export function aberturaMinima(publicadoEm: string, tipo: TipoObjetoEdital, feri
 export function regraPrazoEdital(e: Edital | undefined, feriados: Set<string>): ResultadoRegra {
   if (!e) return falha("Registre o edital com data de publicação e de abertura.");
   if (!e.publicadoEm || !e.aberturaEm) return falha("Informe a data de publicação e a data de abertura do edital.");
-  if (!(e.tipoObjeto in PRAZO_MINIMO_EDITAL)) {
+  if (!tipoObjetoValido(e.tipoObjeto)) {
     return falha(`Tipo de objeto do edital inválido: "${String(e.tipoObjeto)}". Escolha um dos tipos previstos no art. 55.`);
   }
   if (!diaUtil(e.aberturaEm, feriados)) {
@@ -173,7 +191,7 @@ export function regraAvisoDispensa(
   if (!a?.publicadoEm) {
     return falha(`Publique o aviso de contratação direta (3 dias úteis) ou registre justificativa de ao menos ${MIN_JUSTIFICATIVA} caracteres.`);
   }
-  const fim = somaUteis(a.publicadoEm, 3, feriados);
+  const fim = fimAvisoDispensa(a.publicadoEm, feriados);
   if (hoje <= fim) {
     return falha(`O aviso fica aberto até ${br(fim)}. Siga a partir do próximo dia.`);
   }

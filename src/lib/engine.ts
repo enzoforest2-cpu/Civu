@@ -10,6 +10,7 @@ import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, type EstadoDef, typ
 import {
   MIN_JUSTIFICATIVA,
   impugnacaoTempestiva,
+  mediana,
   prazosRecurso,
   regraAvisoDispensa,
   regraImpugnacoes,
@@ -705,12 +706,6 @@ function texto(v: unknown, rotulo: string, min = 1): string {
   return s;
 }
 
-function mediana(valores: number[]): number {
-  const v = [...valores].sort((a, b) => a - b);
-  const m = Math.floor(v.length / 2);
-  return Math.round((v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2) * 100) / 100;
-}
-
 /** Compras define a forma de contratação (licitação ou direta); a escolha fica justificada no livro. */
 export async function definirModalidade(u: SessaoUsuario, processoId: string, modalidade: string, justificativa: string) {
   if (!MODALIDADES[modalidade] || modalidade === "A_DEFINIR") throw new ErroFluxo("Escolha a modalidade: licitação, dispensa por valor ou outra contratação direta.");
@@ -746,7 +741,7 @@ export async function registrarPesquisaPrecos(u: SessaoUsuario, processoId: stri
     let valorEstimado: string | null = null;
     let alertaFracionamento: unknown = null;
     if (fontes.length) {
-      valorEstimado = mediana(fontes.map((f) => f.valor)).toFixed(2);
+      valorEstimado = mediana(fontes.map((f) => f.valor))!.toFixed(2);
       novo.valorEstimado = valorEstimado;
       // O valor estimado mudou: numa dispensa por valor o limite e o fracionamento são conferidos de novo
       if (meta.modalidade === "DISPENSA_VALOR" && meta.natureza) {

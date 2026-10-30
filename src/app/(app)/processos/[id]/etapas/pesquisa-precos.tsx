@@ -26,13 +26,7 @@ export function PainelPesquisaPrecos({ p, pode }: PropsEtapa) {
       {pode ? (
         <ActionForm action={pesquisaPrecosAction} className="mt-4" resetOnOk={false}>
           <input type="hidden" name="processoId" value={p.id} />
-          <FontesPrecos inicial={fontes} />
-          <div className="mt-4">
-            <label className="label" htmlFor="pesquisa-just">
-              Justificativa (se houver menos de 3 fontes)
-            </label>
-            <textarea id="pesquisa-just" name="justificativa" className="input" rows={2} defaultValue={pesquisa?.justificativa ?? ""} placeholder="Ex.: Só dois fornecedores atendem a região; o terceiro consultado não respondeu." />
-          </div>
+          <FontesPrecos inicial={fontes} justificativaInicial={pesquisa?.justificativa ?? ""} />
           <div className="mt-4">
             <SubmitButton pendingText="Salvando…">Salvar pesquisa</SubmitButton>
           </div>

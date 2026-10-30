@@ -1,6 +1,6 @@
 import { Chip, Panel } from "@/components/ui";
 import { fmtData } from "@/lib/dates";
-import { PRAZO_MINIMO_EDITAL, ROTULO_TIPO, aberturaMinima, type Edital, type Impugnacao, type TipoObjetoEdital } from "@/lib/regras-fluxo";
+import { PRAZO_MINIMO_EDITAL, ROTULO_TIPO, aberturaMinima, tipoObjetoValido, type Edital, type Impugnacao, type TipoObjetoEdital } from "@/lib/regras-fluxo";
 import { EditalForm } from "./edital-form";
 import { Dado, SoConsulta, dataBr, listaDe, metaDe, type PropsEtapa } from "./util";
 
@@ -11,7 +11,7 @@ const TIPOS = (Object.keys(PRAZO_MINIMO_EDITAL) as TipoObjetoEdital[]).map((k) =
 
 /** Frase da abertura mínima do edital, para o edital já salvo. */
 export function fraseAbertura(e: Edital, feriados: Set<string>): string | undefined {
-  if (!(e.tipoObjeto in PRAZO_MINIMO_EDITAL) || !e.publicadoEm) return undefined;
+  if (!tipoObjetoValido(e.tipoObjeto) || !e.publicadoEm) return undefined;
   return `Abertura a partir de ${dataBr(aberturaMinima(e.publicadoEm, e.tipoObjeto, feriados))}: ${PRAZO_MINIMO_EDITAL[e.tipoObjeto]} dias úteis (art. 55)`;
 }
 
