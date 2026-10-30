@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { Search } from "lucide-react";
 import { db } from "@/db";
 import { municipios, processos, setores } from "@/db/schema";
-import { caminhoPrincipal, getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { caminhoDoProcesso, caminhoPrincipal, getEstado, nomeEtapa, ramoDaModalidade, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
 import { Marca, MarcaCompleta } from "@/components/marca";
@@ -34,6 +34,11 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
       : null;
   const def = p ? (p.tipo.definicao as WorkflowDef) : null;
   const listaSetores = p && mun ? await db.query.setores.findMany({ where: eq(setores.municipioId, mun.id) }) : [];
+  // Trilho: só as etapas do ramo da modalidade (licitação ou contratação direta), como na página interna do processo
+  const metaP = (p?.metadados ?? {}) as Record<string, unknown>;
+  const ramo = ramoDaModalidade(metaP.modalidade);
+  const principal = def ? caminhoPrincipal(def) : [];
+  const caminho = def ? caminhoDoProcesso(def, metaP) : [];
   const nome = (k: string | null) => (def && k ? nomeEtapa(getEstado(def, k)?.nome ?? k) : "");
 
   return (
@@ -105,11 +110,11 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
               </p>
               <div className="mt-6">
                 <Trilho
-                  estacoes={def.estados.map((e) => ({
+                  estacoes={caminho.map((e) => ({
                     chave: e.chave,
                     nome: nomeEtapa(e.nome),
                     setor: e.setor && e.setor !== "LIVRE" ? listaSetores.find((s) => s.sigla === e.setor)?.nome.replace(/^(Secretaria|Setor) de /, "") : null,
-                    opcional: !caminhoPrincipal(def).includes(e.chave),
+                    opcional: !!e.opcional || (!principal.includes(e.chave) && !(ramo && e.ramo === ramo)),
                   }))}
                   atual={p.estadoAtual}
                   encerrado={!!p.encerradoEm}

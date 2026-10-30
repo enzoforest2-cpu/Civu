@@ -11,6 +11,7 @@ import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
+import { regraContratacao } from "@/lib/regras-fluxo";
 import { Chip, Panel, Prazo, UrgenciaChip, Avatar } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -68,7 +69,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const contratacao = meta.contratacao as Contratacao | undefined;
   const idxContratado = ordemCaminho.indexOf("CONTRATADO");
   const chegouContratacao = tipoCompra && idxContratado >= 0 && (ordemCaminho.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
-  const podeContratacao = !p.encerradoEm && chegouContratacao && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  // Os dados se registram na etapa do contrato (o motor recusa antes e depois dela)
+  const podeContratacao = !p.encerradoEm && p.estadoAtual === "CONTRATADO" && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  // Falta algum dado (ex.: a sessão preencheu o vencedor, mas não a fonte de recurso): o formulário já abre
+  const contratacaoIncompleta = !regraContratacao(contratacao, FONTES).ok;
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
   const exigencia = meta.exigencia as Exigencia | undefined;
   const [pessoaInteressada, empresaInteressada] = await Promise.all([
@@ -522,8 +526,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <p className="text-[14px] text-ink-2">Ainda não informados. Eles definem a fila de pagamento e a remessa ao Tribunal de Contas.</p>
                 )}
                 {podeContratacao && (
-                  <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={!contratacao}>
-                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">{contratacao ? "Corrigir dados" : "Informar dados"}</summary>
+                  <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta}>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">{!contratacao ? "Informar dados" : contratacaoIncompleta ? "Completar dados" : "Corrigir dados"}</summary>
                     <ActionForm action={contratacaoAction} className="space-y-3 px-4 pb-4" resetOnOk={false}>
                       <input type="hidden" name="processoId" value={p.id} />
                       <div>

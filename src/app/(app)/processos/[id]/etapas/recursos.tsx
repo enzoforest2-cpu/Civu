@@ -8,6 +8,7 @@ import { SoConsulta, dataBr, listaDe, metaDe, type PropsEtapa } from "./util";
 /** Recursos (art. 165): intenção na sessão, razões em 3 dias úteis, contrarrazões em mais 3, decisão. */
 export function PainelRecursos({ p, pode }: PropsEtapa) {
   const lista = listaDe<Recurso>(metaDe(p).recursos);
+  const hoje = hojeIso();
   return (
     <Panel title="Recursos">
       <p className="text-[13.5px] text-ink-2">Razões em 3 dias úteis após a intenção e contrarrazões em mais 3 (art. 165). Recurso provido devolve o processo à sessão para refazer o julgamento.</p>
@@ -37,6 +38,8 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                   <div className="mt-2 rounded-lg bg-sunken px-3 py-2 text-[13.5px] text-ink">
                     <strong className="font-semibold">Decidido em {dataBr(r.decididoEm)}:</strong> {r.decisao}
                   </div>
+                ) : pode && hoje <= r.contrarrazoesAte ? (
+                  <p className="mt-2 text-[13px] text-ink-3">A decisão fica disponível a partir do dia seguinte ao fim das contrarrazões ({dataBr(r.contrarrazoesAte)}).</p>
                 ) : (
                   pode && (
                     <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">

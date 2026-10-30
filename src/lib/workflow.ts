@@ -81,7 +81,8 @@ export type RegraFluxo =
   | "RESULTADO_SESSAO"
   | "RECURSOS"
   | "AVISO_DISPENSA"
-  | "RETORNO_BANCARIO";
+  | "RETORNO_BANCARIO"
+  | "CONTRATACAO_COMPLETA";
 
 export type Gate =
   | { tipo: "documento"; documentoTipo: string; assinadoPor?: Papel[]; assinadoPorQualquer?: Papel[]; descricao?: string }
@@ -471,7 +472,7 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
         doc("CONTRATO", ["ORDENADOR"], "Contrato ou ordem de compra assinado"),
         doc("PORTARIA_FISCAL", undefined, "Portaria nomeando gestor e fiscal com suplente"),
         doc("PUBLICACAO_PNCP", undefined, "Publicação no PNCP (20 dias úteis licitação / 10 direta)"),
-        { tipo: "campo", campo: "contratacao", descricao: "Fornecedor, CNPJ, valor contratado e fonte de recurso informados" },
+        regra("CONTRATACAO_COMPLETA", "Fornecedor, CNPJ, valor contratado e fonte de recurso informados"),
       ],
       avancos: [{ para: "EXECUCAO", rotulo: "Contrato publicado: iniciar a execução" }],
       devolucoes: [],

@@ -117,3 +117,18 @@ test("número digitado no padrão brasileiro", () => {
   assert.ok(Number.isNaN(numeroBr("")));
   assert.ok(Number.isNaN(numeroBr("1,2,3")));
 });
+
+test("contratação completa: fornecedor, CNPJ, valor e fonte válida", () => {
+  const fontes = { ORDINARIOS: "Recursos ordinários", SAUDE: "Saúde" };
+  const c = { fornecedor: "Móveis Ltda", cnpj: "11222333000181", valor: "8500.00", fonte: "ORDINARIOS" };
+  assert.equal(R.regraContratacao(c, fontes).ok, true);
+  assert.equal(R.regraContratacao(undefined, fontes).ok, false);
+  const semFonte = R.regraContratacao({ ...c, fonte: undefined }, fontes);
+  assert.equal(semFonte.ok, false);
+  assert.match(semFonte.motivo, /fonte de recurso/);
+  assert.equal(R.regraContratacao({ ...c, fonte: "INVENTADA" }, fontes).ok, false);
+  assert.equal(R.regraContratacao({ ...c, fonte: "toString" }, fontes).ok, false);
+  assert.equal(R.regraContratacao({ ...c, valor: "0" }, fontes).ok, false);
+  assert.equal(R.regraContratacao({ ...c, cnpj: "" }, fontes).ok, false);
+  assert.equal(R.regraContratacao({ ...c, fornecedor: " " }, fontes).ok, false);
+});

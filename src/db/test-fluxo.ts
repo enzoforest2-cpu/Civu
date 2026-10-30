@@ -73,6 +73,22 @@ async function main() {
   const publicado = doDia(abertura, -40);
   const assunto = (t: string) => `TESTE FLUXO — ${t}`;
   const dadosCompra = { objeto: "10 mesas", natureza: "EQUIPAMENTOS", modalidade: "A_DEFINIR", justificativa: "teste", quantidade: "10", valorEstimado: "9000", dataPretendida: "2026-12-01", prioridade: "BAIXA", noPCA: "SIM" };
+  // Demonstração (valor.ts): a quebra de ordem fica no envio ao banco e cada processo segue o caminho da sua modalidade
+  const historicoDemo = await historicoDePagamentos(requisitante.municipioId);
+  if (historicoDemo.quebras.length === 0) falha("a demonstração deveria ter ao menos uma quebra de ordem no histórico de pagamentos");
+  const estadosDemo = async (assuntoDemo: string) => {
+    const pd = await db.query.processos.findFirst({ where: and(eq(processos.municipioId, requisitante.municipioId), eq(processos.assunto, assuntoDemo)), with: { eventos: true } });
+    if (!pd) return falha("processo de demonstração ausente: " + assuntoDemo);
+    return pd.eventos.map((e) => e.paraEstado).filter(Boolean) as string[];
+  };
+  const evDispensa = await estadosDemo("Conserto emergencial da ambulância do Distrito de Lagoa Seca");
+  if (!evDispensa.includes("INSTRUCAO_DIRETA") || !evDispensa.includes("AUTORIZACAO_DIRETA") || evDispensa.includes("SESSAO_DISPUTA") || evDispensa.includes("HOMOLOGADO"))
+    falha("dispensa da demonstração deveria passar pela instrução e autorização diretas: " + evDispensa.join(","));
+  const evLicit = await estadosDemo("Combustível para a frota da Saúde");
+  for (const e of ["PUBLICACAO_EDITAL", "IMPUGNACOES", "SESSAO_DISPUTA", "RECURSOS", "HOMOLOGADO"]) if (!evLicit.includes(e)) falha(`licitação da demonstração sem ${e}: ` + evLicit.join(","));
+  if (evLicit.includes("INSTRUCAO_DIRETA")) falha("licitação da demonstração não passa pela instrução direta");
+  ok(`demonstração: ${historicoDemo.quebras.length} quebra(s) de ordem no histórico; dispensa e licitação seguem cada uma o seu caminho`);
+
   const fontes3 = [{ fonte: "PNCP", data: "2026-10-01", valor: 900 }, { fonte: "Cotação A", data: "2026-10-02", valor: 950 }, { fonte: "Cotação B", data: "2026-10-03", valor: 880 }];
 
   /** Da demanda até estar em INSTRUCAO com ETP e TR prontos; verifica as travas do começo do fluxo. */
@@ -279,7 +295,21 @@ async function main() {
   let recs = meta(c).recursos as { id: string; razoesAte: string; contrarrazoesAte: string }[];
   if (!recs[0].id || !(recs[0].razoesAte > hoje) || !(recs[0].contrarrazoesAte > recs[0].razoesAte)) falha("prazos do recurso errados: " + JSON.stringify(recs));
   await esperaErro("recurso não decidido bloqueia", () => engine.avancar(compras, p.id, "HOMOLOGADO"));
-  await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Provido: proposta vencedora desclassificada.", provido: true });
+  // Art. 165: a decisão só vem depois do prazo das contrarrazões
+  const [ac, mc, dc] = recs[0].contrarrazoesAte.split("-");
+  try {
+    await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Decisão antecipada.", provido: false });
+    falha("decidir recurso antes do fim das contrarrazões deveria falhar");
+  } catch (e) {
+    if (!(e instanceof engine.ErroFluxo) || !e.message.includes(`${dc}/${mc}/${ac}`)) throw e;
+    ok(`decidir antes do fim das contrarrazões → bloqueado: "${e.message}"`);
+  }
+  // Intenção registrada há 20 dias: o prazo das contrarrazões já passou
+  const intencaoAntiga = doDia(hoje, -20);
+  await engine.registrarRecurso(compras, p.id, { recorrente: "Concorrente A2", intencaoEm: intencaoAntiga });
+  c = await carregar(p.id);
+  recs = meta(c).recursos as typeof recs;
+  await engine.decidirRecurso(compras, p.id, recs[1].id, { decisao: "Provido: proposta vencedora desclassificada.", provido: true });
   c = await estaEm(p.id, "SESSAO_DISPUTA");
   if (!c.eventos.some((e) => e.tipo === "DEVOLUCAO" && (e.dados as { motivo?: string }).motivo === "Recurso provido: refazer o julgamento")) falha("devolução automática sem o motivo esperado");
   if (meta(c).resultadoSessao || meta(c).recursos || meta(c).contratacao) falha("resultado, recursos e vencedor da rodada anterior deveriam ir para o histórico");
@@ -288,7 +318,7 @@ async function main() {
   await esperaErro("sessão devolvida sem resultado novo", () => engine.avancar(compras, p.id, "RECURSOS"));
   await engine.registrarResultadoSessao(compras, p.id, { situacao: "VENCEDOR", fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: 8700, ataEm: hoje });
   await engine.avancar(compras, p.id, "RECURSOS");
-  await engine.registrarRecurso(compras, p.id, { recorrente: "Concorrente B", intencaoEm: hoje });
+  await engine.registrarRecurso(compras, p.id, { recorrente: "Concorrente B", intencaoEm: intencaoAntiga });
   c = await carregar(p.id);
   recs = meta(c).recursos as typeof recs;
   await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Improvido.", provido: false });
@@ -309,14 +339,24 @@ async function main() {
   const emp = await engine.juntarDocumento(contador, p.id, "NOTA_EMPENHO", "Empenho", "Empenhado.");
   await engine.assinarDocumento(contador, emp.id, "CONTABILIDADE");
   await engine.assinarDocumento(prefeita, emp.id, "ORDENADOR");
+  await esperaErro("dados da contratação antes da etapa do contrato", () => engine.registrarContratacao(compras, p.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "8700", fonte: "ORDINARIOS" }));
   await engine.avancar(contador, p.id, "CONTRATADO");
   await engine.receber(compras, p.id);
-  await engine.registrarContratacao(compras, p.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "8700", fonte: "ORDINARIOS" });
   const contrato = await engine.juntarDocumento(compras, p.id, "CONTRATO", "Contrato", "Contrato assinado.");
   await engine.assinarDocumento(prefeita, contrato.id, "ORDENADOR");
   await engine.juntarDocumento(compras, p.id, "PORTARIA_FISCAL", "Portaria", "Fiscal designado.");
   await engine.juntarDocumento(compras, p.id, "PUBLICACAO_PNCP", "PNCP", "Publicado.");
+  // O vencedor preenche fornecedor, CNPJ e valor, mas não a fonte: a trava CONTRATACAO_COMPLETA segura o contrato
+  c = await carregar(p.id);
+  if ((meta(c).contratacao as Record<string, unknown>).fonte) falha("premissa: o vencedor não traz a fonte de recurso");
+  const gCt = engine.avaliarGates(c, fer).find((g) => g.gate.tipo === "regra" && g.gate.regra === "CONTRATACAO_COMPLETA");
+  if (!gCt || gCt.ok || !gCt.motivo.includes("fonte de recurso")) falha("trava de contratação deveria pedir a fonte de recurso: " + JSON.stringify(gCt));
+  await esperaErro("licitação vencedora sem fonte de recurso não sai de CONTRATADO", () => engine.avancar(compras, p.id, "EXECUCAO"));
+  await esperaErro("CNPJ diferente do vencedor da sessão", () => engine.registrarContratacao(compras, p.id, { fornecedor: "Outra Empresa Ltda", cnpj: "11444777000161", valor: "8700", fonte: "ORDINARIOS" }));
+  await engine.registrarContratacao(compras, p.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "8700", fonte: "ORDINARIOS" });
   await engine.avancar(compras, p.id, "EXECUCAO");
+  await esperaErro("dados da contratação depois da etapa do contrato", () => engine.registrarContratacao(compras, p.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "8700", fonte: "SAUDE" }));
+  ok("contratação: só na etapa do contrato, CNPJ do vencedor obrigatório, sem fonte não segue; com fonte segue para a execução");
   await engine.juntarDocumento(secretario, p.id, "ORDEM_FORNECIMENTO", "Ordem", "Fornecer.");
   await engine.juntarDocumento(secretario, p.id, "NOTA_FISCAL", "NF", "NF 1.");
   const atesto = await engine.juntarDocumento(secretario, p.id, "ATESTO", "Atesto", "Recebido.");
@@ -431,6 +471,34 @@ async function main() {
   c = await estaEm(d.id, "EMPENHADO");
   if (!engine.verificarCadeia(c.eventos).ok) falha("cadeia de eventos da dispensa rompida");
   ok("contratação direta chegou a EMPENHADO com o ato assinado pelo ordenador");
+
+  // =========================================================================
+  // D) Troca de modalidade na instrução: o aviso da dispensa não vale para a nova rodada
+  // =========================================================================
+  const t = await ateInstrucao("troca de modalidade");
+  await engine.definirModalidade(compras, t.id, "DISPENSA_VALOR", "Valor abaixo do limite do art. 75, II, sem fracionamento aparente.");
+  await engine.registrarPesquisaPrecos(compras, t.id, { fontes: fontes3 });
+  await instrucaoAteParecer(t.id);
+  await engine.avancar(procurador, t.id, "INSTRUCAO_DIRETA");
+  await engine.receber(compras, t.id);
+  await engine.publicarAvisoDispensa(compras, t.id, { justificativaSemAviso: "Entrega urgente para inaugurar a unidade na próxima semana." });
+  await engine.devolver(compras, t.id, "INSTRUCAO", "Rever o caminho: o mercado tem mais fornecedores do que o previsto.");
+  await estaEm(t.id, "INSTRUCAO");
+  await engine.definirModalidade(compras, t.id, "LICITACAO", "Há vários fornecedores: a disputa por pregão amplia a competição.");
+  c = await carregar(t.id);
+  if (meta(c).avisoDispensa) falha("ao trocar para licitação o aviso da dispensa deveria sair dos metadados");
+  const hav = meta(c).historicoAvisos as { justificativaSemAviso?: string; arquivadoEm?: string }[] | undefined;
+  if (hav?.length !== 1 || !hav[0].arquivadoEm || !hav[0].justificativaSemAviso) falha("aviso deveria ir para historicoAvisos: " + JSON.stringify(hav));
+  const evMod = c.eventos.filter((e) => e.tipo === "MODALIDADE").at(-1)?.dados as { arquivados?: string[] } | undefined;
+  if (!evMod?.arquivados?.includes("avisoDispensa")) falha("evento MODALIDADE deveria dizer o que foi arquivado: " + JSON.stringify(evMod));
+  await engine.definirModalidade(compras, t.id, "DISPENSA_VALOR", "Pregão inviável no prazo: volta à dispensa por valor com aviso.");
+  await instrucaoAteParecer(t.id);
+  await engine.avancar(procurador, t.id, "INSTRUCAO_DIRETA");
+  await engine.receber(compras, t.id);
+  await esperaErro("de volta à dispensa, o aviso antigo não vale", () => engine.avancar(compras, t.id, "AUTORIZACAO_DIRETA"));
+  await engine.publicarAvisoDispensa(compras, t.id, { justificativaSemAviso: "Nova justificativa: entrega urgente para a inauguração." });
+  await engine.avancar(compras, t.id, "AUTORIZACAO_DIRETA");
+  ok("dispensa → licitação → dispensa: o aviso antigo vai para o histórico e a dispensa exige aviso novo");
 
   // ---- processo com etapa que não existe mais
   const velho = await engine.abrirProcesso(requisitante, {

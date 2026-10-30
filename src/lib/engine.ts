@@ -7,13 +7,14 @@ import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
 import { numeroBr } from "./numeros";
-import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, ramoDaModalidade, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
 import {
   MIN_JUSTIFICATIVA,
   impugnacaoTempestiva,
   mediana,
   prazosRecurso,
   regraAvisoDispensa,
+  regraContratacao,
   regraImpugnacoes,
   regraModalidadeDefinida,
   regraPesquisaPrecos,
@@ -22,6 +23,7 @@ import {
   regraResultado,
   regraRetornoBancario,
   type AvisoDispensa,
+  type DadosContratacao,
   type Edital,
   type Impugnacao,
   type PesquisaPrecos,
@@ -242,6 +244,7 @@ export function hojeIso(): string {
  *   metadados.recursos          Recurso[]                  RECURSOS            → regraRecursos
  *   metadados.avisoDispensa     AvisoDispensa              AVISO_DISPENSA      → regraAvisoDispensa (com hoje e feriados)
  *   metadados.retornoBancario   RetornoBancario            RETORNO_BANCARIO    → regraRetornoBancario
+ *   metadados.contratacao       DadosContratacao           CONTRATACAO_COMPLETA → regraContratacao (com FONTES)
  */
 function avaliarRegra(regra: Extract<Gate, { tipo: "regra" }>["regra"], meta: Record<string, unknown>, feriados: Set<string>, hoje: string): ResultadoRegra {
   const modalidade = typeof meta.modalidade === "string" ? meta.modalidade : undefined;
@@ -262,6 +265,8 @@ function avaliarRegra(regra: Extract<Gate, { tipo: "regra" }>["regra"], meta: Re
       return regraAvisoDispensa(modalidade, meta.avisoDispensa as AvisoDispensa | undefined, hoje, feriados);
     case "RETORNO_BANCARIO":
       return regraRetornoBancario(meta.retornoBancario as RetornoBancario | undefined);
+    case "CONTRATACAO_COMPLETA":
+      return regraContratacao(meta.contratacao as DadosContratacao | undefined, FONTES);
     default:
       return { ok: false, motivo: `Regra desconhecida: ${String(regra)}.` };
   }
@@ -347,6 +352,16 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
   }
 
   return db.transaction(async (tx) => {
+    // Reavalia com a linha travada: outra gravação pode ter mudado os metadados entre a leitura acima e agora
+    const metaAtual = await travarMetadados(tx, p);
+    const pAtual: ProcessoCompleto = { ...p, metadados: metaAtual };
+    if (!avancosDisponiveis(p.def, p.estado, metaAtual).some((t) => t.para === paraEstado))
+      throw new ErroFluxo("Os dados do processo mudaram e este caminho não vale mais. Recarregue a página e confira a modalidade.");
+    const pendAtual = avaliarGates(pAtual, fer).filter((g) => !g.ok);
+    if (pendAtual.length)
+      throw new ErroFluxo(
+        "Faltam requisitos desta etapa: " + pendAtual.map((g) => (g.gate.tipo === "documento" ? `${g.gate.documentoTipo} (${g.motivo})` : g.motivo)).join("; "),
+      );
     await moverEstado(tx, u, p, destino, fer, destino.final ? "ENCERRAMENTO" : "MUDANCA_ESTADO", quebraOrdem ? { rotulo: trans.rotulo, despacho: despacho?.trim() || null, quebraOrdem } : { rotulo: trans.rotulo, despacho: despacho?.trim() || null }, { encerra: true });
   });
 }
@@ -546,14 +561,25 @@ export async function registrarContratacao(u: SessaoUsuario, processoId: string,
   if (fornecedor.length < 3) throw new ErroFluxo("Informe a razão social do fornecedor.");
   if (!cnpjValido(cnpj)) throw new ErroFluxo("CNPJ inválido. Confira os 14 dígitos.");
   if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo("Informe o valor contratado.");
-  if (!FONTES[input.fonte]) throw new ErroFluxo("Escolha a fonte de recurso.");
+  if (!Object.hasOwn(FONTES, input.fonte)) throw new ErroFluxo("Escolha a fonte de recurso.");
+  // Os dados entram na etapa do contrato: antes dela o vencedor ainda pode mudar; depois, o contrato já foi publicado
+  if (!ETAPAS_CONTRATACAO.includes(p.estadoAtual)) {
+    const nomes = ETAPAS_CONTRATACAO.map((e) => getEstado(p.def, e)?.nome ?? e).join(" ou ");
+    throw new ErroFluxo(`Os dados da contratação se registram na etapa ${nomes}. O processo está em "${p.estado.nome}".`);
+  }
   const contratacao = { fornecedor, cnpj, valor: valor.toFixed(2), fonte: input.fonte };
-  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>), contratacao };
   return db.transaction(async (tx) => {
-    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    const meta = await travarMetadados(tx, p);
+    const vencedor = meta.resultadoSessao as ResultadoSessao | undefined;
+    if (vencedor?.situacao === "VENCEDOR" && vencedor.cnpj && vencedor.cnpj !== cnpj)
+      throw new ErroFluxo(`O fornecedor é o vencedor da sessão (${vencedor.fornecedor}, CNPJ ${vencedor.cnpj}); para mudar, registre novo resultado.`);
+    await gravarMeta(tx, p.id, { ...meta, contratacao });
     await registrarEvento(tx, p.id, u.id, "DADOS_CONTRATACAO", { dados: contratacao });
   });
 }
+
+/** Etapas em que compras ou contabilidade registram (ou corrigem) os dados da contratação: as do painel na página do processo. */
+const ETAPAS_CONTRATACAO = ["CONTRATADO"];
 
 /** Registra o envio da contratação ao sistema do Tribunal de Contas, com o número do recibo. */
 export async function registrarRemessaTce(u: SessaoUsuario, processoId: string, recibo: string) {
@@ -632,9 +658,9 @@ export async function abrirExigencia(u: SessaoUsuario, processoId: string, texto
   if (!texto.trim()) throw new ErroFluxo("Escreva o que o interessado precisa enviar.");
   const fer = await feriadosDo(u.municipioId);
   const exig: Exigencia = { texto: texto.trim(), prazo: addDiasUteis(new Date(), Math.max(1, prazoDiasUteis), fer).toISOString(), abertaEm: new Date().toISOString(), autor: u.nome };
-  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>), exigencia: exig };
   return db.transaction(async (tx) => {
-    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    const meta = await travarMetadados(tx, p);
+    await gravarMeta(tx, p.id, { ...meta, exigencia: exig });
     await registrarEvento(tx, p.id, u.id, "EXIGENCIA", { dados: exig });
   });
 }
@@ -643,13 +669,13 @@ export async function abrirExigencia(u: SessaoUsuario, processoId: string, texto
 export async function responderExigencia(municipioId: string, processoId: string, resposta: { texto: string; pessoaId: string; nome: string }) {
   const p = await carregarProcesso(municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
-  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>) };
-  if (!meta.exigencia) throw new ErroFluxo("Não há pendência aberta neste processo.");
   if (!resposta.texto.trim()) throw new ErroFluxo("Escreva a resposta.");
-  delete meta.exigencia;
   const sys = await usuarioAtendimentoDigital(municipioId);
   return db.transaction(async (tx) => {
-    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    const meta = await travarMetadados(tx, p);
+    if (!meta.exigencia) throw new ErroFluxo("Não há pendência aberta neste processo. Recarregue a página: ela pode já ter sido respondida.");
+    delete meta.exigencia;
+    await gravarMeta(tx, p.id, meta);
     await registrarEvento(tx, p.id, sys.id, "RESPOSTA_EXIGENCIA", { dados: { texto: resposta.texto.trim(), pessoaId: resposta.pessoaId, nome: resposta.nome } });
   });
 }
@@ -713,8 +739,11 @@ export async function definirModalidade(u: SessaoUsuario, processoId: string, mo
   const just = texto(justificativa, "Justificativa da modalidade", MIN_JUSTIFICATIVA);
   return agirNoProcesso(u, processoId, ["INSTRUCAO"], async ({ tx, p, meta }) => {
     const anterior = typeof meta.modalidade === "string" ? meta.modalidade : null;
-    const novo: Record<string, unknown> = { ...meta, modalidade, modalidadeJustificativa: just };
-    const dados: Record<string, unknown> = { de: anterior, para: modalidade, justificativa: just };
+    const ramoAnterior = ramoDaModalidade(anterior);
+    // Trocou de ramo (licitação ↔ direta): o que valia no caminho antigo vai para o histórico e não satisfaz as travas do novo
+    const { meta: base, arquivados } = ramoAnterior && ramoAnterior !== ramoDaModalidade(modalidade) ? arquivarRamo(meta, ramoAnterior) : { meta, arquivados: [] };
+    const novo: Record<string, unknown> = { ...base, modalidade, modalidadeJustificativa: just };
+    const dados: Record<string, unknown> = { de: anterior, para: modalidade, justificativa: just, ...(arquivados.length ? { arquivados } : {}) };
     // Dispensa por valor: refaz a análise de limite e fracionamento (art. 75, §1º), como na abertura, sem contar este processo duas vezes
     if (modalidade === "DISPENSA_VALOR" && meta.natureza) {
       const r = await analiseDispensa(u, p, meta);
@@ -726,6 +755,40 @@ export async function definirModalidade(u: SessaoUsuario, processoId: string, mo
     await gravarMeta(tx, p.id, novo);
     await registrarEvento(tx, p.id, u.id, "MODALIDADE", { dados });
   });
+}
+
+/** Tira de `metadados` os dados do ramo abandonado (aviso da dispensa; ou edital, impugnações, sessão e recursos) e os guarda em histórico. */
+function arquivarRamo(meta: Record<string, unknown>, ramo: "LICITACAO" | "DIRETA"): { meta: Record<string, unknown>; arquivados: string[] } {
+  const m = { ...meta };
+  const arquivadoEm = new Date().toISOString();
+  const arquivar = (chave: string, item: object) => {
+    m[chave] = [...((m[chave] as unknown[] | undefined) ?? []), { ...item, arquivadoEm }];
+  };
+  const arquivados: string[] = [];
+  if (ramo === "DIRETA") {
+    if (m.avisoDispensa) {
+      arquivar("historicoAvisos", m.avisoDispensa as object);
+      delete m.avisoDispensa;
+      arquivados.push("avisoDispensa");
+    }
+    return { meta: m, arquivados };
+  }
+  if (m.edital || m.impugnacoes) {
+    arquivar("historicoEditais", { edital: m.edital ?? null, impugnacoes: m.impugnacoes ?? [] });
+    for (const k of ["edital", "impugnacoes"]) if (m[k]) arquivados.push(k);
+    delete m.edital;
+    delete m.impugnacoes;
+  }
+  if (m.resultadoSessao || m.recursos) {
+    arquivar("historicoSessoes", { resultadoSessao: m.resultadoSessao ?? null, recursos: m.recursos ?? [], contratacao: m.contratacao ?? null });
+    for (const k of ["resultadoSessao", "recursos"]) if (m[k]) arquivados.push(k);
+    delete m.resultadoSessao;
+    delete m.recursos;
+    const resto = semVencedor(m.contratacao);
+    if (resto) m.contratacao = resto;
+    else delete m.contratacao;
+  }
+  return { meta: m, arquivados };
 }
 
 /** Registra as fontes da pesquisa de preços (art. 23) e recalcula o valor estimado como a mediana delas. */
@@ -870,6 +933,11 @@ export async function decidirRecurso(u: SessaoUsuario, processoId: string, id: s
     const alvo = lista.find((r) => r.id === id);
     if (!alvo) throw new ErroFluxo("Recurso não encontrado neste processo. Atualize a página e escolha outro.");
     if (alvo.decididoEm) throw new ErroFluxo("Este recurso já foi decidido.");
+    // Art. 165: as contrarrazões podem chegar até o último dia do prazo; a decisão vem depois dele
+    if (hojeIso() <= alvo.contrarrazoesAte) {
+      const [a, m, d] = alvo.contrarrazoesAte.split("-");
+      throw new ErroFluxo(`O prazo de contrarrazões vai até ${d}/${m}/${a} (art. 165). Decida o recurso a partir do dia seguinte.`);
+    }
     const decisao = texto(d.decisao, "Decisão do recurso");
     const decidido: Recurso = { ...alvo, decisao, provido: !!d.provido, decididoEm: hojeIso() };
     const novo = { ...meta, recursos: lista.map((r) => (r.id === id ? decidido : r)) };

@@ -130,10 +130,16 @@ export function gerarSqlValor(ids: IdsValor): string {
 
   // 4. Processos novos de exemplo
   let seqNum = ids.maxSeq;
-  const caminho = ["DEMANDA", "APROVACAO_SECRETARIO", "AUTUACAO", "AUTORIZACAO", "INSTRUCAO", "VERIFICACAO_ORCAMENTARIA", "RESERVADO", "CONTROLE_INTERNO", "PARECER_JURIDICO", "SESSAO_DISPUTA", "HOMOLOGADO", "EMPENHADO", "CONTRATADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGAMENTO_ENVIADO", "PAGO", "ARQUIVADO"];
+  // Caminho de cada processo conforme a modalidade: licitação passa pelo edital e pela sessão; contratação direta, pela instrução e autorização diretas
+  const inicio = ["DEMANDA", "APROVACAO_SECRETARIO", "AUTUACAO", "AUTORIZACAO", "INSTRUCAO", "VERIFICACAO_ORCAMENTARIA", "RESERVADO", "CONTROLE_INTERNO", "PARECER_JURIDICO"];
+  const fim = ["EMPENHADO", "CONTRATADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGAMENTO_ENVIADO", "PAGO", "ARQUIVADO"];
+  const ramoLicitacao = ["PUBLICACAO_EDITAL", "IMPUGNACOES", "SESSAO_DISPUTA", "RECURSOS", "HOMOLOGADO"];
+  const ramoDireta = ["INSTRUCAO_DIRETA", "AUTORIZACAO_DIRETA"];
+  const caminhoDe = (modalidade: unknown) => [...inicio, ...(modalidade === "LICITACAO" ? ramoLicitacao : ramoDireta), ...fim];
   const setorDe: Record<string, string | null> = {
     DEMANDA: null, APROVACAO_SECRETARIO: null, AUTUACAO: "PROT", AUTORIZACAO: "GAB", INSTRUCAO: "COMPRAS", VERIFICACAO_ORCAMENTARIA: "CONTAB", RESERVADO: "CONTAB", CONTROLE_INTERNO: "CGM",
-    PARECER_JURIDICO: "PGM", SESSAO_DISPUTA: "COMPRAS", HOMOLOGADO: "GAB", EMPENHADO: "CONTAB", CONTRATADO: "COMPRAS", EXECUCAO: null,
+    PARECER_JURIDICO: "PGM", PUBLICACAO_EDITAL: "COMPRAS", IMPUGNACOES: "COMPRAS", SESSAO_DISPUTA: "COMPRAS", RECURSOS: "COMPRAS", HOMOLOGADO: "GAB",
+    INSTRUCAO_DIRETA: "COMPRAS", AUTORIZACAO_DIRETA: "GAB", EMPENHADO: "CONTAB", CONTRATADO: "COMPRAS", EXECUCAO: null,
     LIQUIDADO: "CONTAB", FILA_PAGAMENTO: "TES", PAGAMENTO_ENVIADO: "TES", PAGO: "TES", ARQUIVADO: "PROT",
   };
 
@@ -143,8 +149,8 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: string;
     meta: Record<string, unknown>;
     ate: string;
-    /** dias atrás em que entrou em cada estado do caminho, do primeiro até `ate` */
-    datas: number[];
+    /** dias atrás em que entrou no primeiro estado e em `ate`; os do meio são espaçados entre os dois */
+    periodo: [number, number];
     contratacao?: { fornecedor: string; cnpj: string; valor: string; fonte: string };
     quebra?: { aFrente: string[]; justificativa: string };
     docs?: [string, string, string, number][];
@@ -159,7 +165,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     if (!numeroDe.has(assunto)) numeroDe.set(assunto, `${ids.ano}/${String(++seqNum).padStart(6, "0")}`);
     return numeroDe.get(assunto)!;
   };
-  const base = (objeto: string, valor: number, natureza: string, modalidade: string, prioridade = "MEDIA") => ({
+  const base = (objeto: string, valor: number, natureza: string, modalidade: "LICITACAO" | "DISPENSA_VALOR" | "OUTRA_DIRETA", prioridade = "MEDIA") => ({
     objeto,
     natureza,
     modalidade,
@@ -170,9 +176,10 @@ export function gerarSqlValor(ids: IdsValor): string {
     prioridade,
     noPCA: "SIM",
   });
-  const datasAte = (estado: string, inicio: number, fim: number) => {
-    const n = caminho.indexOf(estado) + 1;
-    return Array.from({ length: n }, (_, i) => Math.round(inicio - ((inicio - fim) * i) / Math.max(1, n - 1)));
+  /** Dias atrás em que o processo entrou em cada etapa do seu caminho, do primeiro até `estado`, espaçados entre `de` e `ate`. */
+  const datasAte = (estado: string, de: number, ate: number, modalidade: string) => {
+    const n = caminhoDe(modalidade).indexOf(estado) + 1;
+    return Array.from({ length: n }, (_, i) => Math.round(de - ((de - ate) * i) / Math.max(1, n - 1)));
   };
 
   // limite de dispensa: material de expediente fica perto do limite
@@ -182,7 +189,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SEDUC",
     meta: base("Papel, cartolina e material de escritório para 9 escolas", 21400, "MATERIAL_EXPEDIENTE", "DISPENSA_VALOR"),
     ate: "ARQUIVADO",
-    datas: datasAte("ARQUIVADO", 110, 40),
+    periodo: [110, 40],
     contratacao: { fornecedor: "Papelaria Central do Norte Ltda", cnpj: cnpj("112223330001"), valor: "21400.00", fonte: "EDUCACAO" },
     remessa: true,
   });
@@ -192,7 +199,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SESAU",
     meta: base("Material de escritório para 4 UBS", 14900, "MATERIAL_EXPEDIENTE", "DISPENSA_VALOR"),
     ate: "EXECUCAO",
-    datas: datasAte("EXECUCAO", 45, 6),
+    periodo: [45, 6],
     contratacao: { fornecedor: "Papelaria Central do Norte Ltda", cnpj: cnpj("112223330001"), valor: "14900.00", fonte: "SAUDE" },
     remessa: true,
   });
@@ -205,7 +212,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SEMAD",
     meta: base("Troca de rotor e quadro de comando de 2 bombas", 18750, "SERVICOS_GERAIS", "DISPENSA_VALOR", "ALTA"),
     ate: "FILA_PAGAMENTO",
-    datas: datasAte("FILA_PAGAMENTO", 70, 16),
+    periodo: [70, 16],
     contratacao: { fornecedor: "Hidrobombas Sertão Ltda", cnpj: cnpj("458712300001"), valor: "18750.00", fonte: "ORDINARIOS" },
     remessa: true,
   });
@@ -215,7 +222,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SESAU",
     meta: base("Luvas de procedimento e máscaras cirúrgicas", 42300, "MEDICAMENTOS", "LICITACAO"),
     ate: "FILA_PAGAMENTO",
-    datas: datasAte("FILA_PAGAMENTO", 95, 9),
+    periodo: [95, 9],
     contratacao: { fornecedor: "Distribuidora Médica Cariri Ltda", cnpj: cnpj("307755410001"), valor: "41890.00", fonte: "SAUDE" },
     remessa: true,
   });
@@ -225,7 +232,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SESAU",
     meta: base("Recarga de 40 cilindros de oxigênio medicinal", 9600, "MEDICAMENTOS", "DISPENSA_VALOR", "ALTA"),
     ate: "FILA_PAGAMENTO",
-    datas: datasAte("FILA_PAGAMENTO", 30, 4),
+    periodo: [30, 4],
     contratacao: { fornecedor: "Oxigênio Nordeste Ltda", cnpj: cnpj("612098770001"), valor: "9600.00", fonte: "SAUDE" },
   });
   novos.push({
@@ -234,7 +241,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SESAU",
     meta: base("Gasolina e diesel para 6 veículos da Saúde", 96000, "COMBUSTIVEIS", "LICITACAO"),
     ate: "FILA_PAGAMENTO",
-    datas: datasAte("FILA_PAGAMENTO", 120, 2),
+    periodo: [120, 2],
     contratacao: { fornecedor: "Posto Avenida Ltda", cnpj: cnpj("771234560001"), valor: "94380.00", fonte: "SAUDE" },
     remessa: true,
   });
@@ -245,7 +252,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SESAU",
     meta: base("Troca de embreagem e revisão da ambulância", 6400, "SERVICOS_GERAIS", "DISPENSA_VALOR", "ALTA"),
     ate: "ARQUIVADO",
-    datas: datasAte("ARQUIVADO", 28, 9),
+    periodo: [28, 9],
     contratacao: { fornecedor: "Auto Mecânica São José Ltda", cnpj: cnpj("554433220001"), valor: "6400.00", fonte: "ORDINARIOS" },
     quebra: {
       aFrente: [nBombas],
@@ -261,7 +268,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SEMAD",
     meta: base("Dedetização e desratização de 14 prédios", 12800, "SERVICOS_GERAIS", "DISPENSA_VALOR"),
     ate: "CONTRATADO",
-    datas: datasAte("CONTRATADO", 50, 22),
+    periodo: [50, 22],
     contratacao: { fornecedor: "Dedetizadora Limpa Mais Ltda", cnpj: cnpj("663399880001"), valor: "12650.00", fonte: "ORDINARIOS" },
     docs: [["CONTRATO", "Contrato 041/2026 — dedetização", "Contrato de prestação de serviço de dedetização e desratização, 12 meses.", 20]],
   });
@@ -271,7 +278,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     setorReq: "SEDUC",
     meta: base("Carteiras, mesas e armários para 6 salas", 74000, "EQUIPAMENTOS", "LICITACAO"),
     ate: "CONTRATADO",
-    datas: datasAte("CONTRATADO", 80, 6),
+    periodo: [80, 6],
     docs: [["CONTRATO", "Contrato 044/2026 — mobiliário escolar", "Contrato de fornecimento de mobiliário escolar, entrega em 30 dias.", 5]],
   });
 
@@ -280,21 +287,25 @@ export function gerarSqlValor(ids: IdsValor): string {
     const numero = reservarNumero(n.assunto);
     const sequencial = Number(numero.split("/")[1]);
     const id = createHash("md5").update(ids.municipioId + numero + n.assunto).digest("hex").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+    const caminho = caminhoDe(n.meta.modalidade);
     const estados = caminho.slice(0, caminho.indexOf(n.ate) + 1);
+    const datas = datasAte(n.ate, n.periodo[0], n.periodo[1], String(n.meta.modalidade));
     const setorEstado = (e: string) => S(setorDe[e] ?? n.setorReq);
     const final = n.ate === "ARQUIVADO";
     const meta = { ...n.meta, ...(n.contratacao ? { contratacao: n.contratacao } : {}) };
     out.push(
-      `insert into tramite.processos (id, municipio_id, unidade_gestora_id, tipo_id, ano, sequencial, numero, assunto, descricao, urgencia, estado_atual, setor_atual_id, recebido_em, prazo_etapa_em, aberto_por_id, aberto_em, encerrado_em, metadados) values (${lit(id)}, ${lit(ids.municipioId)}, ${lit(ug)}, ${lit(ids.tipos.COMPRA)}, ${ids.ano}, ${sequencial}, ${lit(numero)}, ${lit(n.assunto)}, ${lit(String(n.meta.justificativa))}, ${lit(n.meta.prioridade === "ALTA" ? "PRIORITARIO" : "NORMAL")}, ${lit(n.ate)}, ${lit(setorEstado(n.ate))}, ${ts(dia(n.datas.at(-1)!))}, ${final ? "null" : ts(new Date(agora + 6 * 86400_000))}, ${lit(U(n.req))}, ${ts(dia(n.datas[0]))}, ${final ? ts(dia(n.datas.at(-1)!)) : "null"}, ${json(meta)});`,
+      `insert into tramite.processos (id, municipio_id, unidade_gestora_id, tipo_id, ano, sequencial, numero, assunto, descricao, urgencia, estado_atual, setor_atual_id, recebido_em, prazo_etapa_em, aberto_por_id, aberto_em, encerrado_em, metadados) values (${lit(id)}, ${lit(ids.municipioId)}, ${lit(ug)}, ${lit(ids.tipos.COMPRA)}, ${ids.ano}, ${sequencial}, ${lit(numero)}, ${lit(n.assunto)}, ${lit(String(n.meta.justificativa))}, ${lit(n.meta.prioridade === "ALTA" ? "PRIORITARIO" : "NORMAL")}, ${lit(n.ate)}, ${lit(setorEstado(n.ate))}, ${ts(dia(datas.at(-1)!))}, ${final ? "null" : ts(new Date(agora + 6 * 86400_000))}, ${lit(U(n.req))}, ${ts(dia(datas[0]))}, ${final ? ts(dia(datas.at(-1)!)) : "null"}, ${json(meta)});`,
     );
     const evs: Ev[] = [];
     estados.forEach((e, i) => {
       const anterior = estados[i - 1];
       const ehPago = e === "PAGO";
+      // A quebra de ordem é decidida na saída da fila, no envio ao banco (art. 141): é onde historicoDePagamentos a lê
+      const ehEnvio = e === "PAGAMENTO_ENVIADO";
       evs.push({
         tipo: i === 0 ? "ABERTURA" : e === "ARQUIVADO" ? "ENCERRAMENTO" : "MUDANCA_ESTADO",
-        autor: U(ehPago || e === "ARQUIVADO" ? "77777777777" : n.req),
-        quando: dia(n.datas[i]),
+        autor: U(ehPago || ehEnvio || e === "ARQUIVADO" ? "77777777777" : n.req),
+        quando: dia(datas[i]),
         deEstado: anterior,
         paraEstado: e,
         deSetor: anterior ? setorEstado(anterior) : undefined,
@@ -302,17 +313,19 @@ export function gerarSqlValor(ids: IdsValor): string {
         dados:
           i === 0
             ? { numero, tipo: "COMPRA" }
-            : ehPago && n.quebra
-              ? { rotulo: "Registrar pagamento", despacho: n.quebra.justificativa, quebraOrdem: n.quebra }
-              : { rotulo: "Avanço" },
+            : ehEnvio && n.quebra
+              ? { rotulo: "Enviar ao banco", despacho: n.quebra.justificativa, quebraOrdem: n.quebra }
+              : ehPago
+                ? { rotulo: "Banco confirmou o pagamento", despacho: null }
+                : { rotulo: "Avanço" },
       });
       if (e === "CONTRATADO" && n.contratacao) {
-        evs.push({ tipo: "DADOS_CONTRATACAO", autor: U("33333333333"), quando: new Date(dia(n.datas[i]).getTime() + 3600_000), dados: n.contratacao });
+        evs.push({ tipo: "DADOS_CONTRATACAO", autor: U("33333333333"), quando: new Date(dia(datas[i]).getTime() + 3600_000), dados: n.contratacao });
         if (n.remessa)
           evs.push({
             tipo: "REMESSA_TCE",
             autor: U("33333333333"),
-            quando: new Date(dia(n.datas[i]).getTime() + 2 * 3600_000),
+            quando: new Date(dia(datas[i]).getTime() + 2 * 3600_000),
             dados: { sistema: "LicitaCon (TCE-RS)", recibo: `2026.${String(sequencial).padStart(4, "0")}.${(sequencial * 37) % 97}` },
           });
       }

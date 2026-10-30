@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { MessageSquareWarning } from "lucide-react";
 import { requirePortal, ErroAcesso } from "@/lib/portal";
-import { carregarMeuProcesso } from "@/lib/portal-processos";
-import { caminhoPrincipal, getEstado, nomeEtapa } from "@/lib/workflow";
+import { EVENTOS_EXTERNOS, carregarMeuProcesso } from "@/lib/portal-processos";
+import { caminhoDoProcesso, caminhoPrincipal, getEstado, nomeEtapa, ramoDaModalidade } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
@@ -28,6 +28,12 @@ export default async function MeuPedido({ params }: { params: Promise<{ id: stri
   if (!p) notFound();
   const nome = (k: string | null) => (k ? nomeEtapa(getEstado(p.def, k)?.nome ?? k) : "");
   const exig = (p.metadados as { exigencia?: Exigencia } | null)?.exigencia;
+  // O interessado vê só movimentações e exigências (lista de tipos permitidos, como em /consulta); despachos, documentos e dados internos ficam na gestão.
+  // carregarMeuProcesso já filtra; o filtro aqui garante o mesmo se a página passar a receber eventos de outra fonte.
+  const eventosVisiveis = p.eventos.filter((e) => EVENTOS_EXTERNOS.includes(e.tipo));
+  const metaP = (p.metadados ?? {}) as Record<string, unknown>;
+  const ramo = ramoDaModalidade(metaP.modalidade);
+  const principal = caminhoPrincipal(p.def);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 text-[14px]">
@@ -68,7 +74,12 @@ export default async function MeuPedido({ params }: { params: Promise<{ id: stri
 
       <section className="panel mt-6 p-6">
         <Trilho
-          estacoes={p.def.estados.map((e) => ({ chave: e.chave, nome: nomeEtapa(e.nome), setor: null, opcional: !caminhoPrincipal(p.def).includes(e.chave) }))}
+          estacoes={caminhoDoProcesso(p.def, metaP).map((e) => ({
+            chave: e.chave,
+            nome: nomeEtapa(e.nome),
+            setor: null,
+            opcional: !!e.opcional || (!principal.includes(e.chave) && !(ramo && e.ramo === ramo)),
+          }))}
           atual={p.estadoAtual}
           encerrado={!!p.encerradoEm}
           visitadas={p.eventos.map((e) => e.paraEstado).filter((x): x is string => !!x)}
@@ -78,7 +89,7 @@ export default async function MeuPedido({ params }: { params: Promise<{ id: stri
       <section className="panel mt-6 p-6">
         <h2 className="text-[16px] font-semibold text-ink">O que aconteceu</h2>
         <ol className="mt-4 space-y-4">
-          {[...p.eventos].reverse().map((e) => {
+          {[...eventosVisiveis].reverse().map((e) => {
             const d = (e.dados ?? {}) as Record<string, string>;
             return (
               <li key={e.id} className="grid grid-cols-[minmax(0,130px)_minmax(0,1fr)] gap-4 text-[14.5px]">

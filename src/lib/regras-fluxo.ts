@@ -204,6 +204,24 @@ export function regraRetornoBancario(r: RetornoBancario | undefined): ResultadoR
   return ok("Pagamento aceito pelo banco.");
 }
 
+/** Dados da contratação como ficam em `metadados.contratacao` (o valor é texto com duas casas, ex.: "8500.00"). */
+export type DadosContratacao = { fornecedor?: string; cnpj?: string; valor?: string | number; fonte?: string };
+
+/**
+ * Contrato só segue com fornecedor, CNPJ, valor e fonte de recurso válida: a fonte define a fila cronológica de pagamento (art. 141).
+ * `fontes` é a tabela de fontes válidas (FONTES de workflow.ts), recebida aqui para a regra continuar pura.
+ */
+export function regraContratacao(c: DadosContratacao | undefined, fontes: Record<string, string>): ResultadoRegra {
+  const faltam: string[] = [];
+  if (!c?.fornecedor?.trim()) faltam.push("fornecedor");
+  if (String(c?.cnpj ?? "").replace(/\D/g, "").length !== 14) faltam.push("CNPJ");
+  const valor = Number(c?.valor);
+  if (!Number.isFinite(valor) || valor <= 0) faltam.push("valor contratado");
+  if (typeof c?.fonte !== "string" || !Object.hasOwn(fontes, c.fonte)) faltam.push("fonte de recurso");
+  if (faltam.length) return falha(`Informe nos dados da contratação: ${faltam.join(", ")}.`);
+  return ok(`Contratação com ${c!.fornecedor}, fonte ${fontes[c!.fonte!]}.`);
+}
+
 export function regraModalidadeDefinida(modalidade: string | undefined): ResultadoRegra {
   if (!modalidade || modalidade === "A_DEFINIR") return falha("Defina a modalidade da contratação.");
   return ok(`Modalidade: ${modalidade}.`);

@@ -17,7 +17,7 @@ export function PainelDaEtapa(props: PropsEtapa) {
     case "INSTRUCAO":
       return (
         <>
-          {(!modalidade || modalidade === "A_DEFINIR") && <PainelModalidade {...props} />}
+          <PainelModalidade {...props} />
           <PainelPesquisaPrecos {...props} />
         </>
       );
