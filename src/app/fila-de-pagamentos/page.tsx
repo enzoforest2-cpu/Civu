@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ListOrdered, Search } from "lucide-react";
 import { db } from "@/db";
 import { municipios } from "@/db/schema";
-import { filaDePagamentos, historicoDePagamentos, enviadosAoBanco, fmtCnpj } from "@/lib/pagamentos";
+import { filaDePagamentos, historicoDePagamentos, enviadosAoBanco, mudancasDeFonteNaFila, fmtCnpj } from "@/lib/pagamentos";
 import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Marca, MarcaCompleta } from "@/components/marca";
 
@@ -15,9 +15,9 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
   const lista = await db.query.municipios.findMany({ orderBy: municipios.nome });
   const mun = lista.find((x) => x.slug === sp.m) ?? lista[0];
   const cnpj = (sp.cnpj ?? "").replace(/\D/g, "");
-  const [filas, hist, enviados] = mun
-    ? await Promise.all([filaDePagamentos(mun.id), historicoDePagamentos(mun.id, 180), enviadosAoBanco(mun.id)])
-    : [[], { pagos: [], mediaDias: null, quebras: [] }, []];
+  const [filas, hist, enviados, mudancas] = mun
+    ? await Promise.all([filaDePagamentos(mun.id), historicoDePagamentos(mun.id, 180), enviadosAoBanco(mun.id), mudancasDeFonteNaFila(mun.id)])
+    : [[], { pagos: [], mediaDias: null, quebras: [] }, [], []];
   const totalItens = filas.reduce((s, f) => s + f.fila.length, 0);
   const totalValor = filas.reduce((s, f) => s + f.total, 0);
   const meus = cnpj
@@ -193,6 +193,31 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
             </ul>
           )}
         </section>
+
+        {mudancas.length > 0 && (
+          <section className="panel mt-8 p-6">
+            <h2 className="text-[17px] font-semibold text-ink">Mudanças de fonte de recurso na fila</h2>
+            <p className="mt-1 text-[14px] text-ink-2">Quando a fonte muda com o pagamento já na fila, ele passa à fila da outra fonte. O motivo é publicado (art. 141).</p>
+            <ul className="mt-4 divide-y divide-line">
+              {mudancas.map((m, i) => (
+                <li key={`${m.processoId}-${i}`} className="py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="text-[14.5px] text-ink">
+                      <span className="tnum font-semibold">{m.numero}</span> · {m.fornecedor ?? "Fornecedor não informado"} · <span className="tnum">{fmtMoeda(m.valor)}</span>
+                    </div>
+                    <span className="tnum text-[13px] text-ink-3">em {fmtData(m.em)}</span>
+                  </div>
+                  <p className="mt-1.5 text-[14px] text-ink-2">
+                    <strong className="font-semibold text-ink">Fonte:</strong> {m.fonteAnterior} → {m.fonteNova}
+                  </p>
+                  <p className="mt-1 text-[14px] text-ink-2">
+                    <strong className="font-semibold text-ink">Motivo:</strong> {m.motivo}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="panel mt-8 p-6">
           <h2 className="text-[17px] font-semibold text-ink">Enviados ao banco, aguardando confirmação</h2>

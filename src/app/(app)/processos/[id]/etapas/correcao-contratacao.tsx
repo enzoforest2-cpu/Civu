@@ -14,13 +14,17 @@ export function CorrecaoContratacao({
   valor,
   fontes,
   minMotivo,
+  etapa,
 }: {
   processoId: string;
   fonte: string;
   valor: string;
   fontes: Record<string, string>;
   minMotivo: number;
+  etapa: string;
 }) {
+  const valorTravado = etapa === "LIQUIDADO" || etapa === "FILA_PAGAMENTO";
+  const naFila = etapa === "FILA_PAGAMENTO";
   const [state, formAction] = useActionState<FormState, FormData>(corrigirFonteValorAction, null);
   const v: Record<string, string | undefined> = state?.valores ?? {};
   return (
@@ -34,7 +38,8 @@ export function CorrecaoContratacao({
             <label className="label" htmlFor="corr-valor">
               Valor (R$)
             </label>
-            <input id="corr-valor" name="valor" className="input tnum" inputMode="decimal" defaultValue={v.valor ?? valor} placeholder="0,00" />
+            <input id="corr-valor" name="valor" className="input tnum" inputMode="decimal" defaultValue={valorTravado ? valor : (v.valor ?? valor)} placeholder="0,00" disabled={valorTravado} />
+            {valorTravado && <p className="hint mt-1">Depois da liquidação o valor não muda por correção. Devolva a liquidação para a execução e liquide de novo.</p>}
           </div>
           <div>
             <label className="label" htmlFor="corr-fonte">
@@ -55,6 +60,7 @@ export function CorrecaoContratacao({
           </label>
           <textarea id="corr-motivo" name="motivo" className="input" rows={2} required minLength={minMotivo} defaultValue={v.motivo ?? ""} placeholder={`Pelo menos ${minMotivo} caracteres. Fica registrado no histórico do processo.`} />
         </div>
+        {naFila && <p className="hint">Na fila de pagamento, a mudança de fonte e o motivo ficam públicos (art. 141).</p>}
         <SubmitButton pendingText="Salvando…">Salvar correção</SubmitButton>
         {state?.erro && (
           <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-bad-soft px-3 py-2 text-sm text-bad">

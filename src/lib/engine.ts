@@ -589,10 +589,14 @@ export const ETAPAS_CONTRATACAO = ["INSTRUCAO_DIRETA", "AUTORIZACAO_DIRETA", "CO
 /** Etapas em que fonte e valor ainda se corrigem: depois de enviado ao banco, o pagamento já saiu com os dados que tinha. */
 export const ETAPAS_CORRECAO_CONTRATACAO = ["CONTRATADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO"];
 
+/** O valor só se corrige antes da liquidação; depois, a liquidação volta para a execução e é refeita. A fonte segue corrigível em todas as etapas acima. */
+export const ETAPAS_CORRECAO_VALOR = ["CONTRATADO", "EXECUCAO"];
+
 /**
  * Corrige a fonte de recurso e/ou o valor contratado depois do contrato, com motivo. Fornecedor e CNPJ não mudam (para isso, nova contratação).
  * Na fila cronológica a posição continua a data da liquidação; com fonte nova, o processo passa à fila dessa fonte (ver `filaDePagamentos`).
- * O evento CORRECAO_CONTRATACAO é interno: não aparece no portal nem na consulta pública.
+ * O evento CORRECAO_CONTRATACAO é interno (portal e consulta), exceto a mudança de fonte feita na fila de pagamento, que é publicada com o motivo
+ * em `mudancasDeFonteNaFila` (art. 141); por isso o evento guarda a `etapa` em que ocorreu.
  */
 export async function corrigirFonteValor(u: SessaoUsuario, processoId: string, input: { fonte?: string; valor?: string | number; motivo: string }) {
   const motivo = texto(input.motivo, "Motivo da correção", MIN_JUSTIFICATIVA);
@@ -609,11 +613,12 @@ export async function corrigirFonteValor(u: SessaoUsuario, processoId: string, i
   return agirNoProcesso(u, processoId, ETAPAS_CORRECAO_CONTRATACAO, async ({ tx, p, meta }) => {
     const atual = meta.contratacao as DadosContratacao | undefined;
     if (!atual?.fornecedor || !atual.cnpj) throw new ErroFluxo("Este processo ainda não tem dados da contratação. Registre fornecedor, CNPJ, valor e fonte antes de corrigir.");
+    if (valorNovo !== undefined && !ETAPAS_CORRECAO_VALOR.includes(p.estadoAtual)) throw new ErroFluxo("Depois da liquidação o valor não muda por correção. Devolva a liquidação para a execução e liquide de novo.");
     const antes = { fonte: atual.fonte ?? null, valor: atual.valor != null && atual.valor !== "" ? Number(atual.valor).toFixed(2) : null };
     const depois = { fonte: fonteNova ?? antes.fonte, valor: valorNovo ?? antes.valor };
     if (depois.fonte === antes.fonte && depois.valor === antes.valor) throw new ErroFluxo("A fonte e o valor informados são os mesmos de agora. Altere ao menos um deles.");
     await gravarMeta(tx, p.id, { ...meta, contratacao: { ...atual, fonte: depois.fonte, valor: depois.valor } });
-    await registrarEvento(tx, p.id, u.id, "CORRECAO_CONTRATACAO", { dados: { antes, depois, motivo } });
+    await registrarEvento(tx, p.id, u.id, "CORRECAO_CONTRATACAO", { dados: { antes, depois, motivo, etapa: p.estadoAtual } });
   });
 }
 

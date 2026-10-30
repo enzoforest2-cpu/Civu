@@ -16,10 +16,10 @@ async function main() {
   const { usuarios, unidadesGestoras, tiposProcesso, processos } = await import("./schema");
   const { eq, and } = await import("drizzle-orm");
   const engine = await import("../lib/engine");
-  const { avancosDisponiveis, caminhoDoProcesso } = await import("../lib/workflow");
+  const { avancosDisponiveis, caminhoDoProcesso, FONTES } = await import("../lib/workflow");
   const { isDiaUtil } = await import("../lib/dates");
   const { impugnacaoTempestiva } = await import("../lib/regras-fluxo");
-  const { filaDePagamentos, aFrenteNaFila, enviadosAoBanco, historicoDePagamentos } = await import("../lib/pagamentos");
+  const { filaDePagamentos, aFrenteNaFila, enviadosAoBanco, historicoDePagamentos, mudancasDeFonteNaFila } = await import("../lib/pagamentos");
   const { EVENTOS_EXTERNOS } = await import("../lib/portal-processos");
 
   async function sessao(cpf: string) {
@@ -47,8 +47,8 @@ async function main() {
 
   const ok = (m: string) => console.log("✓", m);
   const falha = (m: string): never => { throw new Error(m); };
-  const esperaErro = async (m: string, fn: () => Promise<unknown>) => {
-    try { await fn(); } catch (e) { if (e instanceof engine.ErroFluxo) { ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
+  const esperaErro = async (m: string, fn: () => Promise<unknown>, mensagem?: string) => {
+    try { await fn(); } catch (e) { if (e instanceof engine.ErroFluxo) { if (mensagem && e.message !== mensagem) falha(`${m}: mensagem inesperada "${e.message}"`); ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
     falha("deveria falhar: " + m);
   };
   const carregar = async (id: string) => (await engine.carregarProcesso(requisitante.municipioId, id)) ?? falha("processo sumiu");
@@ -378,12 +378,15 @@ async function main() {
     falha("evento CORRECAO_CONTRATACAO deveria ter antes, depois e motivo: " + JSON.stringify(evCorr));
   if (EVENTOS_EXTERNOS.includes("CORRECAO_CONTRATACAO")) falha("correção da contratação não é evento público");
   ok("correção em EXECUCAO: sem motivo recusa; muda fonte e valor; fornecedor e CNPJ ficam; evento interno com antes, depois e motivo");
+  await engine.corrigirFonteValor(secretario, p.id, { valor: "8700", motivo: "Valor volta ao contratado: o desconto não foi aplicado pelo fornecedor." });
+  const msgValorLiq = "Depois da liquidação o valor não muda por correção. Devolva a liquidação para a execução e liquide de novo.";
   await engine.juntarDocumento(secretario, p.id, "ORDEM_FORNECIMENTO", "Ordem", "Fornecer.");
   await engine.juntarDocumento(secretario, p.id, "NOTA_FISCAL", "NF", "NF 1.");
   const atesto = await engine.juntarDocumento(secretario, p.id, "ATESTO", "Atesto", "Recebido.");
   await engine.assinarDocumento(secretario, atesto.id, "FISCAL");
   await engine.juntarDocumento(secretario, p.id, "CERTIDOES", "Certidões", "Regular.");
   await engine.avancar(secretario, p.id, "LIQUIDADO");
+  await esperaErro("valor não se corrige em LIQUIDADO", () => engine.corrigirFonteValor(contador, p.id, { valor: "8000", motivo: motivoCorr }), msgValorLiq);
   await engine.receber(contador, p.id);
   const liq = await engine.juntarDocumento(contador, p.id, "NOTA_LIQUIDACAO", "Liquidação", "Liquidado.");
   await engine.assinarDocumento(prefeita, liq.id, "ORDENADOR");
@@ -404,12 +407,20 @@ async function main() {
   // Correção na fila: a fonte nova troca a fila; a posição continua a data da liquidação
   const naSaude = await posicaoDe();
   if (naSaude.fonte !== "SAUDE") falha("depois da correção o processo deveria estar na fila da Saúde: " + JSON.stringify(naSaude));
-  await engine.corrigirFonteValor(tesouraria, p.id, { fonte: "ORDINARIOS", valor: "8700", motivo: "Fonte corrigida para recursos ordinários conforme a nota de empenho." });
+  const motivoFila = "Fonte corrigida para recursos ordinários conforme a nota de empenho.";
+  await esperaErro("valor não se corrige na fila de pagamento", () => engine.corrigirFonteValor(tesouraria, p.id, { fonte: "ORDINARIOS", valor: "8700,01", motivo: motivoFila }), msgValorLiq);
+  if ((await posicaoDe()).fonte !== "SAUDE") falha("correção recusada não pode mudar a fonte");
+  await engine.corrigirFonteValor(tesouraria, p.id, { fonte: "ORDINARIOS", motivo: motivoFila });
   const naOrd = await posicaoDe();
   if (naOrd.fonte !== "ORDINARIOS") falha("correção de fonte deveria levar o processo à fila da nova fonte: " + JSON.stringify(naOrd));
   if (naOrd.liquidadoEm !== naSaude.liquidadoEm) falha("correção não pode mudar a data da liquidação que define a posição");
   await estaEm(p.id, "FILA_PAGAMENTO");
   ok("correção na fila: a fonte nova troca a fila e a posição continua pela data da liquidação");
+  const mudancas = (await mudancasDeFonteNaFila(requisitante.municipioId)).filter((m) => m.processoId === p.id);
+  if (mudancas.length !== 1 || mudancas[0].motivo !== motivoFila || mudancas[0].fonteNova !== FONTES.ORDINARIOS || mudancas[0].fonteAnterior !== FONTES.SAUDE)
+    falha("mudança de fonte na fila deveria aparecer com o motivo: " + JSON.stringify(mudancas));
+  if (mudancas.some((m) => m.motivo === motivoCorr)) falha("correção feita na execução não pode aparecer entre as mudanças na fila");
+  ok("mudancasDeFonteNaFila lista a mudança feita na fila com motivo; a correção feita na execução continua interna");
   const antes = await posicaoDe();
   const justificativaFila = "Pagamento fora da ordem apenas para o teste automatizado.";
   const emHistorico = async () => (await historicoDePagamentos(requisitante.municipioId, 365)).pagos.some((x) => x.processoId === p.id);

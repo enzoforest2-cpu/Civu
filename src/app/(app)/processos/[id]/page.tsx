@@ -583,6 +583,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                     valor={contratacao?.valor ? String(contratacao.valor).replace(".", ",") : ""}
                     fontes={FONTES}
                     minMotivo={MIN_JUSTIFICATIVA}
+                    etapa={p.estadoAtual}
                   />
                 )}
               </Panel>

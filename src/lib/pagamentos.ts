@@ -80,6 +80,41 @@ export async function filaDePagamentos(municipioId: string) {
   return [...porFonte.entries()].map(([fonte, fila]) => ({ fonte, fonteNome: nomeFonte(fonte), fila, total: fila.reduce((s, x) => s + (x.valor ?? 0), 0) }));
 }
 
+/**
+ * Mudanças de fonte de recurso feitas com o processo na fila de pagamento (o pagamento muda de fila, então o motivo é público, art. 141).
+ * Correções em outras etapas ficam internas.
+ */
+export async function mudancasDeFonteNaFila(municipioId: string) {
+  const estados = await estadosDeFila(municipioId);
+  const lista = await db.query.processos.findMany({
+    where: eq(processos.municipioId, municipioId),
+    with: { eventos: { orderBy: (e, { asc }) => [asc(e.seq)] } },
+  });
+  const itens: { processoId: string; numero: string; fornecedor: string | null; valor: number | null; fonteAnterior: string; fonteNova: string; em: Date; motivo: string }[] = [];
+  for (const p of lista) {
+    const cfg = estados.get(p.tipoId);
+    if (!cfg) continue;
+    const c = ((p.metadados as Record<string, unknown> | null)?.contratacao ?? {}) as Contratacao;
+    for (const e of p.eventos) {
+      if (e.tipo !== "CORRECAO_CONTRATACAO") continue;
+      const d = e.dados as { antes?: { fonte?: string | null; valor?: string | null }; depois?: { fonte?: string | null; valor?: string | null }; motivo?: string; etapa?: string } | null;
+      if (d?.etapa !== cfg.fila || !d.motivo || (d.antes?.fonte ?? null) === (d.depois?.fonte ?? null)) continue;
+      const valor = d.depois?.valor ?? c.valor;
+      itens.push({
+        processoId: p.id,
+        numero: p.numero,
+        fornecedor: c.fornecedor ?? null,
+        valor: valor != null && valor !== "" ? Number(valor) : null,
+        fonteAnterior: nomeFonte(d.antes?.fonte ?? "SEM_FONTE"),
+        fonteNova: nomeFonte(d.depois?.fonte ?? "SEM_FONTE"),
+        em: e.criadoEm,
+        motivo: d.motivo,
+      });
+    }
+  }
+  return itens.sort((a, b) => b.em.getTime() - a.em.getTime());
+}
+
 /** Pagamentos que estão à frente de um processo na fila da mesma fonte. */
 export async function aFrenteNaFila(municipioId: string, processoId: string) {
   const filas = await filaDePagamentos(municipioId);
