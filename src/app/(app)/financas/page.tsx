@@ -116,7 +116,7 @@ export default async function FinancasPage() {
         </Panel>
 
         <div className="space-y-6">
-          <Panel title="Índices legais" action={<Link href="/financas/indices" className="text-[13px] font-semibold text-brand hover:underline">Detalhes</Link>}>
+          <Panel title="Índices legais">
             <ul className="divide-y divide-line">
               {idx.lista.map((i) => (
                 <li key={i.chave} className="flex items-center justify-between gap-3 py-2.5">

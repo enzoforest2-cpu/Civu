@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, FolderOpen, Globe, Inbox, LayoutGrid, ListOrdered, Settings2, ShieldCheck } from "lucide-react";
 import type { Papel } from "./workflow";
+import { foraDoEscopo } from "./escopo";
 
 export type ItemGestao = { href: string; rotulo: string; icone: LucideIcon; papeis?: Papel[]; grupo: ChaveGrupo; ordem?: number };
 
@@ -11,7 +12,7 @@ export type ChaveGrupo = "visao" | "atendimento" | "financas" | "compras" | "obr
 export const GRUPOS: { chave: ChaveGrupo; rotulo: string }[] = [
   { chave: "visao", rotulo: "Visão da gestão" },
   { chave: "atendimento", rotulo: "Atendimento e processos" },
-  { chave: "financas", rotulo: "Finanças e tributos" },
+  { chave: "financas", rotulo: "Orçamento e finanças" },
   { chave: "compras", rotulo: "Compras e contratos" },
   { chave: "obras", rotulo: "Obras e território" },
   { chave: "pessoas", rotulo: "Pessoas e serviços públicos" },
@@ -52,5 +53,5 @@ import * as gestao from "@/modulos/gestao/registro";
 
 const MODULOS: { gestao?: ItemGestao[]; portal?: AtalhoPortal[] }[] = [servicos, contratos, financas, tributos, gestao];
 
-export const ITENS_GESTAO: ItemGestao[] = [...NUCLEO, ...MODULOS.flatMap((m) => m.gestao ?? [])].sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
-export const ATALHOS_PORTAL: AtalhoPortal[] = [...ATALHOS_NUCLEO, ...MODULOS.flatMap((m) => m.portal ?? [])].sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
+export const ITENS_GESTAO: ItemGestao[] = [...NUCLEO, ...MODULOS.flatMap((m) => m.gestao ?? [])].filter((i) => !foraDoEscopo(i.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
+export const ATALHOS_PORTAL: AtalhoPortal[] = [...ATALHOS_NUCLEO, ...MODULOS.flatMap((m) => m.portal ?? [])].filter((a) => !foraDoEscopo(a.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));

@@ -1,6 +1,7 @@
 import "server-only";
 // Consultas e regras do módulo de finanças. Tudo é calculado a partir dos lançamentos (dotação, crédito, reserva,
 // empenho, liquidação, pagamento, receita e extrato), para que todas as telas mostrem os mesmos números.
+import { foraDoEscopo } from "@/lib/escopo";
 import { cache } from "react";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -609,7 +610,7 @@ export async function alertas(municipioId: string, ano: number) {
         href: "/financas/caixa#projecao",
       });
   }
-  for (const i of idx.lista) if (i.situacao !== "ok") out.push({ nivel: i.situacao === "risco" ? "risco" : "atencao", titulo: i.titulo, texto: i.mensagem, href: "/financas/indices" });
+  if (!foraDoEscopo("/financas/indices")) for (const i of idx.lista) if (i.situacao !== "ok") out.push({ nivel: i.situacao === "risco" ? "risco" : "atencao", titulo: i.titulo, texto: i.mensagem, href: "/financas/indices" });
   const hoje = hojeIso();
   const vencidas = ex.liquidacoesCalc.filter((l) => l.aPagar > 0 && l.vencimento < hoje);
   if (vencidas.length)
@@ -620,7 +621,7 @@ export async function alertas(municipioId: string, ano: number) {
       href: "/financas/empenhos?situacao=a-pagar",
     });
   const baixas = rec.categorias.filter((c) => c.desempenho != null && c.desempenho < 0.9 && c.previstoAte > 100000);
-  for (const c of baixas)
+  if (!foraDoEscopo("/financas/receita")) for (const c of baixas)
     out.push({
       nivel: "atencao",
       titulo: `${c.nome} abaixo da previsão`,

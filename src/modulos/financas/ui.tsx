@@ -5,6 +5,7 @@ import { fmtMoeda } from "@/lib/dates";
 import type { SessaoUsuario } from "@/lib/auth";
 import { Vazio } from "@/components/ui";
 import { MESES, fmtCompacto, fmtPct } from "./classificacao";
+import { foraDoEscopo } from "@/lib/escopo";
 
 const ABAS = [
   { href: "/financas", rotulo: "Visão geral" },
@@ -19,7 +20,7 @@ export function AbasFinancas({ atual }: { atual: string }) {
   return (
     <nav aria-label="Seções de finanças" className="-mx-4 mb-7 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div className="flex w-max gap-1 rounded-full border border-line bg-white p-1">
-        {ABAS.map((a) => {
+        {ABAS.filter((a) => !foraDoEscopo(a.href)).map((a) => {
           const ativo = a.href === atual;
           return (
             <Link
@@ -44,11 +45,8 @@ export function SemAcesso() {
   return (
     <div className="mx-auto max-w-xl py-16">
       <Vazio>
-        As telas de finanças são para gestão, contabilidade, tesouraria, controle interno e secretários. Se precisar destes dados, consulte o{" "}
-        <Link href="/transparencia/orcamento" className="font-semibold text-brand hover:underline">
-          orçamento aberto
-        </Link>
-        .
+        As telas de finanças são para gestão, contabilidade, tesouraria, controle interno e secretários. Se precisar destes dados, peça à
+        contabilidade.
       </Vazio>
     </div>
   );

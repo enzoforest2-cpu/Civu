@@ -6,6 +6,10 @@ Civu é um sistema de gestão municipal para prefeituras brasileiras: prefeitura
 
 Produção: https://tramite-mocha.vercel.app (projeto Vercel `tramite`, região `gru1`). Dados 100% fictícios do município de demonstração **Vale das Araucárias/RS**.
 
+## Escopo publicado
+
+O produto é o **sistema de protocolo e o fluxo da contratação**, do pedido da secretaria ao pagamento da empresa. Os módulos da visão ampla da Civu (serviços urbanos, tributos, obras públicas, painel do prefeito, receita e índices fiscais, integrações, portal do cidadão) estão no código e no ramo `civu-completo`, mas desligados: a lista `FORA_DO_ESCOPO` em `src/lib/escopo.ts` tira esses itens do menu e `src/proxy.ts` redireciona as rotas. Não religue nada sem o Enzo pedir.
+
 ## Divisão de trabalho
 
 A interface (telas, layout, visual) está sendo feita em outra conversa. Antes de mexer em qualquer arquivo de página ou componente visual, faça `git pull` e confirme com o Enzo se a tarefa é sua. Prefira trabalhar em lógica, dados, integrações, segurança e testes. Sempre `git pull --rebase` antes de começar e antes de enviar.

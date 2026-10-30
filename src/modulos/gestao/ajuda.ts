@@ -1,3 +1,4 @@
+import { foraDoEscopo } from "@/lib/escopo";
 // Central de ajuda: artigos curtos por módulo, ligados às rotas da gestão.
 // O link "Ajuda" do topo leva a /ajuda?pagina=<rota atual>, que abre o artigo da página.
 // Outros módulos podem acrescentar artigos em ARTIGOS (rotas = prefixos das páginas que o artigo explica).
@@ -12,7 +13,7 @@ export type Artigo = {
   secoes: { titulo: string; texto: string[] }[];
 };
 
-export const ARTIGOS: Artigo[] = [
+const TODOS_ARTIGOS: Artigo[] = [
   {
     slug: "painel",
     modulo: "Visão da gestão",
@@ -201,6 +202,9 @@ export const ARTIGOS: Artigo[] = [
 ];
 
 /** Artigo da página: o prefixo de rota mais longo que casa com o caminho. */
+/** Artigos de módulos fora do escopo publicado não aparecem. */
+export const ARTIGOS: Artigo[] = TODOS_ARTIGOS.filter((a) => !a.rotas.length || a.rotas.some((r) => !foraDoEscopo(r)));
+
 export function artigoDaPagina(caminho: string): Artigo | null {
   let melhor: { a: Artigo; len: number } | null = null;
   for (const a of ARTIGOS)

@@ -343,7 +343,7 @@ export const provedorIntegracoes: ProvedorIndicadores = {
               titulo: `${total} ${total === 1 ? "envio rejeitado ou com falha" : "envios rejeitados ou com falha"} em integrações (7 dias)`,
               motivo: "Ambiente de demonstração: os conectores são simulados. Em produção, cada falha entra na fila de reprocessamento.",
               responsavel: "Administração",
-              acao: { rotulo: "Ver integrações", href: "/integracoes" },
+              acao: { rotulo: "Ver obrigações legais", href: "/obrigacoes" },
             },
           ]
         : [],
