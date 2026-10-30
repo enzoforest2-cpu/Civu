@@ -45,9 +45,11 @@ const ATALHOS_NUCLEO: AtalhoPortal[] = [];
 
 // ---- módulos (cada um acrescenta uma linha de import e uma entrada nas listas abaixo) ----
 // import * as servicos from "@/modulos/servicos/registro";
+import * as tributos from "@/modulos/tributos/registro";
 
 const MODULOS: { gestao?: ItemGestao[]; portal?: AtalhoPortal[] }[] = [
   // servicos,
+  tributos,
 ];
 
 export const ITENS_GESTAO: ItemGestao[] = [...NUCLEO, ...MODULOS.flatMap((m) => m.gestao ?? [])].sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
