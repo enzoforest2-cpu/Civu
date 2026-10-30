@@ -681,8 +681,24 @@ export async function definirModalidade(u: SessaoUsuario, processoId: string, mo
   const just = texto(justificativa, "Justificativa da modalidade", MIN_JUSTIFICATIVA);
   return agirNoProcesso(u, processoId, ["INSTRUCAO"], async ({ tx, p, meta }) => {
     const anterior = typeof meta.modalidade === "string" ? meta.modalidade : null;
-    await gravarMeta(tx, p.id, { ...meta, modalidade, modalidadeJustificativa: just });
-    await registrarEvento(tx, p.id, u.id, "MODALIDADE", { dados: { de: anterior, para: modalidade, justificativa: just } });
+    const novo: Record<string, unknown> = { ...meta, modalidade, modalidadeJustificativa: just };
+    const dados: Record<string, unknown> = { de: anterior, para: modalidade, justificativa: just };
+    // Dispensa por valor: refaz a análise de limite e fracionamento (art. 75, §1º), como na abertura, sem contar este processo duas vezes
+    if (modalidade === "DISPENSA_VALOR" && meta.natureza) {
+      const a = await analisarFracionamento({
+        municipioId: u.municipioId,
+        unidadeGestoraId: p.unidadeGestoraId,
+        natureza: String(meta.natureza),
+        valorNovo: Number(meta.valorEstimado),
+        excluirProcessoId: p.id,
+      });
+      novo.fracionamento = { comprometido: a.comprometido, limite: a.limite, total: a.total, situacao: a.situacao, verificadoEm: new Date().toISOString() };
+      if (a.situacao !== "ok") dados.alertaFracionamento = { situacao: a.situacao, total: a.total, limite: a.limite, natureza: a.natureza };
+    } else {
+      delete novo.fracionamento;
+    }
+    await gravarMeta(tx, p.id, novo);
+    await registrarEvento(tx, p.id, u.id, "MODALIDADE", { dados });
   });
 }
 
@@ -799,17 +815,20 @@ export async function registrarRecurso(u: SessaoUsuario, processoId: string, inp
   });
 }
 
-/** Decisão do recurso. Recurso provido não avança sozinho: quem decide devolve à sessão com o motivo. */
+/** Decisão do recurso. Recurso provido devolve o processo à sessão para refazer o julgamento (art. 165). */
 export async function decidirRecurso(u: SessaoUsuario, processoId: string, id: string, d: { decisao: string; provido: boolean }) {
-  return agirNoProcesso(u, processoId, ["RECURSOS"], async ({ tx, p, meta }) => {
+  return agirNoProcesso(u, processoId, ["RECURSOS"], async ({ tx, p, meta, fer }) => {
     const lista = (meta.recursos as Recurso[] | undefined) ?? [];
     const alvo = lista.find((r) => r.id === id);
     if (!alvo) throw new ErroFluxo("Recurso não encontrado neste processo. Atualize a página e escolha outro.");
     if (alvo.decididoEm) throw new ErroFluxo("Este recurso já foi decidido.");
     const decisao = texto(d.decisao, "Decisão do recurso");
     const decidido: Recurso = { ...alvo, decisao, provido: !!d.provido, decididoEm: hojeIso() };
-    await gravarMeta(tx, p.id, { ...meta, recursos: lista.map((r) => (r.id === id ? decidido : r)) });
+    const novo = { ...meta, recursos: lista.map((r) => (r.id === id ? decidido : r)) };
     await registrarEvento(tx, p.id, u.id, "DECISAO_RECURSO", { dados: { id, recorrente: alvo.recorrente, decisao, provido: decidido.provido } });
+    // Recurso provido: o julgamento é refeito; a rodada anterior vai para o histórico
+    if (decidido.provido) return devolverNaTx(tx, u, p, "SESSAO_DISPUTA", "Recurso provido: refazer o julgamento", "Recurso provido: refazer o julgamento", fer, novo);
+    await gravarMeta(tx, p.id, novo);
   });
 }
 

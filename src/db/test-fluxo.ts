@@ -245,9 +245,8 @@ async function main() {
   if (!recs[0].id || !(recs[0].razoesAte > hoje) || !(recs[0].contrarrazoesAte > recs[0].razoesAte)) falha("prazos do recurso errados: " + JSON.stringify(recs));
   await esperaErro("recurso não decidido bloqueia", () => engine.avancar(compras, p.id, "HOMOLOGADO"));
   await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Provido: proposta vencedora desclassificada.", provido: true });
-  await esperaErro("decidir o mesmo recurso duas vezes", () => engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "x", provido: false }));
-  await engine.devolver(compras, p.id, "SESSAO_DISPUTA", "Recurso provido: refazer o julgamento");
   c = await estaEm(p.id, "SESSAO_DISPUTA");
+  if (!c.eventos.some((e) => e.tipo === "DEVOLUCAO" && (e.dados as { motivo?: string }).motivo === "Recurso provido: refazer o julgamento")) falha("devolução automática sem o motivo esperado");
   if (meta(c).resultadoSessao || meta(c).recursos) falha("resultado e recursos da rodada anterior deveriam ir para o histórico");
   if ((meta(c).historicoSessoes as unknown[]).length !== 1) falha("histórico de sessões esperado com 1 item");
   await esperaErro("sessão devolvida sem resultado novo", () => engine.avancar(compras, p.id, "RECURSOS"));
@@ -257,8 +256,10 @@ async function main() {
   c = await carregar(p.id);
   recs = meta(c).recursos as typeof recs;
   await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Improvido.", provido: false });
+  await esperaErro("decidir o mesmo recurso duas vezes", () => engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "x", provido: false }));
+  await estaEm(p.id, "RECURSOS");
   await engine.avancar(compras, p.id, "HOMOLOGADO");
-  ok("recurso não decidido bloqueia RECURSOS; recurso provido devolve à sessão e limpa a rodada anterior");
+  ok("recurso não decidido bloqueia RECURSOS; recurso provido devolve sozinho à sessão e limpa; improvido segue para HOMOLOGADO; a rodada anterior");
 
   // homologação até a execução
   await engine.receber(prefeita, p.id);
@@ -337,6 +338,8 @@ async function main() {
   await engine.definirModalidade(compras, d.id, "DISPENSA_VALOR", "Valor abaixo do limite do art. 75, II, sem fracionamento aparente.");
   await engine.registrarPesquisaPrecos(compras, d.id, { fontes: [], justificativa: "Mercado local com um único fornecedor da marca exigida pelo equipamento." });
   c = await carregar(d.id);
+  const fr = meta(c).fracionamento as { situacao: string; total: number; limite: number } | undefined;
+  if (!fr || !fr.limite || fr.total < 9000) falha("fracionamento deveria ser refeito ao definir DISPENSA_VALOR: " + JSON.stringify(fr));
   if (meta(c).valorEstimado !== "9000") falha("sem fontes o valor estimado não muda");
   await instrucaoAteParecer(d.id);
   await engine.avancar(procurador, d.id, "INSTRUCAO_DIRETA");
