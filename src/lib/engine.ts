@@ -562,9 +562,14 @@ export async function registrarContratacao(u: SessaoUsuario, processoId: string,
   if (!cnpjValido(cnpj)) throw new ErroFluxo("CNPJ inválido. Confira os 14 dígitos.");
   if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo("Informe o valor contratado.");
   if (!Object.hasOwn(FONTES, input.fonte)) throw new ErroFluxo("Escolha a fonte de recurso.");
-  // Os dados entram na etapa do contrato: antes dela o vencedor ainda pode mudar; depois, o contrato já foi publicado
+  // Licitação: os dados entram na etapa do contrato (antes dela o vencedor ainda pode mudar). Contratação direta: já na instrução
+  // e na autorização, porque o fornecedor escolhido precisa estar registrado antes do empenho. Depois do contrato, só a correção de fonte e valor.
   if (!ETAPAS_CONTRATACAO.includes(p.estadoAtual)) {
-    const nomes = ETAPAS_CONTRATACAO.map((e) => getEstado(p.def, e)?.nome ?? e).join(" ou ");
+    const ramo = ramoDaModalidade((p.metadados as Record<string, unknown> | null)?.modalidade);
+    const nomes = ETAPAS_CONTRATACAO.map((e) => getEstado(p.def, e))
+      .filter((e): e is EstadoDef => !!e && (!e.ramo || !ramo || e.ramo === ramo))
+      .map((e) => e.nome)
+      .join(" ou ");
     throw new ErroFluxo(`Os dados da contratação se registram na etapa ${nomes}. O processo está em "${p.estado.nome}".`);
   }
   const contratacao = { fornecedor, cnpj, valor: valor.toFixed(2), fonte: input.fonte };
@@ -579,7 +584,38 @@ export async function registrarContratacao(u: SessaoUsuario, processoId: string,
 }
 
 /** Etapas em que compras ou contabilidade registram (ou corrigem) os dados da contratação: as do painel na página do processo. */
-const ETAPAS_CONTRATACAO = ["CONTRATADO"];
+export const ETAPAS_CONTRATACAO = ["INSTRUCAO_DIRETA", "AUTORIZACAO_DIRETA", "CONTRATADO"];
+
+/** Etapas em que fonte e valor ainda se corrigem: depois de enviado ao banco, o pagamento já saiu com os dados que tinha. */
+export const ETAPAS_CORRECAO_CONTRATACAO = ["CONTRATADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO"];
+
+/**
+ * Corrige a fonte de recurso e/ou o valor contratado depois do contrato, com motivo. Fornecedor e CNPJ não mudam (para isso, nova contratação).
+ * Na fila cronológica a posição continua a data da liquidação; com fonte nova, o processo passa à fila dessa fonte (ver `filaDePagamentos`).
+ * O evento CORRECAO_CONTRATACAO é interno: não aparece no portal nem na consulta pública.
+ */
+export async function corrigirFonteValor(u: SessaoUsuario, processoId: string, input: { fonte?: string; valor?: string | number; motivo: string }) {
+  const motivo = texto(input.motivo, "Motivo da correção", MIN_JUSTIFICATIVA);
+  const fonteNova = typeof input.fonte === "string" && input.fonte.trim() ? input.fonte.trim() : undefined;
+  if (fonteNova !== undefined && !Object.hasOwn(FONTES, fonteNova)) throw new ErroFluxo("Fonte de recurso inválida. Escolha uma das fontes da lista.");
+  const valorTxt = typeof input.valor === "number" ? String(input.valor) : (input.valor ?? "").trim();
+  let valorNovo: string | undefined;
+  if (valorTxt !== "") {
+    const v = typeof input.valor === "number" ? input.valor : numeroBr(valorTxt);
+    if (!Number.isFinite(v) || v <= 0) throw new ErroFluxo("Informe o valor contratado corrigido, maior que zero (ex.: 8.500,00).");
+    valorNovo = v.toFixed(2);
+  }
+  if (fonteNova === undefined && valorNovo === undefined) throw new ErroFluxo("Informe a fonte de recurso ou o valor corrigido.");
+  return agirNoProcesso(u, processoId, ETAPAS_CORRECAO_CONTRATACAO, async ({ tx, p, meta }) => {
+    const atual = meta.contratacao as DadosContratacao | undefined;
+    if (!atual?.fornecedor || !atual.cnpj) throw new ErroFluxo("Este processo ainda não tem dados da contratação. Registre fornecedor, CNPJ, valor e fonte antes de corrigir.");
+    const antes = { fonte: atual.fonte ?? null, valor: atual.valor != null && atual.valor !== "" ? Number(atual.valor).toFixed(2) : null };
+    const depois = { fonte: fonteNova ?? antes.fonte, valor: valorNovo ?? antes.valor };
+    if (depois.fonte === antes.fonte && depois.valor === antes.valor) throw new ErroFluxo("A fonte e o valor informados são os mesmos de agora. Altere ao menos um deles.");
+    await gravarMeta(tx, p.id, { ...meta, contratacao: { ...atual, fonte: depois.fonte, valor: depois.valor } });
+    await registrarEvento(tx, p.id, u.id, "CORRECAO_CONTRATACAO", { dados: { antes, depois, motivo } });
+  });
+}
 
 /** Registra o envio da contratação ao sistema do Tribunal de Contas, com o número do recibo. */
 export async function registrarRemessaTce(u: SessaoUsuario, processoId: string, recibo: string) {
@@ -770,6 +806,15 @@ function arquivarRamo(meta: Record<string, unknown>, ramo: "LICITACAO" | "DIRETA
       arquivar("historicoAvisos", m.avisoDispensa as object);
       delete m.avisoDispensa;
       arquivados.push("avisoDispensa");
+    }
+    // O fornecedor escolhido na contratação direta não vale para a licitação (o vencedor vem da sessão); a fonte de recurso fica
+    const ct = m.contratacao as Record<string, unknown> | undefined;
+    if (ct?.fornecedor || ct?.cnpj || ct?.valor) {
+      arquivar("historicoContratacoes", ct);
+      const resto = semVencedor(ct);
+      if (resto) m.contratacao = resto;
+      else delete m.contratacao;
+      arquivados.push("contratacao");
     }
     return { meta: m, arquivados };
   }

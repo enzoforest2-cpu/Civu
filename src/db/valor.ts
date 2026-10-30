@@ -297,6 +297,7 @@ export function gerarSqlValor(ids: IdsValor): string {
       `insert into tramite.processos (id, municipio_id, unidade_gestora_id, tipo_id, ano, sequencial, numero, assunto, descricao, urgencia, estado_atual, setor_atual_id, recebido_em, prazo_etapa_em, aberto_por_id, aberto_em, encerrado_em, metadados) values (${lit(id)}, ${lit(ids.municipioId)}, ${lit(ug)}, ${lit(ids.tipos.COMPRA)}, ${ids.ano}, ${sequencial}, ${lit(numero)}, ${lit(n.assunto)}, ${lit(String(n.meta.justificativa))}, ${lit(n.meta.prioridade === "ALTA" ? "PRIORITARIO" : "NORMAL")}, ${lit(n.ate)}, ${lit(setorEstado(n.ate))}, ${ts(dia(datas.at(-1)!))}, ${final ? "null" : ts(new Date(agora + 6 * 86400_000))}, ${lit(U(n.req))}, ${ts(dia(datas[0]))}, ${final ? ts(dia(datas.at(-1)!)) : "null"}, ${json(meta)});`,
     );
     const evs: Ev[] = [];
+    const etapaContratacao = n.meta.modalidade === "LICITACAO" ? "CONTRATADO" : "INSTRUCAO_DIRETA";
     estados.forEach((e, i) => {
       const anterior = estados[i - 1];
       const ehPago = e === "PAGO";
@@ -319,8 +320,10 @@ export function gerarSqlValor(ids: IdsValor): string {
                 ? { rotulo: "Banco confirmou o pagamento", despacho: null }
                 : { rotulo: "Avanço" },
       });
-      if (e === "CONTRATADO" && n.contratacao) {
+      // Dados da contratação: na licitação, na etapa do contrato; na contratação direta, já na instrução (antes da autorização e do empenho)
+      if (e === etapaContratacao && n.contratacao)
         evs.push({ tipo: "DADOS_CONTRATACAO", autor: U("33333333333"), quando: new Date(dia(datas[i]).getTime() + 3600_000), dados: n.contratacao });
+      if (e === "CONTRATADO" && n.contratacao) {
         if (n.remessa)
           evs.push({
             tipo: "REMESSA_TCE",

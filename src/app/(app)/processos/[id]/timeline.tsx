@@ -2,7 +2,7 @@ import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, S
 import type { LucideIcon } from "lucide-react";
 import { fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { dataBr } from "./etapas/util";
-import { DOCUMENTO_TIPOS, MODALIDADES, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, MODALIDADES, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
 
 type Ev = {
   id: string;
@@ -28,6 +28,7 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   ASSINATURA: { icon: PenLine, cor: "bg-ok-soft text-ok" },
   DESPACHO: { icon: MessageSquare, cor: "bg-sunken text-ink-2" },
   DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand" },
+  CORRECAO_CONTRATACAO: { icon: Building2, cor: "bg-warn-soft text-warn" },
   REMESSA_TCE: { icon: Landmark, cor: "bg-ok-soft text-ok" },
   EXIGENCIA: { icon: MessageSquare, cor: "bg-warn-soft text-warn" },
   RESPOSTA_EXIGENCIA: { icon: MessageSquare, cor: "bg-ok-soft text-ok" },
@@ -69,6 +70,15 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
             titulo = "Registrou os dados da contratação";
             detalhe = `${d.fornecedor ?? ""} · ${fmtMoeda(d.valor)}`;
             break;
+          case "CORRECAO_CONTRATACAO": {
+            const c = (e.dados ?? {}) as { antes?: { fonte?: string | null; valor?: string | null }; depois?: { fonte?: string | null; valor?: string | null }; motivo?: string };
+            const mudou: string[] = [];
+            if (c.antes?.fonte !== c.depois?.fonte) mudou.push(`fonte de ${FONTES[c.antes?.fonte ?? ""] ?? "não informada"} para ${FONTES[c.depois?.fonte ?? ""] ?? "não informada"}`);
+            if (c.antes?.valor !== c.depois?.valor) mudou.push(`valor de ${fmtMoeda(c.antes?.valor ?? null)} para ${fmtMoeda(c.depois?.valor ?? null)}`);
+            titulo = "Corrigiu os dados da contratação";
+            detalhe = [mudou.join("; "), c.motivo ? `Motivo: ${c.motivo}` : ""].filter(Boolean).join(" · ") || undefined;
+            break;
+          }
           case "EXIGENCIA":
             titulo = "Pediu complemento ao interessado";
             detalhe = d.texto;

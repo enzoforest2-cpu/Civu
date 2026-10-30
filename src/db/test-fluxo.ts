@@ -20,6 +20,7 @@ async function main() {
   const { isDiaUtil } = await import("../lib/dates");
   const { impugnacaoTempestiva } = await import("../lib/regras-fluxo");
   const { filaDePagamentos, aFrenteNaFila, enviadosAoBanco, historicoDePagamentos } = await import("../lib/pagamentos");
+  const { EVENTOS_EXTERNOS } = await import("../lib/portal-processos");
 
   async function sessao(cpf: string) {
     const u = await db.query.usuarios.findFirst({ where: eq(usuarios.cpf, cpf), with: { setor: true, municipio: true } });
@@ -357,6 +358,26 @@ async function main() {
   await engine.avancar(compras, p.id, "EXECUCAO");
   await esperaErro("dados da contratação depois da etapa do contrato", () => engine.registrarContratacao(compras, p.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "8700", fonte: "SAUDE" }));
   ok("contratação: só na etapa do contrato, CNPJ do vencedor obrigatório, sem fonte não segue; com fonte segue para a execução");
+  // Correção de fonte e valor depois de contratado: motivo obrigatório, fornecedor e CNPJ não mudam, evento interno
+  const motivoCorr = "Empenho emitido na fonte da Saúde por erro de digitação na contratação.";
+  await esperaErro("correção sem motivo", () => engine.corrigirFonteValor(secretario, p.id, { fonte: "SAUDE", motivo: "" }));
+  await esperaErro("correção com motivo curto", () => engine.corrigirFonteValor(secretario, p.id, { fonte: "SAUDE", motivo: "erro" }));
+  await esperaErro("correção com fonte inválida", () => engine.corrigirFonteValor(secretario, p.id, { fonte: "toString", motivo: motivoCorr }));
+  await esperaErro("correção com valor zero", () => engine.corrigirFonteValor(secretario, p.id, { valor: "0", motivo: motivoCorr }));
+  await esperaErro("correção sem mudança", () => engine.corrigirFonteValor(secretario, p.id, { fonte: "ORDINARIOS", valor: "8.700,00", motivo: motivoCorr }));
+  await esperaErro("correção por quem não age na etapa", () => engine.corrigirFonteValor(tesouraria, p.id, { fonte: "SAUDE", motivo: motivoCorr }));
+  await engine.corrigirFonteValor(secretario, p.id, { fonte: "SAUDE", valor: "8.650,00", motivo: motivoCorr });
+  c = await estaEm(p.id, "EXECUCAO");
+  const ctCorr = meta(c).contratacao as Record<string, unknown>;
+  if (ctCorr.fonte !== "SAUDE" || ctCorr.valor !== "8650.00") falha("correção deveria mudar fonte e valor: " + JSON.stringify(ctCorr));
+  if (ctCorr.fornecedor !== "Mesas e Cia Ltda" || ctCorr.cnpj !== CNPJ) falha("correção não pode mudar fornecedor nem CNPJ: " + JSON.stringify(ctCorr));
+  const evCorr = c.eventos.filter((e) => e.tipo === "CORRECAO_CONTRATACAO").at(-1)?.dados as
+    | { antes: { fonte: string; valor: string }; depois: { fonte: string; valor: string }; motivo: string }
+    | undefined;
+  if (!evCorr || evCorr.antes.fonte !== "ORDINARIOS" || evCorr.antes.valor !== "8700.00" || evCorr.depois.fonte !== "SAUDE" || evCorr.depois.valor !== "8650.00" || evCorr.motivo !== motivoCorr)
+    falha("evento CORRECAO_CONTRATACAO deveria ter antes, depois e motivo: " + JSON.stringify(evCorr));
+  if (EVENTOS_EXTERNOS.includes("CORRECAO_CONTRATACAO")) falha("correção da contratação não é evento público");
+  ok("correção em EXECUCAO: sem motivo recusa; muda fonte e valor; fornecedor e CNPJ ficam; evento interno com antes, depois e motivo");
   await engine.juntarDocumento(secretario, p.id, "ORDEM_FORNECIMENTO", "Ordem", "Fornecer.");
   await engine.juntarDocumento(secretario, p.id, "NOTA_FISCAL", "NF", "NF 1.");
   const atesto = await engine.juntarDocumento(secretario, p.id, "ATESTO", "Atesto", "Recebido.");
@@ -376,10 +397,19 @@ async function main() {
   const posicaoDe = async () => {
     for (const f of await filaDePagamentos(requisitante.municipioId)) {
       const it = f.fila.find((x) => x.processoId === p.id);
-      if (it) return { posicao: it.posicao, liquidadoEm: it.liquidadoEm.getTime() };
+      if (it) return { posicao: it.posicao, liquidadoEm: it.liquidadoEm.getTime(), fonte: f.fonte };
     }
     return falha("processo fora da fila");
   };
+  // Correção na fila: a fonte nova troca a fila; a posição continua a data da liquidação
+  const naSaude = await posicaoDe();
+  if (naSaude.fonte !== "SAUDE") falha("depois da correção o processo deveria estar na fila da Saúde: " + JSON.stringify(naSaude));
+  await engine.corrigirFonteValor(tesouraria, p.id, { fonte: "ORDINARIOS", valor: "8700", motivo: "Fonte corrigida para recursos ordinários conforme a nota de empenho." });
+  const naOrd = await posicaoDe();
+  if (naOrd.fonte !== "ORDINARIOS") falha("correção de fonte deveria levar o processo à fila da nova fonte: " + JSON.stringify(naOrd));
+  if (naOrd.liquidadoEm !== naSaude.liquidadoEm) falha("correção não pode mudar a data da liquidação que define a posição");
+  await estaEm(p.id, "FILA_PAGAMENTO");
+  ok("correção na fila: a fonte nova troca a fila e a posição continua pela data da liquidação");
   const antes = await posicaoDe();
   const justificativaFila = "Pagamento fora da ordem apenas para o teste automatizado.";
   const emHistorico = async () => (await historicoDePagamentos(requisitante.municipioId, 365)).pagos.some((x) => x.processoId === p.id);
@@ -393,6 +423,7 @@ async function main() {
   if ((await emEnviados()) || (await emHistorico())) falha("processo na fila não pode aparecer como enviado nem pago");
   await engine.avancar(tesouraria, p.id, "PAGAMENTO_ENVIADO", justificativaFila);
   await estaEm(p.id, "PAGAMENTO_ENVIADO");
+  await esperaErro("correção depois de enviado ao banco", () => engine.corrigirFonteValor(tesouraria, p.id, { fonte: "SAUDE", motivo: motivoCorr }));
   const evEnvio = (await carregar(p.id)).eventos.filter((e) => e.paraEstado === "PAGAMENTO_ENVIADO").at(-1);
   if ((evEnvio?.dados as { quebraOrdem?: { justificativa: string } } | null)?.quebraOrdem?.justificativa !== justificativaFila) falha("justificativa pública deveria ficar no evento de envio");
   ok("ordem cronológica vale na saída da fila para o banco: sem justificativa recusa, com justificativa passa e fica pública");
@@ -467,8 +498,15 @@ async function main() {
   const ato = await engine.juntarDocumento(prefeita, d.id, "ATO_AUTORIZACAO_DIRETA", "Ato", "Autorizo a contratação direta.");
   await esperaErro("autorização direta com ato sem assinatura", () => engine.avancar(prefeita, d.id, "EMPENHADO"));
   await engine.assinarDocumento(prefeita, ato.id, "ORDENADOR");
+  await esperaErro("dispensa sem contratação registrada não sai de AUTORIZACAO_DIRETA", () => engine.avancar(prefeita, d.id, "EMPENHADO"));
+  c = await estaEm(d.id, "AUTORIZACAO_DIRETA");
+  const gDir = engine.avaliarGates(c, fer).find((g) => g.gate.tipo === "regra" && g.gate.regra === "CONTRATACAO_COMPLETA");
+  if (!gDir || gDir.ok) falha("AUTORIZACAO_DIRETA deveria exigir a contratação completa: " + JSON.stringify(gDir));
+  await engine.registrarContratacao(compras, d.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "900", fonte: "EDUCACAO" });
   await engine.avancar(prefeita, d.id, "EMPENHADO");
   c = await estaEm(d.id, "EMPENHADO");
+  if ((meta(c).contratacao as Record<string, unknown>).fonte !== "EDUCACAO") falha("a contratação registrada na autorização deveria seguir para o empenho");
+  ok("contratação direta: sem fornecedor, CNPJ, valor e fonte não sai de AUTORIZACAO_DIRETA; com eles vai ao empenho");
   if (!engine.verificarCadeia(c.eventos).ok) falha("cadeia de eventos da dispensa rompida");
   ok("contratação direta chegou a EMPENHADO com o ato assinado pelo ordenador");
 
@@ -482,6 +520,8 @@ async function main() {
   await engine.avancar(procurador, t.id, "INSTRUCAO_DIRETA");
   await engine.receber(compras, t.id);
   await engine.publicarAvisoDispensa(compras, t.id, { justificativaSemAviso: "Entrega urgente para inaugurar a unidade na próxima semana." });
+  await engine.registrarContratacao(compras, t.id, { fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: "880", fonte: "ORDINARIOS" });
+  if (!(meta(await carregar(t.id)).contratacao as Record<string, unknown> | undefined)?.fornecedor) falha("a contratação direta se registra já na INSTRUCAO_DIRETA");
   await engine.devolver(compras, t.id, "INSTRUCAO", "Rever o caminho: o mercado tem mais fornecedores do que o previsto.");
   await estaEm(t.id, "INSTRUCAO");
   await engine.definirModalidade(compras, t.id, "LICITACAO", "Há vários fornecedores: a disputa por pregão amplia a competição.");
@@ -491,6 +531,9 @@ async function main() {
   if (hav?.length !== 1 || !hav[0].arquivadoEm || !hav[0].justificativaSemAviso) falha("aviso deveria ir para historicoAvisos: " + JSON.stringify(hav));
   const evMod = c.eventos.filter((e) => e.tipo === "MODALIDADE").at(-1)?.dados as { arquivados?: string[] } | undefined;
   if (!evMod?.arquivados?.includes("avisoDispensa")) falha("evento MODALIDADE deveria dizer o que foi arquivado: " + JSON.stringify(evMod));
+  const ctTroca = meta(c).contratacao as Record<string, unknown> | undefined;
+  if (ctTroca?.fornecedor || ctTroca?.cnpj || ctTroca?.fonte !== "ORDINARIOS") falha("ao trocar para licitação o fornecedor da contratação direta sai e a fonte fica: " + JSON.stringify(ctTroca));
+  if (!evMod?.arquivados?.includes("contratacao")) falha("evento MODALIDADE deveria dizer que a contratação direta foi arquivada: " + JSON.stringify(evMod));
   await engine.definirModalidade(compras, t.id, "DISPENSA_VALOR", "Pregão inviável no prazo: volta à dispensa por valor com aviso.");
   await instrucaoAteParecer(t.id);
   await engine.avancar(procurador, t.id, "INSTRUCAO_DIRETA");

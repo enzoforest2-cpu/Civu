@@ -445,7 +445,11 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
       papeis: ["ORDENADOR"],
       slaDiasUteis: 2,
       ramo: "DIRETA",
-      gates: [doc("ATO_AUTORIZACAO_DIRETA", ["ORDENADOR"], "Ato de autorização assinado pelo ordenador")],
+      gates: [
+        doc("ATO_AUTORIZACAO_DIRETA", ["ORDENADOR"], "Ato de autorização assinado pelo ordenador"),
+        // O empenho sai em nome do fornecedor: na contratação direta ele é registrado antes (na licitação vem da sessão)
+        regra("CONTRATACAO_COMPLETA", "Fornecedor, CNPJ, valor contratado e fonte de recurso informados por compras"),
+      ],
       avancos: [{ para: "EMPENHADO", rotulo: "Autorizar e enviar para empenho" }],
       devolucoes: [{ para: "INSTRUCAO_DIRETA", rotulo: "Devolver a compras", motivoObrigatorio: true }],
     },

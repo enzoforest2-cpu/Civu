@@ -5,13 +5,13 @@ import { AlertTriangle, ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileT
 import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
+import { ETAPAS_CONTRATACAO, ETAPAS_CORRECAO_CONTRATACAO, carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
 import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeEtapa, ramoDaModalidade, type Papel } from "@/lib/workflow";
 import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
-import { regraContratacao } from "@/lib/regras-fluxo";
+import { MIN_JUSTIFICATIVA, regraContratacao } from "@/lib/regras-fluxo";
 import { Chip, Panel, Prazo, UrgenciaChip, Avatar } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -21,6 +21,7 @@ import type { Exigencia } from "@/lib/engine";
 import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction, contratacaoAction, remessaTceAction } from "@/app/actions";
 import { Timeline } from "./timeline";
 import { PainelDaEtapa } from "./etapas";
+import { CorrecaoContratacao } from "./etapas/correcao-contratacao";
 
 const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; texto: string }> = {
   cumprida: { tone: "ok", texto: "Cumprida" },
@@ -67,10 +68,13 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   // Conformidade: limite de dispensa, dados da contratação, fila cronológica e obrigações
   const tipoCompra = p.tipo.chave === "COMPRA";
   const contratacao = meta.contratacao as Contratacao | undefined;
-  const idxContratado = ordemCaminho.indexOf("CONTRATADO");
-  const chegouContratacao = tipoCompra && idxContratado >= 0 && (ordemCaminho.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
-  // Os dados se registram na etapa do contrato (o motor recusa antes e depois dela)
-  const podeContratacao = !p.encerradoEm && p.estadoAtual === "CONTRATADO" && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  // O painel aparece a partir da primeira etapa em que os dados se registram no caminho do processo (instrução direta ou contrato)
+  const idxContratacao = Math.min(...ETAPAS_CONTRATACAO.map((e) => ordemCaminho.indexOf(e)).filter((i) => i >= 0));
+  const chegouContratacao = tipoCompra && Number.isFinite(idxContratacao) && (ordemCaminho.indexOf(p.estadoAtual) >= idxContratacao || !!p.encerradoEm);
+  // Os dados se registram na instrução e na autorização da contratação direta e na etapa do contrato (o motor recusa fora delas)
+  const podeContratacao = !p.encerradoEm && ETAPAS_CONTRATACAO.includes(p.estadoAtual) && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  // Depois do contrato, até a fila de pagamento, fonte e valor se corrigem com motivo por quem age na etapa
+  const podeCorrigir = !p.encerradoEm && pode && ETAPAS_CORRECAO_CONTRATACAO.includes(p.estadoAtual) && !!contratacao?.fornecedor && !!contratacao?.cnpj;
   // Falta algum dado (ex.: a sessão preencheu o vencedor, mas não a fonte de recurso): o formulário já abre
   const contratacaoIncompleta = !regraContratacao(contratacao, FONTES).ok;
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
@@ -570,6 +574,15 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       </SubmitButton>
                     </ActionForm>
                   </details>
+                )}
+                {podeCorrigir && (
+                  <CorrecaoContratacao
+                    processoId={p.id}
+                    fonte={contratacao?.fonte ?? ""}
+                    valor={contratacao?.valor ? String(contratacao.valor).replace(".", ",") : ""}
+                    fontes={FONTES}
+                    minMotivo={MIN_JUSTIFICATIVA}
+                  />
                 )}
               </Panel>
             </section>

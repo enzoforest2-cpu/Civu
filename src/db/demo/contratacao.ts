@@ -228,6 +228,8 @@ export const contratacaoDemo: ModuloDemo = {
     await ateParecer(pag, rPag.id, "OUTRA_DIRETA", 9800);
     await engine.avancar(procurador, rPag.id, "INSTRUCAO_DIRETA");
     await engine.receber(compras, rPag.id);
+    // Contratação direta: compras registra o fornecedor escolhido antes da autorização e do empenho
+    await engine.registrarContratacao(compras, rPag.id, { fornecedor: "Gráfica Ipê Roxo Ltda", cnpj: cnpj("688001230001"), valor: "9.640,00", fonte: "ASSISTENCIA" });
     await engine.avancar(compras, rPag.id, "AUTORIZACAO_DIRETA");
     await engine.receber(prefeita, rPag.id);
     const ato = await engine.juntarDocumento(prefeita, rPag.id, "ATO_AUTORIZACAO_DIRETA", "Ato de autorização da contratação direta", "Autorizo a contratação direta, nos termos do parecer jurídico.");
@@ -239,7 +241,6 @@ export const contratacaoDemo: ModuloDemo = {
     await engine.assinarDocumento(prefeita, emp.id, "ORDENADOR");
     await engine.avancar(contador, rPag.id, "CONTRATADO");
     await engine.receber(compras, rPag.id);
-    await engine.registrarContratacao(compras, rPag.id, { fornecedor: "Gráfica Ipê Roxo Ltda", cnpj: cnpj("688001230001"), valor: "9.640,00", fonte: "ASSISTENCIA" });
     const contrato = await engine.juntarDocumento(compras, rPag.id, "CONTRATO", "Contrato", "Contrato de prestação de serviço de impressão.");
     await engine.assinarDocumento(prefeita, contrato.id, "ORDENADOR");
     await engine.juntarDocumento(compras, rPag.id, "PORTARIA_FISCAL", "Portaria de fiscalização", "Designa gestor e fiscal do contrato, com suplente.");

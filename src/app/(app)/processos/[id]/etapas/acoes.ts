@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import {
   ErroFluxo,
   carregarProcesso,
+  corrigirFonteValor,
   podeAgir,
   decidirRecurso,
   definirModalidade,
@@ -128,4 +129,10 @@ export async function retornoBancarioAction(_: ActionState, fd: FormData): Promi
   return executar(fd, aceito ? "Pagamento confirmado pelo banco." : "Recusa do banco registrada; o pagamento voltou à fila.", (u, id) =>
     registrarRetornoBancario(u, id, { aceito, autenticacao: str(fd, "autenticacao"), motivo: str(fd, "motivo") }),
   );
+}
+
+export async function corrigirFonteValorAction(_: FormState, fd: FormData): Promise<FormState> {
+  const r = await executar(fd, "Correção registrada.", (u, id) => corrigirFonteValor(u, id, { fonte: str(fd, "fonte"), valor: str(fd, "valor"), motivo: str(fd, "motivo") }));
+  // Com erro, o formulário volta com o que foi digitado; com sucesso, mostra os dados novos (vindos da página)
+  return r?.erro ? { ...r, valores: valoresDe(fd, ["fonte", "valor", "motivo"]) } : r;
 }
