@@ -27,7 +27,8 @@ export function Navegacao({ grupos }: { grupos: GrupoNav[] }) {
             </summary>
             <div className="space-y-0.5 pb-2">
               {g.itens.map((i) => {
-                const a = ativo(path, i.href);
+                // um item mais específico (ex.: /financas/caixa) vence o item-pai (/financas)
+                const a = ativo(path, i.href) && !grupos.some((x) => x.itens.some((o) => o.href.startsWith(i.href + "/") && ativo(path, o.href)));
                 return (
                   <Link
                     key={i.href}

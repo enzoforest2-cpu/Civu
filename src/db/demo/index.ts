@@ -5,8 +5,9 @@ import type { ModuloDemo } from "./contexto";
 import { portalDemo } from "./portal";
 import { servicosDemo } from "../../modulos/servicos/demo";
 import { contratosDemo } from "../../modulos/contratos/demo";
+import { financasDemo } from "../../modulos/financas/demo";
 import { gestaoDemo } from "../../modulos/gestao/demo";
 
 export const DEMO_VERSAO = 10;
 
-export const MODULOS_DEMO: ModuloDemo[] = [portalDemo, servicosDemo, contratosDemo, gestaoDemo];
+export const MODULOS_DEMO: ModuloDemo[] = [portalDemo, servicosDemo, contratosDemo, financasDemo, gestaoDemo];
