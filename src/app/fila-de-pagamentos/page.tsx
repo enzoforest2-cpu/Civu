@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ListOrdered, Search } from "lucide-react";
 import { db } from "@/db";
 import { municipios } from "@/db/schema";
-import { filaDePagamentos, historicoDePagamentos, fmtCnpj } from "@/lib/pagamentos";
+import { filaDePagamentos, historicoDePagamentos, enviadosAoBanco, fmtCnpj } from "@/lib/pagamentos";
 import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Marca, MarcaCompleta } from "@/components/marca";
 
@@ -15,7 +15,9 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
   const lista = await db.query.municipios.findMany({ orderBy: municipios.nome });
   const mun = lista.find((x) => x.slug === sp.m) ?? lista[0];
   const cnpj = (sp.cnpj ?? "").replace(/\D/g, "");
-  const [filas, hist] = mun ? await Promise.all([filaDePagamentos(mun.id), historicoDePagamentos(mun.id, 180)]) : [[], { pagos: [], mediaDias: null, quebras: [] }];
+  const [filas, hist, enviados] = mun
+    ? await Promise.all([filaDePagamentos(mun.id), historicoDePagamentos(mun.id, 180), enviadosAoBanco(mun.id)])
+    : [[], { pagos: [], mediaDias: null, quebras: [] }, []];
   const totalItens = filas.reduce((s, f) => s + f.fila.length, 0);
   const totalValor = filas.reduce((s, f) => s + f.total, 0);
   const meus = cnpj
@@ -186,6 +188,29 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
                     <strong className="font-semibold text-ink">Justificativa:</strong> {q.quebra?.justificativa}
                   </p>
                   <p className="mt-1 text-[12.5px] text-ink-3">Passou à frente de: {q.quebra?.aFrente.join(", ")}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="panel mt-8 p-6">
+          <h2 className="text-[17px] font-semibold text-ink">Enviados ao banco, aguardando confirmação</h2>
+          {enviados.length === 0 ? (
+            <p className="mt-3 rounded-xl bg-sunken px-4 py-3 text-[14.5px] text-ink-2">
+              Nenhum pagamento enviado ao banco agora. Quando a prefeitura envia uma ordem de pagamento, ela aparece aqui até o banco confirmar; só depois disso o
+              pagamento é considerado pago.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-line">
+              {enviados.map((x) => (
+                <li key={x.processoId} className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-[14px]">
+                  <span className="text-ink">
+                    <span className="tnum font-semibold">{x.numero}</span> · {x.fornecedor ?? "Fornecedor não informado"}
+                  </span>
+                  <span className="tnum text-ink-3">
+                    {fmtMoeda(x.valor)} · enviado em {fmtData(x.enviadoEm)}
+                  </span>
                 </li>
               ))}
             </ul>

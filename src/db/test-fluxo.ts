@@ -19,7 +19,7 @@ async function main() {
   const { avancosDisponiveis, caminhoDoProcesso } = await import("../lib/workflow");
   const { isDiaUtil } = await import("../lib/dates");
   const { impugnacaoTempestiva } = await import("../lib/regras-fluxo");
-  const { filaDePagamentos } = await import("../lib/pagamentos");
+  const { filaDePagamentos, aFrenteNaFila, enviadosAoBanco, historicoDePagamentos } = await import("../lib/pagamentos");
 
   async function sessao(cpf: string) {
     const u = await db.query.usuarios.findFirst({ where: eq(usuarios.cpf, cpf), with: { setor: true, municipio: true } });
@@ -342,8 +342,25 @@ async function main() {
   };
   const antes = await posicaoDe();
   const justificativaFila = "Pagamento fora da ordem apenas para o teste automatizado.";
+  const emHistorico = async () => (await historicoDePagamentos(requisitante.municipioId, 365)).pagos.some((x) => x.processoId === p.id);
+  const emEnviados = async () => (await enviadosAoBanco(requisitante.municipioId)).find((x) => x.processoId === p.id);
+  // Ordem cronológica (art. 141) vale também na saída da fila para o envio ao banco
+  const naFrente = await aFrenteNaFila(requisitante.municipioId, p.id);
+  if (!naFrente || naFrente.aFrente.length === 0) falha("o teste precisa de pelo menos um pagamento liquidado antes na mesma fonte");
+  await esperaErro("enviar ao banco fora da ordem, sem justificativa", () => engine.avancar(tesouraria, p.id, "PAGAMENTO_ENVIADO"));
+  await esperaErro("enviar ao banco fora da ordem, justificativa curta", () => engine.avancar(tesouraria, p.id, "PAGAMENTO_ENVIADO", "Urgente."));
+  await estaEm(p.id, "FILA_PAGAMENTO");
+  if ((await emEnviados()) || (await emHistorico())) falha("processo na fila não pode aparecer como enviado nem pago");
   await engine.avancar(tesouraria, p.id, "PAGAMENTO_ENVIADO", justificativaFila);
   await estaEm(p.id, "PAGAMENTO_ENVIADO");
+  const evEnvio = (await carregar(p.id)).eventos.filter((e) => e.paraEstado === "PAGAMENTO_ENVIADO").at(-1);
+  if ((evEnvio?.dados as { quebraOrdem?: { justificativa: string } } | null)?.quebraOrdem?.justificativa !== justificativaFila) falha("justificativa pública deveria ficar no evento de envio");
+  ok("ordem cronológica vale na saída da fila para o banco: sem justificativa recusa, com justificativa passa e fica pública");
+  const env1 = await emEnviados();
+  if (!env1 || env1.numero !== p.numero || env1.valor !== 8700 || env1.fornecedor !== "Mesas e Cia Ltda") falha("enviadosAoBanco deveria listar o processo enviado: " + JSON.stringify(env1));
+  if (await emHistorico()) falha("enviado ao banco ainda não é pago: não pode entrar em historicoDePagamentos");
+  if (await posicaoDe().then(() => true, () => false)) falha("enviado ao banco não pode continuar na fila de espera");
+  ok("enviado ao banco aparece em enviadosAoBanco e não em historicoDePagamentos nem na fila");
   await esperaErro("PAGO sem retorno do banco", () => engine.avancar(tesouraria, p.id, "PAGO"));
   await esperaErro("retorno rejeitado sem motivo", () => engine.registrarRetornoBancario(tesouraria, p.id, { aceito: false }));
   await esperaErro("retorno por quem não é da tesouraria", () => engine.registrarRetornoBancario(compras, p.id, { aceito: true }));
@@ -353,6 +370,7 @@ async function main() {
   if ((meta(c).historicoRetornos as unknown[]).length !== 1) falha("rejeição deveria ficar em historicoRetornos");
   const evRet = c.eventos.filter((e) => e.tipo === "RETORNO_BANCARIO");
   if (evRet.length !== 1 || (evRet[0].dados as { aceito: boolean }).aceito !== false) falha("rejeição deveria ficar no histórico de eventos");
+  if (await emEnviados()) falha("devolvido pelo banco não pode ficar em enviadosAoBanco");
   const depois = await posicaoDe();
   if (depois.posicao !== antes.posicao || depois.liquidadoEm !== antes.liquidadoEm) falha(`posição na fila mudou: ${JSON.stringify(antes)} -> ${JSON.stringify(depois)}`);
   ok("retorno rejeitado volta à fila, limpa metadados.retornoBancario e mantém a posição (data da liquidação)");
@@ -360,6 +378,14 @@ async function main() {
   await esperaErro("reenvio começa limpo: PAGO sem novo retorno", () => engine.avancar(tesouraria, p.id, "PAGO"));
   await engine.registrarRetornoBancario(tesouraria, p.id, { aceito: true, autenticacao: "AUT-123456" });
   c = await estaEm(p.id, "PAGO");
+  if (await emEnviados()) falha("pago não pode continuar em enviadosAoBanco");
+  const hist = (await historicoDePagamentos(requisitante.municipioId, 365)).pagos.find((x) => x.processoId === p.id);
+  if (!hist) falha("pago deveria entrar em historicoDePagamentos");
+  else {
+    if (hist.diasNaFila > 1) falha(`dias na fila deveria medir da liquidação ao PAGO (teste roda em minutos), veio ${hist.diasNaFila}`);
+    if (hist.quebra?.justificativa !== justificativaFila) falha("quebra de ordem deveria vir do evento de envio ao banco: " + JSON.stringify(hist.quebra));
+  }
+  ok("retorno aceito: sai de enviadosAoBanco, entra em historicoDePagamentos com a quebra de ordem justificada");
   await esperaErro("segundo retorno depois de pago", () => engine.registrarRetornoBancario(tesouraria, p.id, { aceito: true }));
   await engine.juntarDocumento(tesouraria, p.id, "COMPROVANTE_PAGAMENTO", "Comprovante", "Comprovante do banco.");
   await engine.avancar(tesouraria, p.id, "ARQUIVADO");

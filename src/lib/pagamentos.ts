@@ -23,14 +23,23 @@ export type Contratacao = { fornecedor?: string; cnpj?: string; valor?: string |
 
 export const nomeFonte = (f: string) => FONTES[f] ?? "Fonte não informada";
 
-/** Estados com fila cronológica e o estado de destino que representa o pagamento, por tipo de processo. */
+/**
+ * Estados da fila cronológica por tipo de processo: `fila` (aguardando), `enviado` (opcional: pagamento enviado ao banco,
+ * ainda sem confirmação) e `pago` (confirmado). Há etapa de envio quando o primeiro avanço da fila leva a um estado que pode
+ * devolver o processo à fila (banco recusou); sem isso, o primeiro avanço da fila já é o pagamento.
+ */
 async function estadosDeFila(municipioId: string) {
   const tipos = await db.query.tiposProcesso.findMany({ where: eq(tiposProcesso.municipioId, municipioId) });
-  const m = new Map<string, { fila: string; pago: string }>();
+  const m = new Map<string, { fila: string; enviado?: string; pago: string }>();
   for (const t of tipos) {
     const def = t.definicao as WorkflowDef;
     const e = def.estados.find((x) => x.filaCronologica);
-    if (e && e.avancos[0]) m.set(t.id, { fila: e.chave, pago: e.avancos[0].para });
+    const primeiro = e?.avancos[0];
+    if (!e || !primeiro) continue;
+    const alvo = def.estados.find((x) => x.chave === primeiro.para);
+    const pagoDepois = alvo?.avancos[0];
+    if (alvo && pagoDepois && alvo.devolucoes.some((d) => d.para === e.chave)) m.set(t.id, { fila: e.chave, enviado: alvo.chave, pago: pagoDepois.para });
+    else m.set(t.id, { fila: e.chave, pago: primeiro.para });
   }
   return m;
 }
@@ -47,7 +56,7 @@ export async function filaDePagamentos(municipioId: string) {
     const cfg = estados.get(p.tipoId);
     if (!cfg || p.estadoAtual !== cfg.fila || p.encerradoEm) continue;
     // A posição é a data da liquidação: a volta do banco (deEstado = estado de envio) não conta como nova entrada na fila.
-    const entrada = [...p.eventos].sort((a, b) => b.seq - a.seq).find((e) => e.paraEstado === cfg.fila && e.deEstado !== cfg.pago);
+    const entrada = [...p.eventos].sort((a, b) => b.seq - a.seq).find((e) => e.paraEstado === cfg.fila && e.deEstado !== (cfg.enviado ?? cfg.pago));
     const c = ((p.metadados as Record<string, unknown> | null)?.contratacao ?? {}) as Contratacao;
     const fonte = c.fonte ?? "SEM_FONTE";
     itens.push({
@@ -102,11 +111,15 @@ export async function historicoDePagamentos(municipioId: string, dias = 180) {
   for (const p of lista) {
     const cfg = estados.get(p.tipoId);
     if (!cfg) continue;
-    const pg = p.eventos.find((e) => e.deEstado === cfg.fila && e.paraEstado === cfg.pago);
+    // Só conta como pago a entrada em PAGO (retorno aceito); "enviado ao banco" ainda não é pagamento.
+    const pg = p.eventos.find((e) => e.deEstado === (cfg.enviado ?? cfg.fila) && e.paraEstado === cfg.pago);
     if (!pg || pg.criadoEm.getTime() < desde) continue;
-    const entrada = p.eventos.filter((e) => e.paraEstado === cfg.fila && e.seq < pg.seq).at(-1);
+    // Dias na fila: da liquidação (primeira entrada na fila, sem contar voltas do banco) até o PAGO.
+    const entrada = p.eventos.filter((e) => e.paraEstado === cfg.fila && e.deEstado !== cfg.enviado && e.seq < pg.seq).at(-1);
+    // A justificativa de quebra de ordem fica no evento que saiu da fila (último envio ao banco, ou o próprio pagamento).
+    const saida = p.eventos.filter((e) => e.deEstado === cfg.fila && e.paraEstado === (cfg.enviado ?? cfg.pago) && e.seq < pg.seq).at(-1);
     const c = ((p.metadados as Record<string, unknown> | null)?.contratacao ?? {}) as Contratacao;
-    const q = (pg.dados as { quebraOrdem?: { aFrente: string[]; justificativa: string } } | null)?.quebraOrdem ?? null;
+    const q = (saida?.dados as { quebraOrdem?: { aFrente: string[]; justificativa: string } } | null)?.quebraOrdem ?? null;
     pagos.push({
       processoId: p.id,
       numero: p.numero,
@@ -121,6 +134,30 @@ export async function historicoDePagamentos(municipioId: string, dias = 180) {
   pagos.sort((a, b) => b.pagoEm.getTime() - a.pagoEm.getTime());
   const media = pagos.length ? Math.round(pagos.reduce((s, x) => s + x.diasNaFila, 0) / pagos.length) : null;
   return { pagos, mediaDias: media, quebras: pagos.filter((x) => x.quebra) };
+}
+
+/** Pagamentos enviados ao banco que aguardam confirmação (ainda não são pagos nem estão na fila). */
+export async function enviadosAoBanco(municipioId: string) {
+  const estados = await estadosDeFila(municipioId);
+  const lista = await db.query.processos.findMany({
+    where: eq(processos.municipioId, municipioId),
+    with: { eventos: { columns: { paraEstado: true, criadoEm: true, seq: true } } },
+  });
+  const itens: { processoId: string; numero: string; fornecedor: string | null; valor: number | null; enviadoEm: Date }[] = [];
+  for (const p of lista) {
+    const cfg = estados.get(p.tipoId);
+    if (!cfg?.enviado || p.estadoAtual !== cfg.enviado || p.encerradoEm) continue;
+    const ev = [...p.eventos].sort((a, b) => b.seq - a.seq).find((e) => e.paraEstado === cfg.enviado);
+    const c = ((p.metadados as Record<string, unknown> | null)?.contratacao ?? {}) as Contratacao;
+    itens.push({
+      processoId: p.id,
+      numero: p.numero,
+      fornecedor: c.fornecedor ?? null,
+      valor: c.valor != null && c.valor !== "" ? Number(c.valor) : null,
+      enviadoEm: ev?.criadoEm ?? p.abertoEm,
+    });
+  }
+  return itens.sort((a, b) => a.enviadoEm.getTime() - b.enviadoEm.getTime() || a.numero.localeCompare(b.numero));
 }
 
 /** Valida CNPJ numérico (dígitos verificadores). */
