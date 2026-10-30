@@ -13,6 +13,7 @@
     "db:reset": "tsx src/db/reset.ts && tsx src/db/deploy.ts --forcar",
     "db:setup": "tsx src/db/deploy.ts",
     "test:engine": "tsx src/db/test-engine.ts",
+    "test:regras": "tsx --test src/lib/regras-fluxo.test.ts",
     "db:valor": "tsx src/db/valor-cli.ts",
     "vercel-build": "tsx src/db/deploy.ts --opcional && next build",
     "db:deploy": "tsx src/db/deploy.ts"
