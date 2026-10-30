@@ -33,6 +33,9 @@ const valoresDe = (fd: FormData, campos: string[]) => Object.fromEntries(campos.
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ERRO_PROCESSO = "Processo não encontrado.";
+
 function trata(e: unknown): { erro: string } {
   if (e instanceof ErroFluxo) return { erro: e.message };
   console.error(e);
@@ -43,6 +46,7 @@ function trata(e: unknown): { erro: string } {
 async function executar(fd: FormData, ok: string, fn: (u: Awaited<ReturnType<typeof requireUser>>, processoId: string) => Promise<unknown>): Promise<ActionState> {
   const u = await requireUser();
   const processoId = str(fd, "processoId");
+  if (!UUID.test(processoId)) return { erro: ERRO_PROCESSO };
   try {
     await fn(u, processoId);
   } catch (e) {
@@ -73,7 +77,9 @@ export async function publicarEditalAction(_: EditalState, fd: FormData): Promis
   const publicadoEm = str(fd, "publicadoEm");
   const valores = valoresDe(fd, ["numero", "tipoObjeto", "publicadoEm", "aberturaEm", "plataforma"]);
   // Só quem pode agir na etapa recebe o cálculo; os demais recebem a recusa do motor
-  const p = await carregarProcesso(u.municipioId, str(fd, "processoId"));
+  const processoId = str(fd, "processoId");
+  if (!UUID.test(processoId)) return { erro: ERRO_PROCESSO, valores };
+  const p = await carregarProcesso(u.municipioId, processoId);
   if (!p || !podeAgir(u, p)) return { erro: "Você não tem papel para agir nesta etapa.", valores };
   let abertura: string | undefined;
   if (tipoObjetoValido(tipoObjeto) && /^\d{4}-\d{2}-\d{2}$/.test(publicadoEm)) {

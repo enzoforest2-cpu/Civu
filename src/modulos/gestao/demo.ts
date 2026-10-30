@@ -85,7 +85,9 @@ export const gestaoDemo: ModuloDemo = {
       await engine.assinarDocumento(u, dfd.id, papel);
       // secretário da pasta aprova (assina o DFD, se quem abriu não foi ele) e o protocolo autua antes do gabinete
       await engine.avancar(u, p.id, "APROVACAO_SECRETARIO", "Encaminho ao secretário da pasta.");
-      const secretario = papel === "SECRETARIO" ? u : marcos;
+      // secretário da secretaria de quem pediu (cada pasta do seed tem o seu); sem ele na lista, Marcos (Saúde)
+      const secretarioDaPasta: Record<string, SessaoUsuario> = { SESAU: marcos, SEDUC: paulo, SEMAD: sandra };
+      const secretario = papel === "SECRETARIO" ? u : (secretarioDaPasta[u.setor?.sigla ?? ""] ?? marcos);
       if (papel !== "SECRETARIO") await engine.assinarDocumento(secretario, dfd.id, "SECRETARIO");
       await engine.avancar(secretario, p.id, "AUTUACAO", "Aprovado. Ao protocolo para autuação.");
       await engine.receber(protocolo, p.id);

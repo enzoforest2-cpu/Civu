@@ -53,7 +53,7 @@ const json = (v: unknown) => `${lit(JSON.stringify(v))}::jsonb`;
 const ts = (d: Date) => lit(d.toISOString());
 
 /** CNPJ fictício com dígitos verificadores válidos. */
-function cnpj(base12: string) {
+export function cnpj(base12: string) {
   const calc = (b: string) => {
     const pesos = b.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     const r = b.split("").reduce((a, n, i) => a + Number(n) * pesos[i], 0) % 11;
@@ -130,11 +130,11 @@ export function gerarSqlValor(ids: IdsValor): string {
 
   // 4. Processos novos de exemplo
   let seqNum = ids.maxSeq;
-  const caminho = ["DEMANDA", "AUTORIZACAO", "INSTRUCAO", "VERIFICACAO_ORCAMENTARIA", "RESERVADO", "CONTROLE_INTERNO", "PARECER_JURIDICO", "CONTRATACAO", "HOMOLOGADO", "CONTRATADO", "EMPENHADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGO", "ARQUIVADO"];
+  const caminho = ["DEMANDA", "APROVACAO_SECRETARIO", "AUTUACAO", "AUTORIZACAO", "INSTRUCAO", "VERIFICACAO_ORCAMENTARIA", "RESERVADO", "CONTROLE_INTERNO", "PARECER_JURIDICO", "SESSAO_DISPUTA", "HOMOLOGADO", "EMPENHADO", "CONTRATADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGAMENTO_ENVIADO", "PAGO", "ARQUIVADO"];
   const setorDe: Record<string, string | null> = {
-    DEMANDA: null, AUTORIZACAO: "GAB", INSTRUCAO: "COMPRAS", VERIFICACAO_ORCAMENTARIA: "CONTAB", RESERVADO: "CONTAB", CONTROLE_INTERNO: "CGM",
-    PARECER_JURIDICO: "PGM", CONTRATACAO: "COMPRAS", HOMOLOGADO: "GAB", CONTRATADO: "COMPRAS", EMPENHADO: "CONTAB", EXECUCAO: null,
-    LIQUIDADO: "CONTAB", FILA_PAGAMENTO: "TES", PAGO: "TES", ARQUIVADO: "PROT",
+    DEMANDA: null, APROVACAO_SECRETARIO: null, AUTUACAO: "PROT", AUTORIZACAO: "GAB", INSTRUCAO: "COMPRAS", VERIFICACAO_ORCAMENTARIA: "CONTAB", RESERVADO: "CONTAB", CONTROLE_INTERNO: "CGM",
+    PARECER_JURIDICO: "PGM", SESSAO_DISPUTA: "COMPRAS", HOMOLOGADO: "GAB", EMPENHADO: "CONTAB", CONTRATADO: "COMPRAS", EXECUCAO: null,
+    LIQUIDADO: "CONTAB", FILA_PAGAMENTO: "TES", PAGAMENTO_ENVIADO: "TES", PAGO: "TES", ARQUIVADO: "PROT",
   };
 
   type Novo = {

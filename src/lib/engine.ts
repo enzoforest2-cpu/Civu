@@ -6,6 +6,7 @@ import { assinaturas, documentos, eventos, feriados, processos, setores, tiposPr
 import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
+import { numeroBr } from "./numeros";
 import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
 import {
   MIN_JUSTIFICATIVA,
@@ -541,7 +542,7 @@ export async function registrarContratacao(u: SessaoUsuario, processoId: string,
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
   const fornecedor = input.fornecedor.trim();
   const cnpj = input.cnpj.replace(/\D/g, "");
-  const valor = Number(String(input.valor).replace(/\./g, "").replace(",", "."));
+  const valor = numeroBr(input.valor);
   if (fornecedor.length < 3) throw new ErroFluxo("Informe a razão social do fornecedor.");
   if (!cnpjValido(cnpj)) throw new ErroFluxo("CNPJ inválido. Confira os 14 dígitos.");
   if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo("Informe o valor contratado.");

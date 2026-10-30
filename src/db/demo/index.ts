@@ -8,7 +8,8 @@ import { contratosDemo } from "../../modulos/contratos/demo";
 import { financasDemo } from "../../modulos/financas/demo";
 import { tributosDemo } from "../../modulos/tributos/demo";
 import { gestaoDemo } from "../../modulos/gestao/demo";
+import { contratacaoDemo } from "./contratacao";
 
-export const DEMO_VERSAO = 10;
+export const DEMO_VERSAO = 11;
 
-export const MODULOS_DEMO: ModuloDemo[] = [portalDemo, servicosDemo, contratosDemo, financasDemo, tributosDemo, gestaoDemo];
+export const MODULOS_DEMO: ModuloDemo[] = [portalDemo, servicosDemo, contratosDemo, financasDemo, tributosDemo, gestaoDemo, contratacaoDemo];
