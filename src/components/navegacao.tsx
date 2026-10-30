@@ -68,8 +68,6 @@ export function Navegacao({ grupos }: { grupos: GrupoNav[] }) {
 /** No celular, o menu vira uma folha de tela cheia aberta pelo botão da barra superior. */
 export function MenuMovel({ grupos, topo, rodape }: { grupos: GrupoNav[]; topo: ReactNode; rodape: ReactNode }) {
   const [aberto, setAberto] = useState(false);
-  const path = usePathname();
-  useEffect(() => setAberto(false), [path]);
   useEffect(() => {
     document.body.style.overflow = aberto ? "hidden" : "";
     return () => {
