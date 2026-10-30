@@ -18,6 +18,7 @@ async function main() {
   const engine = await import("../lib/engine");
   const { avancosDisponiveis, caminhoDoProcesso } = await import("../lib/workflow");
   const { isDiaUtil } = await import("../lib/dates");
+  const { impugnacaoTempestiva } = await import("../lib/regras-fluxo");
   const { filaDePagamentos } = await import("../lib/pagamentos");
 
   async function sessao(cpf: string) {
@@ -46,7 +47,7 @@ async function main() {
   const ok = (m: string) => console.log("✓", m);
   const falha = (m: string): never => { throw new Error(m); };
   const esperaErro = async (m: string, fn: () => Promise<unknown>) => {
-    try { await fn(); } catch (e) { if (e instanceof engine.ErroFluxo) { ok(`${m} → bloqueado: "${e.message.slice(0, 80)}"`); return; } throw e; }
+    try { await fn(); } catch (e) { if (e instanceof engine.ErroFluxo) { ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
     falha("deveria falhar: " + m);
   };
   const carregar = async (id: string) => (await engine.carregarProcesso(requisitante.municipioId, id)) ?? falha("processo sumiu");
@@ -63,12 +64,12 @@ async function main() {
     return c;
   };
   const CNPJ = "11222333000181";
-  const fer = new Set<string>(); // sem feriados cadastrados que interfiram: usado só nas travas puras
+  const fer = await engine.feriadosDo(requisitante.municipioId); // feriados do município, como o motor usa
   // datas do teste: abertura = último dia útil até hoje, para a sessão já poder acontecer
   const hoje = engine.hojeIso();
   const doDia = (iso: string, dias: number) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + dias); return d.toISOString().slice(0, 10); };
   let abertura = hoje;
-  while (!isDiaUtil(new Date(abertura + "T12:00:00"), new Set())) abertura = doDia(abertura, -1);
+  while (!isDiaUtil(new Date(abertura + "T12:00:00"), fer)) abertura = doDia(abertura, -1);
   const publicado = doDia(abertura, -40);
   const assunto = (t: string) => `TESTE FLUXO — ${t}`;
   const dadosCompra = { objeto: "10 mesas", natureza: "EQUIPAMENTOS", modalidade: "A_DEFINIR", justificativa: "teste", quantidade: "10", valorEstimado: "9000", dataPretendida: "2026-12-01", prioridade: "BAIXA", noPCA: "SIM" };
@@ -113,9 +114,6 @@ async function main() {
     const par = await engine.juntarDocumento(procurador, id, "PARECER_JURIDICO", "Parecer", "Favorável.");
     await engine.assinarDocumento(procurador, par.id, "JURIDICO");
   }
-
-
-
 
   // =========================================================================
   // A) Modalidade a definir: nenhum avanço; ações fora da etapa são recusadas
@@ -191,14 +189,20 @@ async function main() {
   if ((meta(c).edital as { numero: string }).numero !== "PE 1/2026") falha("edital não gravado");
   ok("edital com abertura curta é recusado; o correto é publicado");
 
-  // impugnações
+  // impugnações: A (tempestiva, será acolhida), B (fora do prazo), C (tempestiva), D (no limite exato do prazo)
+  const limite = (ab: string) => { let d = ab; while (!impugnacaoTempestiva(d, ab, fer)) d = doDia(d, -1); return d; };
+  let abertura2 = doDia(abertura, -1);
+  while (!isDiaUtil(new Date(abertura2 + "T12:00:00"), fer)) abertura2 = doDia(abertura2, -1);
+  if (!(limite(abertura2) < limite(abertura))) falha("premissa do teste: o limite da abertura anterior deveria ser menor");
   await esperaErro("impugnação sem texto", () => engine.registrarImpugnacao(compras, p.id, { autor: "Empresa X", texto: " ", recebidaEm: doDia(publicado, 1) }));
   await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa X", texto: "Especificação direciona a marca.", recebidaEm: doDia(publicado, 1) });
   await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa Y", texto: "Pedido fora do prazo.", recebidaEm: abertura });
+  await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa C", texto: "Exigência de atestado excessiva.", recebidaEm: doDia(publicado, 2) });
+  await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa D", texto: "Critério de julgamento obscuro.", recebidaEm: limite(abertura) });
   c = await carregar(p.id);
-  let imps = meta(c).impugnacoes as { id: string; tempestiva: boolean }[];
-  if (imps.length !== 2 || !imps[0].tempestiva || imps[1].tempestiva) falha("tempestividade errada: " + JSON.stringify(imps));
-  if (new Set(imps.map((i) => i.id)).size !== 2 || !imps[0].id) falha("ids das impugnações devem ser únicos");
+  let imps = meta(c).impugnacoes as { id: string; autor: string; tempestiva: boolean }[];
+  if (imps.map((i) => i.tempestiva).join() !== "true,false,true,true") falha("tempestividade errada: " + JSON.stringify(imps));
+  if (new Set(imps.map((i) => i.id)).size !== 4 || !imps[0].id) falha("ids das impugnações devem ser únicos");
   await engine.avancar(compras, p.id, "IMPUGNACOES");
   await esperaErro("impugnação tempestiva sem resposta bloqueia", () => engine.avancar(compras, p.id, "SESSAO_DISPUTA"));
   await esperaErro("resultado da sessão fora da etapa", () => engine.registrarResultadoSessao(compras, p.id, { situacao: "DESERTA", ataEm: hoje }));
@@ -206,35 +210,66 @@ async function main() {
   await engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "Procede: a especificação será ajustada.", acolhida: true, alteraPropostas: true });
   c = await estaEm(p.id, "PUBLICACAO_EDITAL");
   const m1 = meta(c);
-  if (m1.edital || m1.impugnacoes) falha("edital e impugnações deveriam ir para o histórico");
-  if ((m1.historicoEditais as unknown[]).length !== 1) falha("histórico de editais esperado com 1 item");
+  const levadas = (m1.impugnacoes as { autor: string }[] | undefined) ?? [];
+  if (m1.edital || levadas.map((i) => i.autor).join() !== "Empresa C,Empresa D") falha("só o edital deveria sair; as tempestivas sem resposta seguem: " + JSON.stringify(levadas));
+  const hed = m1.historicoEditais as { impugnacoes: unknown[] }[];
+  if (hed.length !== 1 || hed[0].impugnacoes.length !== 4) falha("histórico de editais esperado com o edital e as 4 impugnações");
   const dev = c.eventos.filter((e) => e.tipo === "DEVOLUCAO").at(-1);
   if (!(dev?.dados as { motivo: string }).motivo.startsWith("Impugnação acolhida: republicar o edital com prazo novo")) falha("motivo da devolução errado");
-  await esperaErro("responder de novo a mesma impugnação", () => engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "x", acolhida: false, alteraPropostas: false }));
+  await esperaErro("responder impugnação já arquivada", () => engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "x", acolhida: false, alteraPropostas: false }));
   await esperaErro("avançar com o edital a republicar", () => engine.avancar(compras, p.id, "IMPUGNACOES"));
-  ok("impugnação acolhida que altera propostas devolve a PUBLICACAO_EDITAL e exige novo edital");
+  await esperaErro("registrar impugnação sem edital publicado", () => engine.registrarImpugnacao(compras, p.id, { autor: "W", texto: "x", recebidaEm: publicado }));
+  await esperaErro("republicar com a mesma data de publicação", () => engine.publicarEdital(compras, p.id, { ...edital, aberturaEm: abertura2 }));
+  ok("impugnação acolhida devolve a PUBLICACAO_EDITAL, leva as tempestivas sem resposta e exige edital com prazo novo");
 
-  await engine.publicarEdital(compras, p.id, { ...edital, numero: "PE 1/2026 (republicado)" });
-  await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa Z", texto: "Prazo de entrega exíguo.", recebidaEm: doDia(publicado, 2) });
+  await engine.publicarEdital(compras, p.id, { ...edital, numero: "PE 1/2026 (republicado)", publicadoEm: doDia(publicado, 3), aberturaEm: abertura2 });
+  c = await carregar(p.id);
+  imps = meta(c).impugnacoes as typeof imps;
+  if (imps.map((i) => i.tempestiva).join() !== "true,false") falha("a nova abertura deveria recalcular a tempestividade: " + JSON.stringify(imps));
+  await engine.registrarImpugnacao(compras, p.id, { autor: "Empresa Z", texto: "Prazo de entrega exíguo.", recebidaEm: doDia(publicado, 4) });
   await engine.avancar(compras, p.id, "IMPUGNACOES");
   c = await carregar(p.id);
-  imps = meta(c).impugnacoes as { id: string; tempestiva: boolean }[];
-  await esperaErro("ainda há impugnação sem resposta", () => engine.avancar(compras, p.id, "SESSAO_DISPUTA"));
-  await engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "Improcede: o prazo é compatível.", acolhida: false, alteraPropostas: false });
-  await estaEm(p.id, "IMPUGNACOES");
+  imps = meta(c).impugnacoes as typeof imps;
+  await esperaErro("a impugnação carregada continua bloqueando", () => engine.avancar(compras, p.id, "SESSAO_DISPUTA"));
+  await engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "Improcede: o atestado é compatível.", acolhida: false, alteraPropostas: false });
   await esperaErro("responder impugnação já respondida", () => engine.responderImpugnacao(compras, p.id, imps[0].id, { resposta: "outra", acolhida: true, alteraPropostas: true }));
+  await esperaErro("ainda falta responder uma", () => engine.avancar(compras, p.id, "SESSAO_DISPUTA"));
+  await engine.responderImpugnacao(compras, p.id, imps[2].id, { resposta: "Improcede: o prazo é compatível.", acolhida: false, alteraPropostas: false });
+  await estaEm(p.id, "IMPUGNACOES");
   await engine.avancar(compras, p.id, "SESSAO_DISPUTA");
 
-  // sessão
+  // sessão: vencedor, depois deserta (limpa o vencedor), e a deserta volta à instrução
   await engine.juntarDocumento(compras, p.id, "ATA_SESSAO", "Ata da sessão", "Sessão realizada.");
-  await engine.registrarResultadoSessao(compras, p.id, { situacao: "DESERTA", ataEm: hoje });
-  await esperaErro("sessão deserta não avança", () => engine.avancar(compras, p.id, "RECURSOS"));
   await esperaErro("vencedor com CNPJ inválido", () => engine.registrarResultadoSessao(compras, p.id, { situacao: "VENCEDOR", fornecedor: "Móveis Ltda", cnpj: "11111111111111", valor: 8500, ataEm: hoje }));
+  await engine.registrarResultadoSessao(compras, p.id, { situacao: "VENCEDOR", fornecedor: "Móveis Ltda", cnpj: CNPJ, valor: 8500, ataEm: hoje });
+  c = await carregar(p.id);
+  if ((meta(c).contratacao as Record<string, string>).fornecedor !== "Móveis Ltda") falha("vencedor não gravado em contratacao");
+  await engine.registrarResultadoSessao(compras, p.id, { situacao: "DESERTA", ataEm: hoje });
+  c = await carregar(p.id);
+  if (meta(c).contratacao) falha("resultado sem vencedor deveria limpar contratacao: " + JSON.stringify(meta(c).contratacao));
+  await esperaErro("sessão deserta não avança", () => engine.avancar(compras, p.id, "RECURSOS"));
+  await engine.devolver(compras, p.id, "INSTRUCAO", "Licitação deserta: refazer a instrução e o edital");
+  c = await estaEm(p.id, "INSTRUCAO");
+  if (meta(c).edital || meta(c).impugnacoes || meta(c).resultadoSessao || meta(c).contratacao) falha("a deserta deveria arquivar edital, impugnações, resultado e vencedor");
+  if ((meta(c).historicoEditais as unknown[]).length !== 2 || (meta(c).historicoSessoes as unknown[]).length !== 1) falha("históricos esperados após a deserta");
+  await instrucaoAteParecer(p.id);
+  await engine.avancar(procurador, p.id, "PUBLICACAO_EDITAL");
+  await engine.receber(compras, p.id);
+  c = await carregar(p.id);
+  const gNovo = engine.avaliarGates(c, fer).find((g) => g.gate.tipo === "regra" && g.gate.regra === "PRAZO_EDITAL");
+  if (!gNovo || gNovo.ok) falha("depois da deserta a trava exige edital novo");
+  await esperaErro("avançar sem o edital novo", () => engine.avancar(compras, p.id, "IMPUGNACOES"));
+  await esperaErro("edital novo com publicação não posterior", () => engine.publicarEdital(compras, p.id, { ...edital, publicadoEm: doDia(publicado, 3), aberturaEm: abertura2 }));
+  await engine.publicarEdital(compras, p.id, { ...edital, numero: "PE 2/2026", publicadoEm: doDia(publicado, 6), aberturaEm: abertura2 });
+  await engine.avancar(compras, p.id, "IMPUGNACOES");
+  await engine.avancar(compras, p.id, "SESSAO_DISPUTA");
+  ok("deserta volta à instrução, arquiva tudo e exige edital novo; resultado sem vencedor limpa a contratação");
+
   await engine.registrarResultadoSessao(compras, p.id, { situacao: "VENCEDOR", fornecedor: "Móveis Ltda", cnpj: CNPJ, valor: 8500, ataEm: hoje });
   c = await carregar(p.id);
   const ct = meta(c).contratacao as Record<string, string>;
   if (ct.fornecedor !== "Móveis Ltda" || ct.cnpj !== CNPJ || ct.valor !== "8500.00") falha("contratacao não preenchida: " + JSON.stringify(ct));
-  ok("DESERTA não deixa avançar; VENCEDOR preenche metadados.contratacao");
+  ok("VENCEDOR preenche metadados.contratacao");
   await engine.avancar(compras, p.id, "RECURSOS");
 
   // recursos
@@ -247,8 +282,9 @@ async function main() {
   await engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "Provido: proposta vencedora desclassificada.", provido: true });
   c = await estaEm(p.id, "SESSAO_DISPUTA");
   if (!c.eventos.some((e) => e.tipo === "DEVOLUCAO" && (e.dados as { motivo?: string }).motivo === "Recurso provido: refazer o julgamento")) falha("devolução automática sem o motivo esperado");
-  if (meta(c).resultadoSessao || meta(c).recursos) falha("resultado e recursos da rodada anterior deveriam ir para o histórico");
-  if ((meta(c).historicoSessoes as unknown[]).length !== 1) falha("histórico de sessões esperado com 1 item");
+  if (meta(c).resultadoSessao || meta(c).recursos || meta(c).contratacao) falha("resultado, recursos e vencedor da rodada anterior deveriam ir para o histórico");
+  const hs = meta(c).historicoSessoes as { contratacao: { fornecedor?: string } | null }[];
+  if (hs.length !== 2 || hs[1].contratacao?.fornecedor !== "Móveis Ltda") falha("histórico de sessões esperado com 2 itens, o último com o vencedor");
   await esperaErro("sessão devolvida sem resultado novo", () => engine.avancar(compras, p.id, "RECURSOS"));
   await engine.registrarResultadoSessao(compras, p.id, { situacao: "VENCEDOR", fornecedor: "Mesas e Cia Ltda", cnpj: CNPJ, valor: 8700, ataEm: hoje });
   await engine.avancar(compras, p.id, "RECURSOS");
@@ -259,7 +295,7 @@ async function main() {
   await esperaErro("decidir o mesmo recurso duas vezes", () => engine.decidirRecurso(compras, p.id, recs[0].id, { decisao: "x", provido: false }));
   await estaEm(p.id, "RECURSOS");
   await engine.avancar(compras, p.id, "HOMOLOGADO");
-  ok("recurso não decidido bloqueia RECURSOS; recurso provido devolve sozinho à sessão e limpa; improvido segue para HOMOLOGADO; a rodada anterior");
+  ok("recurso não decidido bloqueia; provido devolve sozinho à sessão e arquiva a rodada; improvido segue para HOMOLOGADO");
 
   // homologação até a execução
   await engine.receber(prefeita, p.id);
@@ -338,16 +374,24 @@ async function main() {
   await engine.definirModalidade(compras, d.id, "DISPENSA_VALOR", "Valor abaixo do limite do art. 75, II, sem fracionamento aparente.");
   await engine.registrarPesquisaPrecos(compras, d.id, { fontes: [], justificativa: "Mercado local com um único fornecedor da marca exigida pelo equipamento." });
   c = await carregar(d.id);
-  const fr = meta(c).fracionamento as { situacao: string; total: number; limite: number } | undefined;
+  const fr = meta(c).fracionamento as { situacao: string; total: number; limite: number; comprometido: number } | undefined;
   if (!fr || !fr.limite || fr.total < 9000) falha("fracionamento deveria ser refeito ao definir DISPENSA_VALOR: " + JSON.stringify(fr));
   if (meta(c).valorEstimado !== "9000") falha("sem fontes o valor estimado não muda");
+  if (Math.round(fr!.total - fr!.comprometido) !== 9000) falha("fracionamento deveria usar o valor estimado de 9000");
+  await engine.registrarPesquisaPrecos(compras, d.id, { fontes: fontes3 });
+  c = await carregar(d.id);
+  const fr2 = meta(c).fracionamento as { total: number; comprometido: number };
+  if (meta(c).valorEstimado !== "900.00" || Math.round(fr2.total - fr2.comprometido) !== 900) falha("a pesquisa deveria refazer o fracionamento com 900: " + JSON.stringify(fr2));
+  ok("pesquisa de preços numa dispensa por valor refaz o fracionamento com o novo valor estimado");
   await instrucaoAteParecer(d.id);
   await engine.avancar(procurador, d.id, "INSTRUCAO_DIRETA");
   await engine.receber(compras, d.id);
   await esperaErro("dispensa sem aviso nem justificativa", () => engine.avancar(compras, d.id, "AUTORIZACAO_DIRETA"));
   await esperaErro("justificativa curta demais", () => engine.publicarAvisoDispensa(compras, d.id, { justificativaSemAviso: "urgente" }));
   await esperaErro("aviso sem nada", () => engine.publicarAvisoDispensa(compras, d.id, {}));
-  await engine.publicarAvisoDispensa(compras, d.id, { publicadoEm: hoje });
+  let ontemUtil = doDia(hoje, -1);
+  while (!isDiaUtil(new Date(ontemUtil + "T12:00:00"), fer)) ontemUtil = doDia(ontemUtil, -1);
+  await engine.publicarAvisoDispensa(compras, d.id, { publicadoEm: ontemUtil });
   await esperaErro("aviso publicado há menos de 3 dias úteis", () => engine.avancar(compras, d.id, "AUTORIZACAO_DIRETA"));
   await engine.publicarAvisoDispensa(compras, d.id, { justificativaSemAviso: "Entrega urgente para inaugurar a unidade na próxima semana." });
   await engine.avancar(compras, d.id, "AUTORIZACAO_DIRETA");

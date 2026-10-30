@@ -386,21 +386,57 @@ function limparAoDevolver(meta: Record<string, unknown>, de: string, para: strin
   const arquivar = (chave: string, item: unknown) => {
     m[chave] = [...((m[chave] as unknown[] | undefined) ?? []), { ...(item as object), arquivadoEm: new Date().toISOString() }];
   };
+  const deLicitacao = ETAPAS_DE_LICITACAO.has(de);
   if (para === "PUBLICACAO_EDITAL" && (m.edital || m.impugnacoes)) {
+    // Impugnação tempestiva ainda sem resposta não some: segue para o novo ciclo e continua bloqueando IMPUGNACOES
+    const todas = (m.impugnacoes as Impugnacao[] | undefined) ?? [];
+    arquivar("historicoEditais", { edital: m.edital ?? null, impugnacoes: todas });
+    delete m.edital;
+    const pendentes = todas.filter((i) => i.tempestiva && !i.resposta?.trim());
+    if (pendentes.length) m.impugnacoes = pendentes;
+    else delete m.impugnacoes;
+  }
+  // Licitação deserta ou fracassada volta à instrução: o edital inteiro (e o que dependia dele) é refeito
+  if (para === "INSTRUCAO" && deLicitacao && (m.edital || m.impugnacoes)) {
     arquivar("historicoEditais", { edital: m.edital ?? null, impugnacoes: m.impugnacoes ?? [] });
     delete m.edital;
     delete m.impugnacoes;
   }
-  if (["PUBLICACAO_EDITAL", "SESSAO_DISPUTA", "INSTRUCAO"].includes(para) && ETAPAS_DE_LICITACAO.has(de) && (m.resultadoSessao || m.recursos)) {
-    arquivar("historicoSessoes", { resultadoSessao: m.resultadoSessao ?? null, recursos: m.recursos ?? [] });
+  if (["PUBLICACAO_EDITAL", "SESSAO_DISPUTA", "INSTRUCAO"].includes(para) && deLicitacao && (m.resultadoSessao || m.recursos)) {
+    arquivar("historicoSessoes", { resultadoSessao: m.resultadoSessao ?? null, recursos: m.recursos ?? [], contratacao: m.contratacao ?? null });
     delete m.resultadoSessao;
     delete m.recursos;
+    m.contratacao = semVencedor(m.contratacao);
+    if (m.contratacao === undefined) delete m.contratacao;
   }
   if (de === "PAGAMENTO_ENVIADO" && para === "FILA_PAGAMENTO" && m.retornoBancario) {
     arquivar("historicoRetornos", m.retornoBancario);
     delete m.retornoBancario;
   }
   return m;
+}
+
+/** Tira de `contratacao` os dados do vencedor da sessão (fornecedor, CNPJ, valor), preservando o resto (ex.: fonte). Vazio vira undefined. */
+function semVencedor(contratacao: unknown): Record<string, unknown> | undefined {
+  if (!contratacao || typeof contratacao !== "object") return undefined;
+  const { fornecedor: _f, cnpj: _c, valor: _v, ...resto } = contratacao as Record<string, unknown>;
+  void _f; void _c; void _v;
+  return Object.keys(resto).length ? resto : undefined;
+}
+
+/** Refaz a análise de limite e fracionamento da dispensa por valor (art. 75, §1º), sem contar o próprio processo. */
+async function analiseDispensa(u: SessaoUsuario, p: ProcessoCompleto, meta: Record<string, unknown>) {
+  const a = await analisarFracionamento({
+    municipioId: u.municipioId,
+    unidadeGestoraId: p.unidadeGestoraId,
+    natureza: String(meta.natureza),
+    valorNovo: Number(meta.valorEstimado),
+    excluirProcessoId: p.id,
+  });
+  return {
+    fracionamento: { comprometido: a.comprometido, limite: a.limite, total: a.total, situacao: a.situacao, verificadoEm: new Date().toISOString() },
+    alerta: a.situacao !== "ok" ? { situacao: a.situacao, total: a.total, limite: a.limite, natureza: a.natureza } : null,
+  };
 }
 
 export async function devolver(u: SessaoUsuario, processoId: string, paraEstado: string, motivo: string) {
@@ -685,15 +721,9 @@ export async function definirModalidade(u: SessaoUsuario, processoId: string, mo
     const dados: Record<string, unknown> = { de: anterior, para: modalidade, justificativa: just };
     // Dispensa por valor: refaz a análise de limite e fracionamento (art. 75, §1º), como na abertura, sem contar este processo duas vezes
     if (modalidade === "DISPENSA_VALOR" && meta.natureza) {
-      const a = await analisarFracionamento({
-        municipioId: u.municipioId,
-        unidadeGestoraId: p.unidadeGestoraId,
-        natureza: String(meta.natureza),
-        valorNovo: Number(meta.valorEstimado),
-        excluirProcessoId: p.id,
-      });
-      novo.fracionamento = { comprometido: a.comprometido, limite: a.limite, total: a.total, situacao: a.situacao, verificadoEm: new Date().toISOString() };
-      if (a.situacao !== "ok") dados.alertaFracionamento = { situacao: a.situacao, total: a.total, limite: a.limite, natureza: a.natureza };
+      const r = await analiseDispensa(u, p, meta);
+      novo.fracionamento = r.fracionamento;
+      if (r.alerta) dados.alertaFracionamento = r.alerta;
     } else {
       delete novo.fracionamento;
     }
@@ -714,12 +744,21 @@ export async function registrarPesquisaPrecos(u: SessaoUsuario, processoId: stri
     const pesquisa: PesquisaPrecos = { fontes, ...(justificativa ? { justificativa } : {}) };
     const novo: Record<string, unknown> = { ...meta, pesquisaPrecos: pesquisa };
     let valorEstimado: string | null = null;
+    let alertaFracionamento: unknown = null;
     if (fontes.length) {
       valorEstimado = mediana(fontes.map((f) => f.valor)).toFixed(2);
       novo.valorEstimado = valorEstimado;
+      // O valor estimado mudou: numa dispensa por valor o limite e o fracionamento são conferidos de novo
+      if (meta.modalidade === "DISPENSA_VALOR" && meta.natureza) {
+        const r = await analiseDispensa(u, p, novo);
+        novo.fracionamento = r.fracionamento;
+        alertaFracionamento = r.alerta;
+      }
     }
     await gravarMeta(tx, p.id, novo);
-    await registrarEvento(tx, p.id, u.id, "PESQUISA_PRECOS", { dados: { ...pesquisa, valorEstimado, valorEstimadoAnterior: meta.valorEstimado ?? null } });
+    await registrarEvento(tx, p.id, u.id, "PESQUISA_PRECOS", {
+      dados: { ...pesquisa, valorEstimado, valorEstimadoAnterior: meta.valorEstimado ?? null, ...(alertaFracionamento ? { alertaFracionamento } : {}) },
+    });
   });
 }
 
@@ -735,8 +774,16 @@ export async function publicarEdital(u: SessaoUsuario, processoId: string, input
     };
     const r = regraPrazoEdital(edital, fer);
     if (!r.ok) throw new ErroFluxo(r.motivo);
+    // Republicação: o prazo é novo, então a publicação precisa ser posterior à do edital arquivado
+    const arquivado = [...((meta.historicoEditais as { edital: Edital | null }[] | undefined) ?? [])].reverse().find((h) => h.edital)?.edital;
+    if (arquivado && edital.publicadoEm <= arquivado.publicadoEm) {
+      const [ano, mes, dia] = arquivado.publicadoEm.split("-");
+      throw new ErroFluxo(`Republicação com prazo novo: informe uma data de publicação posterior à do edital anterior (${dia}/${mes}/${ano}).`);
+    }
     const anterior = (meta.edital as Edital | undefined)?.numero ?? null;
-    await gravarMeta(tx, p.id, { ...meta, edital });
+    // A abertura pode ter mudado: a tempestividade das impugnações registradas é recalculada
+    const impugnacoes = ((meta.impugnacoes as Impugnacao[] | undefined) ?? []).map((i) => ({ ...i, tempestiva: impugnacaoTempestiva(i.recebidaEm, edital.aberturaEm, fer) }));
+    await gravarMeta(tx, p.id, { ...meta, edital, ...(impugnacoes.length ? { impugnacoes } : {}) });
     await registrarEvento(tx, p.id, u.id, "EDITAL", { dados: { ...edital, substitui: anterior } });
   });
 }
@@ -798,6 +845,11 @@ export async function registrarResultadoSessao(u: SessaoUsuario, processoId: str
     if (resultado.situacao === "VENCEDOR") {
       const atual = (meta.contratacao as Record<string, unknown> | undefined) ?? {};
       novo.contratacao = { ...atual, fornecedor: resultado.fornecedor, cnpj: resultado.cnpj, valor: Number(resultado.valor).toFixed(2) };
+    } else {
+      // Sem vencedor: o vencedor de um resultado anterior deixa de valer
+      const resto = semVencedor(meta.contratacao);
+      if (resto) novo.contratacao = resto;
+      else delete novo.contratacao;
     }
     await gravarMeta(tx, p.id, novo);
     await registrarEvento(tx, p.id, u.id, "RESULTADO_SESSAO", { dados: { ...resultado } });
