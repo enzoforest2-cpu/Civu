@@ -74,7 +74,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   // Os dados se registram na instrução e na autorização da contratação direta e na etapa do contrato (o motor recusa fora delas)
   const podeContratacao = !p.encerradoEm && ETAPAS_CONTRATACAO.includes(p.estadoAtual) && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
   // Depois do contrato, até a fila de pagamento, fonte e valor se corrigem com motivo por quem age na etapa
-  const podeCorrigir = !p.encerradoEm && pode && ETAPAS_CORRECAO_CONTRATACAO.includes(p.estadoAtual) && !!contratacao?.fornecedor && !!contratacao?.cnpj;
+  // Onde o formulário completo de contratação aparece, ele já cobre fonte e valor.
+  const podeCorrigir = !p.encerradoEm && pode && !podeContratacao && ETAPAS_CORRECAO_CONTRATACAO.includes(p.estadoAtual) && !!contratacao?.fornecedor && !!contratacao?.cnpj;
   // Falta algum dado (ex.: a sessão preencheu o vencedor, mas não a fonte de recurso): o formulário já abre
   const contratacaoIncompleta = !regraContratacao(contratacao, FONTES).ok;
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
