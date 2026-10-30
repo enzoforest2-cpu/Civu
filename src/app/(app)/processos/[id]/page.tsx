@@ -14,6 +14,9 @@ import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { Chip, Panel, Prazo, UrgenciaChip, Avatar } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { abrirExigenciaAction } from "@/app/actions";
+import { db as dbInteressado } from "@/db";
+import type { Exigencia } from "@/lib/engine";
 import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction, contratacaoAction, remessaTceAction } from "@/app/actions";
 import { Timeline } from "./timeline";
 
@@ -60,6 +63,11 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const chegouContratacao = tipoCompra && idxContratado >= 0 && (principal.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
   const podeContratacao = !p.encerradoEm && chegouContratacao && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
+  const exigencia = meta.exigencia as Exigencia | undefined;
+  const [pessoaInteressada, empresaInteressada] = await Promise.all([
+    p.interessadoPessoaId ? dbInteressado.query.pessoas.findFirst({ where: (x, { eq }) => eq(x.id, p.interessadoPessoaId!) }) : null,
+    p.interessadoEmpresaId ? dbInteressado.query.empresas.findFirst({ where: (x, { eq }) => eq(x.id, p.interessadoEmpresaId!) }) : null,
+  ]);
   const [analise, posFila, obrigs] = await Promise.all([
     tipoCompra && meta.natureza && meta.modalidade === "DISPENSA_VALOR"
       ? analisarFracionamento({
@@ -289,7 +297,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                 {p.documentos.map((d) => (
                   <li key={d.id}>
                     <details className="group">
-                      <summary className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f8f9fc]">
+                      <summary className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f4f8f6]">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
                           <FileText size={18} />
                         </span>
@@ -415,6 +423,54 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   );
                 })}
               </dl>
+            </Panel>
+          )}
+
+          {(pessoaInteressada || empresaInteressada) && (
+            <Panel title="Interessado">
+              <div className="text-[14.5px] text-ink">
+                {empresaInteressada ? (
+                  <>
+                    <div className="font-semibold">{empresaInteressada.razaoSocial}</div>
+                    <div className="text-[13px] text-ink-2">por {pessoaInteressada?.nome ?? "—"}</div>
+                  </>
+                ) : (
+                  <div className="font-semibold">{pessoaInteressada?.nome}</div>
+                )}
+                <div className="mt-1 text-[13px] text-ink-3">
+                  Pelo {p.canal === "WHATSAPP" ? "WhatsApp" : p.canal === "PORTAL" ? "portal" : p.canal.toLowerCase()}
+                  {pessoaInteressada?.telefone ? ` · ${pessoaInteressada.telefone}` : ""}
+                </div>
+              </div>
+              {exigencia ? (
+                <div className="mt-4 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13.5px] text-ink">
+                  <strong className="font-semibold">Aguardando o interessado até {fmtData(exigencia.prazo)}:</strong> {exigencia.texto}
+                </div>
+              ) : (
+                !p.encerradoEm && (
+                  <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Pedir complemento ao interessado</summary>
+                    <ActionForm action={abrirExigenciaAction} className="space-y-3 px-4 pb-4">
+                      <input type="hidden" name="processoId" value={p.id} />
+                      <div>
+                        <label className="label" htmlFor="exig-texto">
+                          O que falta e por quê
+                        </label>
+                        <textarea id="exig-texto" name="texto" className="input" rows={3} required placeholder="Ex.: Envie a foto do local com o número da casa mais próxima." />
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="exig-prazo">
+                          Prazo (dias úteis)
+                        </label>
+                        <input id="exig-prazo" name="prazo" type="number" min={1} max={60} defaultValue={10} className="input !w-28" />
+                      </div>
+                      <SubmitButton className="btn btn-primary" pendingText="Enviando…">
+                        Enviar pedido
+                      </SubmitButton>
+                    </ActionForm>
+                  </details>
+                )
+              )}
             </Panel>
           )}
 

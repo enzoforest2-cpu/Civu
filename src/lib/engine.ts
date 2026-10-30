@@ -96,13 +96,24 @@ async function setorDoEstado(tx: Tx, municipioId: string, estado: EstadoDef, req
 // ---------------------------------------------------------------------------
 export async function abrirProcesso(
   u: SessaoUsuario,
-  input: { tipoId: string; unidadeGestoraId: string; assunto: string; descricao?: string; urgencia?: string; metadados?: Record<string, unknown> },
+  input: {
+    tipoId: string;
+    unidadeGestoraId: string;
+    assunto: string;
+    descricao?: string;
+    urgencia?: string;
+    metadados?: Record<string, unknown>;
+    /** Processo aberto por pessoa ou empresa no portal (ou em nome dela). */
+    externo?: { pessoaId: string; empresaId: string | null; canal: string; nomeExibicao: string };
+  },
 ) {
   const tipo = await db.query.tiposProcesso.findFirst({ where: and(eq(tiposProcesso.id, input.tipoId), eq(tiposProcesso.municipioId, u.municipioId)) });
   if (!tipo || !tipo.ativo) throw new ErroFluxo("Tipo de processo inválido.");
   const def = tipo.definicao as WorkflowDef;
   const inicial = getEstado(def, def.estadoInicial)!;
   const fer = await feriadosDo(u.municipioId);
+  // pedido externo: o interessado é quem pediu pelo portal
+  if (input.externo && !input.metadados?.interessado) input = { ...input, metadados: { ...(input.metadados ?? {}), interessado: input.externo.nomeExibicao } };
 
   for (const c of def.camposAbertura ?? []) {
     if (c.obrigatorio && !input.metadados?.[c.chave]) throw new ErroFluxo(`Preencha o campo "${c.rotulo}".`);
@@ -151,13 +162,15 @@ export async function abrirProcesso(
         prazoEtapaEm: inicial.slaDiasUteis > 0 ? addDiasUteis(new Date(), inicial.slaDiasUteis, fer) : null,
         abertoPorId: u.id,
         metadados: Object.keys(meta).length ? meta : null,
+        interessadoPessoaId: input.externo?.pessoaId ?? null,
+        interessadoEmpresaId: input.externo?.empresaId ?? null,
+        canal: input.externo?.canal ?? "INTERNO",
       })
       .returning();
-    await registrarEvento(tx, p.id, u.id, "ABERTURA", {
-      paraEstado: inicial.chave,
-      paraSetorId: setorAtualId,
-      dados: alertaFracionamento ? { numero, tipo: tipo.chave, alertaFracionamento } : { numero, tipo: tipo.chave },
-    });
+    const dadosAbertura: Record<string, unknown> = { numero, tipo: tipo.chave };
+    if (alertaFracionamento) dadosAbertura.alertaFracionamento = alertaFracionamento;
+    if (input.externo) dadosAbertura.solicitante = { pessoaId: input.externo.pessoaId, empresaId: input.externo.empresaId, nome: input.externo.nomeExibicao, canal: input.externo.canal };
+    await registrarEvento(tx, p.id, u.id, "ABERTURA", { paraEstado: inicial.chave, paraSetorId: setorAtualId, dados: dadosAbertura });
     return p;
   });
 }
@@ -401,6 +414,91 @@ export async function registrarRemessaTce(u: SessaoUsuario, processoId: string, 
   const sistema = sistemaTce(mun?.uf ?? "", mun?.tce).nome;
   return db.transaction(async (tx) => {
     await registrarEvento(tx, p.id, u.id, "REMESSA_TCE", { dados: { sistema, recibo: recibo.trim() } });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Atendimento externo: pedidos do portal e exigências ao interessado
+// ---------------------------------------------------------------------------
+
+/** CPF reservado do usuário de sistema que registra o que chega pelos canais digitais. */
+export const CPF_ATENDIMENTO_DIGITAL = "00000000000";
+
+/** Usuário de sistema do município ("Atendimento digital"): autor técnico dos registros feitos pelo portal. */
+export async function usuarioAtendimentoDigital(municipioId: string): Promise<SessaoUsuario> {
+  const u = await db.query.usuarios.findFirst({
+    where: (x, { and, eq }) => and(eq(x.municipioId, municipioId), eq(x.cpf, CPF_ATENDIMENTO_DIGITAL)),
+    with: { setor: true, municipio: true },
+  });
+  if (!u) throw new ErroFluxo("Atendimento digital não configurado neste município.");
+  return {
+    id: u.id,
+    nome: u.nome,
+    cpf: u.cpf,
+    email: u.email,
+    cargo: u.cargo,
+    papeis: u.papeis as Papel[],
+    setorId: u.setorId,
+    setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
+    municipioId: u.municipioId,
+    municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
+  };
+}
+
+/** Pedido feito no portal: abre o processo em nome da pessoa ou da empresa ativa. */
+export async function abrirProcessoExterno(
+  municipioId: string,
+  externo: { pessoaId: string; empresaId: string | null; nomeExibicao: string; canal?: string },
+  input: { tipoChave: string; assunto: string; descricao?: string; metadados?: Record<string, unknown>; urgencia?: string; ugCodigo?: string },
+) {
+  const sys = await usuarioAtendimentoDigital(municipioId);
+  const tipo = await db.query.tiposProcesso.findFirst({
+    where: (t, { and, eq }) => and(eq(t.municipioId, municipioId), eq(t.chave, input.tipoChave), eq(t.ativo, true)),
+  });
+  if (!tipo) throw new ErroFluxo("Este serviço não está disponível no município.");
+  const ug = await db.query.unidadesGestoras.findFirst({ where: (g, { and, eq }) => and(eq(g.municipioId, municipioId), eq(g.codigo, input.ugCodigo ?? "01")) });
+  if (!ug) throw new ErroFluxo("Unidade gestora não encontrada.");
+  return abrirProcesso(sys, {
+    tipoId: tipo.id,
+    unidadeGestoraId: ug.id,
+    assunto: input.assunto,
+    descricao: input.descricao,
+    urgencia: input.urgencia,
+    metadados: input.metadados,
+    externo: { ...externo, canal: externo.canal ?? "PORTAL" },
+  });
+}
+
+export type Exigencia = { texto: string; prazo: string; abertaEm: string; autor: string };
+
+/** O servidor pede ao interessado um complemento (documento ou informação), com prazo. */
+export async function abrirExigencia(u: SessaoUsuario, processoId: string, texto: string, prazoDiasUteis: number) {
+  const p = await carregarProcesso(u.municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  if (!p.interessadoPessoaId && !p.interessadoEmpresaId) throw new ErroFluxo("Este processo não tem interessado externo.");
+  if (p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN", "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
+  if (!texto.trim()) throw new ErroFluxo("Escreva o que o interessado precisa enviar.");
+  const fer = await feriadosDo(u.municipioId);
+  const exig: Exigencia = { texto: texto.trim(), prazo: addDiasUteis(new Date(), Math.max(1, prazoDiasUteis), fer).toISOString(), abertaEm: new Date().toISOString(), autor: u.nome };
+  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>), exigencia: exig };
+  return db.transaction(async (tx) => {
+    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    await registrarEvento(tx, p.id, u.id, "EXIGENCIA", { dados: exig });
+  });
+}
+
+/** O interessado responde a exigência pelo portal. Quem pode responder é checado por quem chama (sessão do portal). */
+export async function responderExigencia(municipioId: string, processoId: string, resposta: { texto: string; pessoaId: string; nome: string }) {
+  const p = await carregarProcesso(municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  const meta = { ...((p.metadados ?? {}) as Record<string, unknown>) };
+  if (!meta.exigencia) throw new ErroFluxo("Não há pendência aberta neste processo.");
+  if (!resposta.texto.trim()) throw new ErroFluxo("Escreva a resposta.");
+  delete meta.exigencia;
+  const sys = await usuarioAtendimentoDigital(municipioId);
+  return db.transaction(async (tx) => {
+    await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
+    await registrarEvento(tx, p.id, sys.id, "RESPOSTA_EXIGENCIA", { dados: { texto: resposta.texto.trim(), pessoaId: resposta.pessoaId, nome: resposta.nome } });
   });
 }
 

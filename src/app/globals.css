@@ -1,32 +1,35 @@
 @import "tailwindcss";
-@import "@fontsource-variable/figtree/index.css";
-@import "@fontsource-variable/bricolage-grotesque/index.css";
+@import "@fontsource-variable/manrope/index.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
 
 /*
-  Trâmite — linguagem visual
-  Conceito: o processo é uma viagem por estações (setores). O "trilho" é o elemento-assinatura.
-  Uma única cor de ação (índigo elétrico); sinais de prazo em verde, âmbar e vermelho.
+  Civu — gestão municipal integrada. "A cidade conectada."
+  Verde Cívico para ação e identidade; Azul Institucional para texto e navegação;
+  Verde Suave para superfícies de apoio; Branco Quente para fundos. Cor nunca informa situação sozinha.
+  O "trilho" continua como elemento-assinatura do andamento de cada processo.
 */
 @theme {
-  --font-sans: "Figtree Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Bricolage Grotesque Variable", "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Manrope Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-bg: #f3f5f9;
+  --color-bg: #f7f9f8;
   --color-surface: #ffffff;
-  --color-sunken: #eef1f6;
-  --color-ink: #0d1530;
-  --color-ink-2: #4a5372;
-  --color-ink-3: #8a91a8;
-  --color-line: #e3e6ee;
-  --color-line-2: #cfd4e0;
+  --color-sunken: #eef3f1;
+  --color-ink: #172d36;
+  --color-ink-2: #4b5f68;
+  --color-ink-3: #82949b;
+  --color-line: #e1e8e5;
+  --color-line-2: #c9d5d0;
 
-  --color-brand: #3d3af0;
-  --color-brand-2: #2c29c9;
-  --color-brand-soft: #ecebff;
-  --color-brand-ink: #1e1b8f;
+  --color-brand: #168779;
+  --color-brand-2: #106b60;
+  --color-brand-soft: #e5f3ee;
+  --color-brand-ink: #0d564d;
 
-  --color-ok: #17875c;
-  --color-ok-soft: #e2f5ec;
+  --color-ok: #2e7d32;
+  --color-ok-soft: #e6f2e3;
   --color-warn: #b86e00;
   --color-warn-soft: #fff1d6;
   --color-bad: #d22f3a;
@@ -49,7 +52,6 @@ body {
 
 .display {
   font-family: var(--font-display);
-  font-variation-settings: "opsz" 48;
   letter-spacing: -0.02em;
 }
 
@@ -200,7 +202,7 @@ table.lista tbody tr:last-child td {
   border-bottom: none;
 }
 table.lista tbody tr.linha:hover td {
-  background: #f8f9fc;
+  background: #f4f8f6;
 }
 
 /* Texto de documento */

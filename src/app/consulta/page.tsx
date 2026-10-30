@@ -6,7 +6,7 @@ import { municipios, processos, setores } from "@/db/schema";
 import { caminhoPrincipal, getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
-import { Marca } from "@/components/marca";
+import { Marca, MarcaCompleta } from "@/components/marca";
 import { Trilho } from "@/components/trilho";
 
 export const dynamic = "force-dynamic";
@@ -41,9 +41,8 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <Marca />
-            <div className="leading-tight">
-              <div className="display text-[18px] font-semibold text-ink">Trâmite</div>
+            <MarcaCompleta altura={26} />
+            <div className="leading-tight border-l border-line pl-2.5">
               <div className="text-[12.5px] text-ink-3">Consulta pública de processos</div>
             </div>
           </div>

@@ -28,6 +28,8 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   DESPACHO: { icon: MessageSquare, cor: "bg-sunken text-ink-2" },
   DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand" },
   REMESSA_TCE: { icon: Landmark, cor: "bg-ok-soft text-ok" },
+  EXIGENCIA: { icon: MessageSquare, cor: "bg-warn-soft text-warn" },
+  RESPOSTA_EXIGENCIA: { icon: MessageSquare, cor: "bg-ok-soft text-ok" },
 };
 
 export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) {
@@ -43,6 +45,10 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
         switch (e.tipo) {
           case "ABERTURA": {
             titulo = "Processo aberto";
+            if ((e.dados as { solicitante?: { nome: string; canal: string } } | null)?.solicitante) {
+              const so = (e.dados as { solicitante: { nome: string; canal: string } }).solicitante;
+              titulo = `Pedido de ${so.nome} pelo ${so.canal === "WHATSAPP" ? "WhatsApp" : "portal"}`;
+            }
             const al = (e.dados as { alertaFracionamento?: { situacao: string; total: number; limite: number } } | null)?.alertaFracionamento;
             if (al)
               detalhe =
@@ -61,6 +67,14 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
           case "DADOS_CONTRATACAO":
             titulo = "Registrou os dados da contratação";
             detalhe = `${d.fornecedor ?? ""} · ${fmtMoeda(d.valor)}`;
+            break;
+          case "EXIGENCIA":
+            titulo = "Pediu complemento ao interessado";
+            detalhe = d.texto;
+            break;
+          case "RESPOSTA_EXIGENCIA":
+            titulo = `${d.nome ?? "Interessado"} respondeu pelo portal`;
+            detalhe = d.texto;
             break;
           case "REMESSA_TCE":
             titulo = `Enviado ao ${d.sistema ?? "Tribunal de Contas"}`;

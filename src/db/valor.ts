@@ -31,7 +31,7 @@ export const SQL_IDS = `select json_build_object(
       'hasRemessa', exists(select 1 from tramite.eventos e where e.processo_id = p.id and e.tipo = 'REMESSA_TCE'),
       'hasContratacao', coalesce(p.metadados ? 'contratacao', false)))
     from tramite.processos p where p.municipio_id = m.id)
-) as ids from tramite.municipios m where m.slug = 'sao-benedito-do-norte'`;
+) as ids from tramite.municipios m where m.slug = 'vale-das-araucarias'`;
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 function canon(v: unknown): string {
@@ -123,7 +123,7 @@ export function gerarSqlValor(ids: IdsValor): string {
     "Material de expediente para a Secretaria de Administração",
     () => [
       { tipo: "DADOS_CONTRATACAO", autor: U("33333333333"), quando: dia(73), dados: ctExped },
-      { tipo: "REMESSA_TCE", autor: U("33333333333"), quando: dia(73), dados: { sistema: "sistema do TCE-CE", recibo: "2026.0412.88" } },
+      { tipo: "REMESSA_TCE", autor: U("33333333333"), quando: dia(73), dados: { sistema: "LicitaCon (TCE-RS)", recibo: "2026.0412.88" } },
     ],
     { contratacao: ctExped },
   );
@@ -313,7 +313,7 @@ export function gerarSqlValor(ids: IdsValor): string {
             tipo: "REMESSA_TCE",
             autor: U("33333333333"),
             quando: new Date(dia(n.datas[i]).getTime() + 2 * 3600_000),
-            dados: { sistema: "sistema do TCE-CE", recibo: `2026.${String(sequencial).padStart(4, "0")}.${(sequencial * 37) % 97}` },
+            dados: { sistema: "LicitaCon (TCE-RS)", recibo: `2026.${String(sequencial).padStart(4, "0")}.${(sequencial * 37) % 97}` },
           });
       }
     });

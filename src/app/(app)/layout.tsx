@@ -3,39 +3,39 @@ import { redirect } from "next/navigation";
 import { LogOut, Search } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/app/actions";
-import { NavLink } from "@/components/nav-link";
+import { Navegacao, type GrupoNav } from "@/components/navegacao";
+import { GRUPOS, ITENS_GESTAO } from "@/lib/modulos";
 import { Avatar } from "@/components/ui";
-import { Marca } from "@/components/marca";
+import { Marca, MarcaCompleta } from "@/components/marca";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await getSessionUser();
   if (!u) redirect("/login");
+  const grupos: GrupoNav[] = GRUPOS.map((g) => ({
+    chave: g.chave,
+    rotulo: g.rotulo,
+    itens: ITENS_GESTAO.filter((i) => i.grupo === g.chave && (!i.papeis || u.papeis.includes("ADMIN") || i.papeis.some((p) => u.papeis.includes(p)))).map((i) => ({
+      href: i.href,
+      rotulo: i.rotulo,
+      icone: <i.icone size={18} strokeWidth={2} />,
+    })),
+  })).filter((g) => g.itens.length > 0);
+  const mobile = ITENS_GESTAO.filter((i) => i.grupo !== "publico").slice(0, 8);
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
         <div className="px-5 pt-6 pb-5">
           <Link href="/painel" className="flex items-center gap-2.5">
-            <Marca />
-            <span className="display text-[20px] font-semibold text-ink">Trâmite</span>
+            <MarcaCompleta />
           </Link>
           <div className="mt-3 rounded-lg bg-sunken px-3 py-2 text-[13px] leading-tight text-ink-2">
             <div className="font-semibold text-ink">{u.municipio.nome}</div>
             <div className="text-ink-3">Prefeitura · {u.municipio.uf}</div>
           </div>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3">
-          <NavLink href="/painel" icone="painel">Painel</NavLink>
-          <NavLink href="/caixa" icone="caixa">Minha caixa</NavLink>
-          <NavLink href="/processos" icone="processos">Processos</NavLink>
-          <NavLink href="/obrigacoes" icone="obrigacoes">Obrigações</NavLink>
-          <NavLink href="/fluxos" icone="fluxos">Fluxos</NavLink>
-          <NavLink href="/configuracoes" icone="config">Cadastros</NavLink>
-          <div className="my-3 border-t border-line" />
-          <NavLink href="/consulta" icone="publico">Consulta pública</NavLink>
-          <NavLink href="/fila-de-pagamentos" icone="fila">Fila de pagamentos</NavLink>
-        </nav>
+        <Navegacao grupos={grupos} />
         <div className="border-t border-line p-4">
           <div className="flex items-center gap-3">
             <Avatar nome={u.nome} size={36} />
@@ -56,14 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/painel" className="mr-2 shrink-0">
             <Marca size={26} />
           </Link>
-          {[
-            ["/painel", "Painel"],
-            ["/caixa", "Minha caixa"],
-            ["/processos", "Processos"],
-            ["/obrigacoes", "Obrigações"],
-            ["/fluxos", "Fluxos"],
-            ["/configuracoes", "Cadastros"],
-          ].map(([h, r]) => (
+          {mobile.map(({ href: h, rotulo: r }) => (
             <Link key={h} href={h} className="shrink-0 rounded-lg px-3 py-1.5 text-[14px] font-medium text-ink-2 hover:bg-sunken">
               {r}
             </Link>

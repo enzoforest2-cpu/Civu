@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { municipios } from "@/db/schema";
 import { filaDePagamentos, historicoDePagamentos, fmtCnpj } from "@/lib/pagamentos";
 import { fmtData, fmtMoeda } from "@/lib/dates";
-import { Marca } from "@/components/marca";
+import { Marca, MarcaCompleta } from "@/components/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +32,8 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <Marca />
-            <div className="leading-tight">
-              <div className="display text-[18px] font-semibold text-ink">Trâmite</div>
+            <MarcaCompleta altura={26} />
+            <div className="leading-tight border-l border-line pl-2.5">
               <div className="text-[12.5px] text-ink-3">Transparência</div>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { login, logout, requireUser, confirmarSenha } from "@/lib/auth";
-import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarDocumento, assinarDocumento, despachar, registrarContratacao, registrarRemessaTce } from "@/lib/engine";
+import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarDocumento, assinarDocumento, despachar, registrarContratacao, registrarRemessaTce, abrirExigencia } from "@/lib/engine";
 import { analisarFracionamento, type AnaliseFracionamento } from "@/lib/conformidade";
 import type { Papel } from "@/lib/workflow";
 
@@ -160,4 +160,15 @@ export async function checarFracionamentoAction(input: { unidadeGestoraId: strin
   const u = await requireUser();
   if (!input.natureza || !input.unidadeGestoraId) return null;
   return analisarFracionamento({ municipioId: u.municipioId, unidadeGestoraId: input.unidadeGestoraId, natureza: input.natureza, valorNovo: Number(input.valor) || 0 });
+}
+
+export async function abrirExigenciaAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requireUser();
+    await abrirExigencia(u, str(fd, "processoId"), str(fd, "texto"), Number(str(fd, "prazo")) || 10);
+  } catch (e) {
+    return trata(e);
+  }
+  revalidatePath(`/processos/${str(fd, "processoId")}`);
+  return { ok: "Pedido enviado ao interessado." };
 }

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trâmite — Gestão administrativa municipal",
-  description: "Protocolo, tramitação e fluxo da despesa para prefeituras.",
+  title: "Civu — Gestão municipal integrada",
+  description: "A cidade conectada. Prefeitura, cidadãos e empresas no mesmo lugar.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

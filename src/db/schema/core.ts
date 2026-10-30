@@ -132,8 +132,15 @@ export const processos = tramite.table(
     abertoEm: timestamp("aberto_em", { withTimezone: true }).notNull().defaultNow(),
     encerradoEm: timestamp("encerrado_em", { withTimezone: true }),
     metadados: jsonb("metadados"),
+    /** Interessado externo (pessoa ou empresa), quando o processo nasce no portal ou é aberto em nome de alguém. */
+    interessadoPessoaId: text("interessado_pessoa_id"),
+    interessadoEmpresaId: text("interessado_empresa_id"),
+    /** Canal de entrada: INTERNO | PORTAL | WHATSAPP | PRESENCIAL */
+    canal: text("canal").notNull().default("INTERNO"),
   },
   (t) => [
+    index("processo_interessado_pessoa").on(t.interessadoPessoaId),
+    index("processo_interessado_empresa").on(t.interessadoEmpresaId),
     uniqueIndex("processo_municipio_numero").on(t.municipioId, t.numero),
     index("processo_estado").on(t.municipioId, t.estadoAtual),
     index("processo_setor").on(t.setorAtualId),

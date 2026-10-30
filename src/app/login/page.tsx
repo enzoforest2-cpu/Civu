@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { loginAction } from "@/app/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Marca } from "@/components/marca";
+import { Marca, MarcaCompleta } from "@/components/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,7 @@ export default async function LoginPage() {
     <main className="flex min-h-screen bg-surface">
       <aside className="relative hidden w-[52%] flex-col justify-between overflow-hidden bg-brand p-14 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <Marca size={34} inversa />
-          <span className="display text-[22px] font-semibold">Trâmite</span>
+          <MarcaCompleta altura={34} inversa />
         </div>
 
         <div>
@@ -47,8 +46,7 @@ export default async function LoginPage() {
       <section className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-[380px]">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <Marca size={32} />
-            <span className="display text-[22px] font-semibold">Trâmite</span>
+            <MarcaCompleta altura={32} />
           </div>
           <h2 className="display text-[30px] font-semibold text-ink">Entrar</h2>
           <p className="mt-1.5 text-[14.5px] text-ink-2">Use seu CPF e sua senha de servidor.</p>

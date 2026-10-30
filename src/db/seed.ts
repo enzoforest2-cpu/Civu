@@ -1,17 +1,14 @@
 // Dados de exemplo: um município fictício, setores, usuários (senha "123456"), fluxos e processos.
 // Executar: npm run db:seed
-import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, sql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { poolConfig } from "./config";
 import { WORKFLOWS_PADRAO, type WorkflowDef } from "../lib/workflow";
+import type { DemoCtx } from "./demo/contexto";
 
-const pool = new Pool(poolConfig());
-const db = drizzle(pool, { schema });
+export const SLUG_DEMO = "vale-das-araucarias";
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 function canon(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);
@@ -28,20 +25,24 @@ function canon(v: unknown): string {
   );
 }
 
-async function main() {
-  const existente = await db.query.municipios.findFirst({ where: eq(schema.municipios.slug, "sao-benedito-do-norte") });
-  if (existente) {
-    console.log("Seed já aplicado. Para refazer: npm run db:reset");
-    await pool.end();
-    return;
-  }
+/** CPF fictício com dígitos verificadores válidos, a partir de 9 dígitos. */
+export function cpfDemo(base9: string) {
+  const dv = (b: string) => {
+    const s = b.split("").reduce((a, n, i) => a + Number(n) * (b.length + 1 - i), 0) % 11;
+    return s < 2 ? 0 : 11 - s;
+  };
+  const d1 = dv(base9);
+  return base9 + d1 + dv(base9 + d1);
+}
 
+/** Município fictício de demonstração no RS, com setores, usuários, fluxos, processos, pessoas e empresas. */
+export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoCtx> {
   const [mun] = await db
     .insert(schema.municipios)
-    .values({ slug: "sao-benedito-do-norte", nome: "São Benedito do Norte", uf: "CE", populacao: 18420, tce: "TCE-CE" })
+    .values({ slug: SLUG_DEMO, nome: "Vale das Araucárias", uf: "RS", populacao: 38420, tce: "TCE-RS" })
     .returning();
   const [ug] = await db.insert(schema.unidadesGestoras).values({ municipioId: mun.id, codigo: "01", nome: "Prefeitura Municipal" }).returning();
-  await db.insert(schema.unidadesGestoras).values({ municipioId: mun.id, codigo: "02", nome: "Fundo Municipal de Saúde" });
+  const [ug2] = await db.insert(schema.unidadesGestoras).values({ municipioId: mun.id, codigo: "02", nome: "Fundo Municipal de Saúde" }).returning();
 
   const setoresDef = [
     ["GAB", "Gabinete do Prefeito", 2],
@@ -64,23 +65,25 @@ async function main() {
 
   const senha = await bcrypt.hash("123456", 10);
   const usuariosDef: [string, string, string, string, string[], string][] = [
-    ["11111111111", "Maria Albuquerque", "prefeita@sbn.ce.gov.br", "Prefeita", ["ORDENADOR", "ADMIN"], "GAB"],
-    ["22222222222", "João Protocolo", "protocolo@sbn.ce.gov.br", "Chefe do Protocolo", ["PROTOCOLO"], "PROT"],
-    ["33333333333", "Ana Compras", "compras@sbn.ce.gov.br", "Agente de contratação", ["COMPRAS"], "COMPRAS"],
-    ["44444444444", "Carlos Contador", "contabilidade@sbn.ce.gov.br", "Contador", ["CONTABILIDADE"], "CONTAB"],
-    ["55555555555", "Rita Controladora", "controladoria@sbn.ce.gov.br", "Controladora Geral", ["CONTROLE_INTERNO"], "CGM"],
-    ["66666666666", "Pedro Procurador", "pgm@sbn.ce.gov.br", "Procurador Geral", ["JURIDICO"], "PGM"],
-    ["77777777777", "Lúcia Tesoureira", "tesouraria@sbn.ce.gov.br", "Tesoureira", ["TESOURARIA"], "TES"],
-    ["88888888888", "Dr. Marcos Secretário", "saude@sbn.ce.gov.br", "Secretário de Saúde", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SESAU"],
-    ["99999999999", "Fernanda Requisitante", "ubs@sbn.ce.gov.br", "Coordenadora de UBS", ["REQUISITANTE"], "SESAU"],
-    ["10101010101", "Paulo Educação", "educacao@sbn.ce.gov.br", "Secretário de Educação", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SEDUC"],
-    ["12121212121", "Sandra Administração", "admin@sbn.ce.gov.br", "Secretária de Administração", ["SECRETARIO", "REQUISITANTE", "ORDENADOR"], "SEMAD"],
+    ["11111111111", "Maria Albuquerque", "prefeita@valedasaraucarias.rs.gov.br", "Prefeita", ["ORDENADOR", "ADMIN"], "GAB"],
+    ["22222222222", "João Protocolo", "protocolo@valedasaraucarias.rs.gov.br", "Chefe do Protocolo", ["PROTOCOLO"], "PROT"],
+    ["33333333333", "Ana Compras", "compras@valedasaraucarias.rs.gov.br", "Agente de contratação", ["COMPRAS"], "COMPRAS"],
+    ["44444444444", "Carlos Contador", "contabilidade@valedasaraucarias.rs.gov.br", "Contador", ["CONTABILIDADE"], "CONTAB"],
+    ["55555555555", "Rita Controladora", "controladoria@valedasaraucarias.rs.gov.br", "Controladora Geral", ["CONTROLE_INTERNO"], "CGM"],
+    ["66666666666", "Pedro Procurador", "pgm@valedasaraucarias.rs.gov.br", "Procurador Geral", ["JURIDICO"], "PGM"],
+    ["77777777777", "Lúcia Tesoureira", "tesouraria@valedasaraucarias.rs.gov.br", "Tesoureira", ["TESOURARIA"], "TES"],
+    ["88888888888", "Dr. Marcos Secretário", "saude@valedasaraucarias.rs.gov.br", "Secretário de Saúde", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SESAU"],
+    ["99999999999", "Fernanda Requisitante", "ubs@valedasaraucarias.rs.gov.br", "Coordenadora de UBS", ["REQUISITANTE"], "SESAU"],
+    ["10101010101", "Paulo Educação", "educacao@valedasaraucarias.rs.gov.br", "Secretário de Educação", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SEDUC"],
+    ["12121212121", "Sandra Administração", "admin@valedasaraucarias.rs.gov.br", "Secretária de Administração", ["SECRETARIO", "REQUISITANTE", "ORDENADOR"], "SEMAD"],
   ];
+  // usuário de sistema que registra o que chega pelo portal e pelo WhatsApp (não faz login)
+  usuariosDef.push(["00000000000", "Atendimento digital", "atendimento@valedasaraucarias.rs.gov.br", "Canal digital", ["PROTOCOLO"], "PROT"]);
   const usuarios: Record<string, string> = {};
   for (const [cpf, nome, email, cargo, papeis, setor] of usuariosDef) {
     const [u] = await db
       .insert(schema.usuarios)
-      .values({ municipioId: mun.id, cpf, nome, email, cargo, papeis, senhaHash: senha, setorId: setores[setor] })
+      .values({ municipioId: mun.id, cpf, nome, email, cargo, papeis, senhaHash: senha, setorId: setores[setor], ativo: cpf !== "00000000000" })
       .returning();
     usuarios[cpf] = u.id;
   }
@@ -96,6 +99,7 @@ async function main() {
 
   const ano = new Date().getFullYear();
   await db.insert(schema.feriados).values([
+    { municipioId: mun.id, data: `${ano}-09-20`, nome: "Revolução Farroupilha" },
     { municipioId: mun.id, data: `${ano}-11-02`, nome: "Finados" },
     { municipioId: mun.id, data: `${ano}-11-15`, nome: "Proclamação da República" },
     { municipioId: mun.id, data: `${ano}-11-20`, nome: "Consciência Negra" },
@@ -439,12 +443,57 @@ async function main() {
   }
 
   await db.execute(sql`select 1`);
-  console.log(`Seed concluído: município ${mun.nome}. Usuários (senha 123456):`);
-  for (const [cpf, nome, , cargo] of usuariosDef) console.log(`  ${cpf}  ${nome} — ${cargo}`);
-  await pool.end();
-}
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+  // ---- pessoas e empresas fictícias dos portais ----
+  const end = (logradouro: string, numero: string, bairro: string) => ({ logradouro, numero, bairro, cidade: "Vale das Araucárias", uf: "RS", cep: "95200-000" });
+  const pessoasDef: [string, string, string, string, string | null, ReturnType<typeof end>][] = [
+    ["ana", cpfDemo("402118733"), "Ana Beatriz Souza", "(54) 99812-4410", "ouro", end("Rua das Hortênsias", "212", "Centro")],
+    ["carlos", cpfDemo("517220984"), "Carlos Mendes", "(54) 99630-1180", "prata", end("Av. Moreira Paz", "1450", "Petrópolis")],
+    ["juliana", cpfDemo("638341205"), "Juliana Rocha", "(54) 99155-7720", "ouro", end("Rua Júlio de Castilhos", "88", "Centro")],
+    ["roberto", cpfDemo("749462316"), "Roberto Lima", "(54) 99401-3355", "prata", end("Rua Ramiro Barcelos", "640", "Glória")],
+    ["marta", cpfDemo("851573427"), "Marta Oliveira", "(54) 99277-0901", "ouro", end("Rua Borges de Medeiros", "33", "Centro")],
+  ];
+  const pessoas: Record<string, string> = {};
+  for (const [k, cpf, nome, telefone, nivel, endereco] of pessoasDef) {
+    const [p] = await db
+      .insert(schema.pessoas)
+      .values({ cpf, nome, telefone, nivelGovbr: nivel, endereco, email: `${k}@exemplo.com.br`, demonstracao: true, telefoneConfirmado: true, senhaHash: k === "ana" ? senha : null })
+      .returning();
+    pessoas[k] = p.id;
+  }
+  const empresasDef: [string, string, string, string, string, string[]][] = [
+    ["mendes", "28461937000105", "Mendes Materiais de Construção Ltda", "Mendes Materiais", "ME", ["4744-0/99"]],
+    ["mendesmei", "41208773000140", "Carlos Mendes Reparos", "Mendes Reparos", "MEI", ["4321-5/00"]],
+    ["padaria", "19774502000163", "Padaria Pão da Serra Ltda", "Pão da Serra", "EPP", ["1091-1/02"]],
+    ["hidrobombas", "45871230000164", "Hidrobombas Sertão Ltda", "Hidrobombas", "EPP", ["3314-7/02"]],
+    ["cariri", "30775541000152", "Distribuidora Médica Cariri Ltda", "Cariri Médica", "DEMAIS", ["4644-3/01"]],
+  ];
+  const empresas: Record<string, string> = {};
+  for (const [k, cnpj, razaoSocial, nomeFantasia, porte, atividades] of empresasDef) {
+    const [e] = await db.insert(schema.empresas).values({ cnpj, razaoSocial, nomeFantasia, porte, atividades, endereco: end("Rua do Comércio", "100", "Centro") }).returning();
+    empresas[k] = e.id;
+  }
+  const todos = ["PROCESSOS", "TRIBUTOS", "CONTRATOS", "LICENCAS"];
+  const seisMeses = new Date(Date.now() + 182 * 86400_000).toISOString().slice(0, 10);
+  await db.insert(schema.representacoes).values([
+    { pessoaId: pessoas.carlos, empresaId: empresas.mendes, papel: "RESPONSAVEL_LEGAL", escopos: todos },
+    { pessoaId: pessoas.carlos, empresaId: empresas.mendesmei, papel: "RESPONSAVEL_LEGAL", escopos: todos },
+    { pessoaId: pessoas.juliana, empresaId: empresas.mendes, papel: "CONTADOR", escopos: ["TRIBUTOS"], validaAte: seisMeses, concedidaPorId: pessoas.carlos },
+    { pessoaId: pessoas.juliana, empresaId: empresas.padaria, papel: "CONTADOR", escopos: ["TRIBUTOS", "LICENCAS"], validaAte: seisMeses },
+    { pessoaId: pessoas.roberto, empresaId: empresas.hidrobombas, papel: "RESPONSAVEL_LEGAL", escopos: todos },
+    { pessoaId: pessoas.marta, empresaId: empresas.cariri, papel: "RESPONSAVEL_LEGAL", escopos: todos },
+  ]);
+
+  return {
+    db,
+    municipioId: mun.id,
+    ano,
+    ugs: { "01": ug.id, "02": ug2.id },
+    setores,
+    usuarios,
+    tipos,
+    pessoas,
+    empresas,
+    dia,
+  };
+}

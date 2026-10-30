@@ -1,14 +1,24 @@
-/** Marca do Trâmite: três estações ligadas por um trilho; a última é a atual. `inversa` para fundos na cor da marca. */
+/**
+ * Marca da Civu: o símbolo "C" (uma entrada aberta) e o nome em minúsculas.
+ * Adaptação para interface do estudo de identidade; arquivos finais e registro da marca ainda pendentes.
+ */
 export function Marca({ size = 30, inversa = false }: { size?: number; inversa?: boolean }) {
-  const fundo = inversa ? "#ffffff" : "#3d3af0";
-  const traco = inversa ? "#3d3af0" : "#ffffff";
+  const cor = inversa ? "#ffffff" : "#168779";
   return (
-    <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden>
-      <rect width="30" height="30" rx="9" fill={fundo} />
-      <path d="M7 19 L15 11 L23 19" fill="none" stroke={traco} strokeOpacity="0.55" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="7" cy="19" r="2.6" fill={traco} />
-      <circle cx="15" cy="11" r="2.6" fill={traco} />
-      <circle cx="23" cy="19" r="3.6" fill={fundo} stroke={traco} strokeWidth="2.2" />
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <path d="M78 6H38C19 6 6 20 6 39v24c0 19 13 31 32 31h40l14-14-14-14H42c-5 0-8-3-8-8V44c0-5 3-8 8-8h36l14-15z" fill={cor} />
     </svg>
+  );
+}
+
+/** Símbolo + nome "civu". `inversa` para fundos escuros ou na cor da marca. */
+export function MarcaCompleta({ altura = 28, inversa = false }: { altura?: number; inversa?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-2" style={{ height: altura }}>
+      <Marca size={altura} inversa={inversa} />
+      <span className="display font-extrabold leading-none tracking-[-0.04em]" style={{ fontSize: altura * 0.95, color: inversa ? "#ffffff" : "#172d36" }}>
+        civu
+      </span>
+    </span>
   );
 }
