@@ -6,7 +6,25 @@ import { assinaturas, documentos, eventos, feriados, processos, setores, tiposPr
 import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
-import { FONTES, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import {
+  regraAvisoDispensa,
+  regraImpugnacoes,
+  regraModalidadeDefinida,
+  regraPesquisaPrecos,
+  regraPrazoEdital,
+  regraRecursos,
+  regraResultado,
+  regraRetornoBancario,
+  type AvisoDispensa,
+  type Edital,
+  type Impugnacao,
+  type PesquisaPrecos,
+  type Recurso,
+  type ResultadoRegra,
+  type ResultadoSessao,
+  type RetornoBancario,
+} from "./regras-fluxo";
 import { analisarFracionamento, sistemaTce } from "./conformidade";
 import { aFrenteNaFila, cnpjValido } from "./pagamentos";
 
@@ -34,7 +52,7 @@ function canon(v: unknown): string {
   );
 }
 
-async function feriadosDo(municipioId: string): Promise<Set<string>> {
+export async function feriadosDo(municipioId: string): Promise<Set<string>> {
   const rows = await db.select({ data: feriados.data }).from(feriados).where(eq(feriados.municipioId, municipioId));
   return new Set(rows.map((r) => String(r.data)));
 }
@@ -192,14 +210,65 @@ export async function carregarProcesso(municipioId: string, id: string) {
   });
   if (!p) return null;
   const def = p.tipo.definicao as WorkflowDef;
-  const estado = getEstado(def, p.estadoAtual)!;
+  const estado = getEstado(def, p.estadoAtual) ?? estadoDeReserva(p.estadoAtual);
   return { ...p, def, estado };
 }
 export type ProcessoCompleto = NonNullable<Awaited<ReturnType<typeof carregarProcesso>>>;
 
-/** Avalia cada gate do estado atual contra os documentos juntados. */
-export function avaliarGates(p: ProcessoCompleto): { gate: Gate; ok: boolean; motivo: string }[] {
+/** Processo parado numa etapa que saiu do fluxo (ex.: CONTRATACAO, antes da licitação em etapas): a página abre e só o administrador mexe. */
+function estadoDeReserva(chave: string): EstadoDef {
+  return { chave, nome: "Etapa antiga: " + chave, papeis: ["ADMIN"], avancos: [], devolucoes: [], gates: [], setor: "LIVRE", slaDiasUteis: 0 };
+}
+
+/** Data de hoje (AAAA-MM-DD) no fuso dos municípios atendidos, para as regras de prazo. */
+export function hojeIso(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Fortaleza" });
+}
+
+/*
+ * Travas do tipo "regra": cada uma lê um dado guardado em processos.metadados e chama a função pura de src/lib/regras-fluxo.ts.
+ * Chaves de metadados (quem grava são as ações do motor da Tarefa 3):
+ *   metadados.modalidade        string (MODALIDADES)       MODALIDADE_DEFINIDA → regraModalidadeDefinida; AVISO_DISPENSA usa para saber se é DISPENSA_VALOR
+ *   metadados.pesquisaPrecos    PesquisaPrecos             PESQUISA_PRECOS     → regraPesquisaPrecos
+ *   metadados.edital            Edital                     PRAZO_EDITAL        → regraPrazoEdital (com feriados)
+ *   metadados.impugnacoes       Impugnacao[]               IMPUGNACOES         → regraImpugnacoes (com metadados.edital e hoje)
+ *   metadados.resultadoSessao   ResultadoSessao            RESULTADO_SESSAO    → regraResultado
+ *   metadados.recursos          Recurso[]                  RECURSOS            → regraRecursos
+ *   metadados.avisoDispensa     AvisoDispensa              AVISO_DISPENSA      → regraAvisoDispensa (com hoje e feriados)
+ *   metadados.retornoBancario   RetornoBancario            RETORNO_BANCARIO    → regraRetornoBancario
+ */
+function avaliarRegra(regra: Extract<Gate, { tipo: "regra" }>["regra"], meta: Record<string, unknown>, feriados: Set<string>, hoje: string): ResultadoRegra {
+  const modalidade = typeof meta.modalidade === "string" ? meta.modalidade : undefined;
+  switch (regra) {
+    case "MODALIDADE_DEFINIDA":
+      return regraModalidadeDefinida(modalidade);
+    case "PESQUISA_PRECOS":
+      return regraPesquisaPrecos(meta.pesquisaPrecos as PesquisaPrecos | undefined);
+    case "PRAZO_EDITAL":
+      return regraPrazoEdital(meta.edital as Edital | undefined, feriados);
+    case "IMPUGNACOES":
+      return regraImpugnacoes(meta.edital as Edital | undefined, (meta.impugnacoes as Impugnacao[] | undefined) ?? [], hoje);
+    case "RESULTADO_SESSAO":
+      return regraResultado(meta.resultadoSessao as ResultadoSessao | undefined);
+    case "RECURSOS":
+      return regraRecursos((meta.recursos as Recurso[] | undefined) ?? []);
+    case "AVISO_DISPENSA":
+      return regraAvisoDispensa(modalidade, meta.avisoDispensa as AvisoDispensa | undefined, hoje, feriados);
+    case "RETORNO_BANCARIO":
+      return regraRetornoBancario(meta.retornoBancario as RetornoBancario | undefined);
+    default:
+      return { ok: false, motivo: `Regra desconhecida: ${String(regra)}.` };
+  }
+}
+
+/** Avalia cada gate do estado atual contra os documentos juntados, os metadados e as regras de prazo (dias úteis com os feriados do município). */
+export function avaliarGates(p: ProcessoCompleto, feriados: Set<string>, hoje: string = hojeIso()): { gate: Gate; ok: boolean; motivo: string }[] {
+  const meta = (p.metadados ?? {}) as Record<string, unknown>;
   return p.estado.gates.map((gate) => {
+    if (gate.tipo === "regra") {
+      const r = avaliarRegra(gate.regra, meta, feriados, hoje);
+      return { gate, ok: r.ok, motivo: r.ok ? "ok" : r.motivo };
+    }
     if (gate.tipo === "campo") {
       const ok = Boolean((p.metadados as Record<string, unknown> | null)?.[gate.campo]);
       return { gate, ok, motivo: ok ? "ok" : `Campo ${gate.campo} não preenchido` };
@@ -233,15 +302,27 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
   if (!podeAgir(u, p)) throw new ErroFluxo("Você não tem papel para agir nesta etapa.");
   if (!p.recebidoEm) throw new ErroFluxo("Confirme o recebimento antes de movimentar.");
-  const trans = p.estado.avancos.find((t) => t.para === paraEstado);
-  if (!trans) throw new ErroFluxo("Transição inválida para o estado atual.");
-  const pend = avaliarGates(p).filter((g) => !g.ok);
+  const meta = (p.metadados ?? {}) as Record<string, unknown>;
+  const trans = avancosDisponiveis(p.def, p.estado, meta).find((t) => t.para === paraEstado);
+  if (!trans) {
+    const condicional = p.estado.avancos.find((t) => t.para === paraEstado && t.quando);
+    if (condicional?.quando?.campo === "modalidade") {
+      const m = typeof meta.modalidade === "string" ? meta.modalidade : "";
+      throw new ErroFluxo(
+        !m || m === "A_DEFINIR"
+          ? "Compras precisa definir a modalidade da contratação (licitação ou contratação direta) antes de seguir."
+          : `Este caminho não vale para a modalidade definida: ${MODALIDADES[m] ?? m}.`,
+      );
+    }
+    throw new ErroFluxo("Transição inválida para o estado atual.");
+  }
+  const fer = await feriadosDo(u.municipioId);
+  const pend = avaliarGates(p, fer).filter((g) => !g.ok);
   if (pend.length)
     throw new ErroFluxo(
       "Faltam requisitos desta etapa: " + pend.map((g) => (g.gate.tipo === "documento" ? `${g.gate.documentoTipo} (${g.motivo})` : g.motivo)).join("; "),
     );
   const destino = getEstado(p.def, paraEstado)!;
-  const fer = await feriadosDo(u.municipioId);
 
   // Ordem cronológica (art. 141): pagar antes de quem foi liquidado primeiro exige justificativa, que fica pública
   let quebraOrdem: { aFrente: string[]; justificativa: string } | null = null;

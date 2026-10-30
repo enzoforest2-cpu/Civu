@@ -83,7 +83,14 @@ export const gestaoDemo: ModuloDemo = {
         `DOCUMENTO DE FORMALIZAÇÃO DE DEMANDA\n\nObjeto: ${meta.objeto}\nJustificativa: ${meta.justificativa}\nQuantidade: ${meta.quantidade}\nValor estimado: R$ ${meta.valorEstimado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nPrioridade: ${meta.prioridade}`,
       );
       await engine.assinarDocumento(u, dfd.id, papel);
-      await engine.avancar(u, p.id, "AUTORIZACAO", "Encaminho para autorização do gabinete.");
+      // secretário da pasta aprova (assina o DFD, se quem abriu não foi ele) e o protocolo autua antes do gabinete
+      await engine.avancar(u, p.id, "APROVACAO_SECRETARIO", "Encaminho ao secretário da pasta.");
+      const secretario = papel === "SECRETARIO" ? u : marcos;
+      if (papel !== "SECRETARIO") await engine.assinarDocumento(secretario, dfd.id, "SECRETARIO");
+      await engine.avancar(secretario, p.id, "AUTUACAO", "Aprovado. Ao protocolo para autuação.");
+      await engine.receber(protocolo, p.id);
+      await engine.juntarDocumento(protocolo, p.id, "TERMO_AUTUACAO", `Termo de autuação — ${p.numero}`, `TERMO DE AUTUAÇÃO\n\nProcesso ${p.numero}\nAssunto: ${assunto}\nInteressado: secretaria requisitante.\nDFD conferido e assinado.`);
+      await engine.avancar(protocolo, p.id, "AUTORIZACAO", "Autuado. Encaminho para autorização do gabinete.");
       return p;
     }
 

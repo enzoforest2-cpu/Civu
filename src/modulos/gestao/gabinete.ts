@@ -5,8 +5,8 @@ import { db } from "@/db";
 import { processos, setores } from "@/db/schema";
 import type { SessaoUsuario } from "@/lib/auth";
 import { confirmarSenha } from "@/lib/auth";
-import { ErroFluxo, assinarDocumento, avancar, avaliarGates, carregarProcesso, despachar, juntarDocumento, receber, type ProcessoCompleto } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, getEstado, nomeEtapa, type Gate, type Papel, type WorkflowDef } from "@/lib/workflow";
+import { ErroFluxo, assinarDocumento, avancar, avaliarGates, carregarProcesso, despachar, feriadosDo, juntarDocumento, receber, type ProcessoCompleto } from "@/lib/engine";
+import { DOCUMENTO_TIPOS, avancosDisponiveis, getEstado, nomeEtapa, type Gate, type Papel, type WorkflowDef } from "@/lib/workflow";
 import { fmtData } from "@/lib/dates";
 import { registrarAuditoria } from "./auditoria";
 import { MODELOS, preencher } from "./modelos";
@@ -40,12 +40,12 @@ function cumprivelPeloOrdenador(g: Gate) {
 }
 
 /** O que dá para fazer em lote com este processo e, se nada, por quê. */
-export function analisarItem(p: ProcessoCompleto): { acao: AcaoPrincipal | null; bloqueio: string | null } {
-  const av = p.estado.avancos[0];
+export function analisarItem(p: ProcessoCompleto, feriados: Set<string>): { acao: AcaoPrincipal | null; bloqueio: string | null } {
+  const av = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null)[0];
   if (!av) return { acao: null, bloqueio: "Etapa sem avanço disponível." };
   if (!p.estado.papeis.includes("ORDENADOR") && !p.estado.papeis.includes("ADMIN")) return { acao: null, bloqueio: "Etapa não é de decisão do ordenador." };
   const gerar: AcaoPrincipal["gerar"] = [];
-  for (const r of avaliarGates(p)) {
+  for (const r of avaliarGates(p, feriados)) {
     if (r.ok) continue;
     if (!cumprivelPeloOrdenador(r.gate)) return { acao: null, bloqueio: r.gate.tipo === "documento" ? `Falta ${DOCUMENTO_TIPOS[r.gate.documentoTipo] ?? r.gate.documentoTipo}: ${r.motivo.toLowerCase()}.` : r.motivo };
     const g = r.gate as Extract<Gate, { tipo: "documento" }>;
@@ -64,11 +64,12 @@ export async function itensGabinete(municipioId: string): Promise<ItemGabinete[]
     columns: { id: true },
   });
   const itens: ItemGabinete[] = [];
+  const fer = await feriadosDo(municipioId);
   for (const { id } of lista) {
     const p = await carregarProcesso(municipioId, id);
     if (!p) continue;
     const meta = (p.metadados ?? {}) as Record<string, unknown>;
-    const { acao, bloqueio } = analisarItem(p);
+    const { acao, bloqueio } = analisarItem(p, fer);
     itens.push({
       id: p.id,
       numero: p.numero,
@@ -145,6 +146,7 @@ export async function decidirEmLote(u: SessaoUsuario, input: { ids: string[]; mo
   if (input.modo === "DESPACHAR" && texto.length < 5) throw new ErroFluxo("Escreva o despacho.");
 
   const res: ResultadoLote = [];
+  const fer = await feriadosDo(u.municipioId);
   for (const id of input.ids) {
     const p = await carregarProcesso(u.municipioId, id);
     if (!p) {
@@ -162,7 +164,7 @@ export async function decidirEmLote(u: SessaoUsuario, input: { ids: string[]; mo
         res.push({ processoId: id, numero: p.numero, ok: true, mensagem: "Despacho registrado." });
         continue;
       }
-      const { acao, bloqueio } = analisarItem(p);
+      const { acao, bloqueio } = analisarItem(p, fer);
       if (!acao) {
         res.push({ processoId: id, numero: p.numero, ok: false, mensagem: bloqueio ?? "Sem ação disponível." });
         continue;

@@ -62,13 +62,39 @@ export const DOCUMENTO_TIPOS: Record<string, string> = {
   MEMORANDO: "Memorando",
   OFICIO: "Ofício",
   REQUERIMENTO: "Requerimento",
+  TERMO_AUTUACAO: "Termo de autuação (capa e termo de abertura)",
+  RESPOSTA_IMPUGNACAO: "Resposta a impugnação ou pedido de esclarecimento",
+  DECISAO_RECURSO: "Decisão de recurso",
+  AVISO_DISPENSA: "Aviso de contratação direta",
+  ATO_AUTORIZACAO_DIRETA: "Ato de autorização da contratação direta",
+  ORDEM_FORNECIMENTO: "Ordem de fornecimento ou de serviço",
+  RETORNO_BANCARIO: "Retorno bancário",
   OUTRO: "Outro",
 };
 
-export type Gate =
-  { tipo: "documento"; documentoTipo: string; assinadoPor?: Papel[]; assinadoPorQualquer?: Papel[]; descricao?: string } | { tipo: "campo"; campo: string; descricao?: string };
+/** Regras de negócio avaliadas pelas funções puras de src/lib/regras-fluxo.ts (ver avaliarGates em engine.ts). */
+export type RegraFluxo =
+  | "MODALIDADE_DEFINIDA"
+  | "PESQUISA_PRECOS"
+  | "PRAZO_EDITAL"
+  | "IMPUGNACOES"
+  | "RESULTADO_SESSAO"
+  | "RECURSOS"
+  | "AVISO_DISPENSA"
+  | "RETORNO_BANCARIO";
 
-export type Transicao = { para: string; rotulo: string; motivoObrigatorio?: boolean };
+export type Gate =
+  | { tipo: "documento"; documentoTipo: string; assinadoPor?: Papel[]; assinadoPorQualquer?: Papel[]; descricao?: string }
+  | { tipo: "campo"; campo: string; descricao?: string }
+  | { tipo: "regra"; regra: RegraFluxo; descricao: string };
+
+export type Transicao = {
+  para: string;
+  rotulo: string;
+  motivoObrigatorio?: boolean;
+  /** Avanço condicional: só vale quando metadados[campo] é um dos valores (ex.: modalidade da contratação). */
+  quando?: { campo: string; valores: string[] };
+};
 
 export type EstadoDef = {
   chave: string;
@@ -86,6 +112,10 @@ export type EstadoDef = {
   final?: boolean;
   /** Etapa de pagamento: sair dela fora da ordem cronológica da fonte exige justificativa (Lei 14.133, art. 141). */
   filaCronologica?: boolean;
+  /** Etapa de um só caminho da contratação: licitação ou contratação direta. Sem ramo, vale para os dois. */
+  ramo?: "LICITACAO" | "DIRETA";
+  /** Desvio que só acontece em alguns processos (ex.: alteração orçamentária). */
+  opcional?: boolean;
 };
 
 export type WorkflowDef = {
@@ -97,6 +127,30 @@ export type WorkflowDef = {
 
 export function getEstado(def: WorkflowDef, chave: string): EstadoDef | undefined {
   return def.estados.find((e) => e.chave === chave);
+}
+
+/** Avanços que valem para este processo: aplica as condições `quando` contra os metadados. */
+export function avancosDisponiveis(def: WorkflowDef, estado: EstadoDef, metadados: Record<string, unknown> | null): Transicao[] {
+  return estado.avancos.filter((t) => {
+    if (!getEstado(def, t.para)) return false;
+    if (!t.quando) return true;
+    const v = metadados?.[t.quando.campo];
+    return typeof v === "string" && t.quando.valores.includes(v);
+  });
+}
+
+/** Ramo da contratação conforme a modalidade; null enquanto não está definida. */
+export function ramoDaModalidade(modalidade: unknown): "LICITACAO" | "DIRETA" | null {
+  if (modalidade === "LICITACAO") return "LICITACAO";
+  if (modalidade === "DISPENSA_VALOR" || modalidade === "OUTRA_DIRETA") return "DIRETA";
+  return null;
+}
+
+/** Etapas do fluxo que valem para este processo: sem a etapa do ramo que não é o da modalidade. Sem modalidade, mostra os dois. */
+export function caminhoDoProcesso(def: WorkflowDef, metadados: Record<string, unknown> | null): EstadoDef[] {
+  const ramo = ramoDaModalidade(metadados?.modalidade);
+  if (!ramo) return def.estados;
+  return def.estados.filter((e) => !e.ramo || e.ramo === ramo);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +205,8 @@ export const ROTULO_OPCAO: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Workflow 1: COMPRA — do DFD ao pagamento (18 estados, 2 decisões, retornos)
+// Workflow 1: COMPRA — do DFD ao pagamento (25 estados: licitação ou contratação direta, desvios e retornos)
+// Setores, papéis, prazos sugeridos, documentos e travas seguem o esboço docs/especificacoes/fluxo-protocolo.html.
 // ---------------------------------------------------------------------------
 const doc = (documentoTipo: string, assinadoPor?: Papel[], descricao?: string): Gate => ({
   tipo: "documento",
@@ -159,6 +214,7 @@ const doc = (documentoTipo: string, assinadoPor?: Papel[], descricao?: string): 
   assinadoPor,
   descricao,
 });
+const regra = (r: RegraFluxo, descricao: string): Gate => ({ tipo: "regra", regra: r, descricao });
 
 export const WORKFLOW_COMPRA: WorkflowDef = {
   estadoInicial: "DEMANDA",
@@ -173,48 +229,74 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     { chave: "prioridade", rotulo: "Grau de prioridade", tipo: "opcao", opcoes: ["BAIXA", "MEDIA", "ALTA"], obrigatorio: true },
     { chave: "noPCA", rotulo: "Consta no Plano de Contratações Anual?", tipo: "opcao", opcoes: ["SIM", "NAO", "NAO_SEI"], obrigatorio: true },
   ],
+  // Nomes sem número de ordem: com os dois ramos (licitação e direta) a posição muda conforme o processo.
   estados: [
+    // ---- Pedido
     {
       chave: "DEMANDA",
-      nome: "1. Demanda aberta",
+      nome: "Demanda aberta",
       descricao: "O requisitante formaliza a demanda (DFD) e assina.",
       setor: null,
       papeis: ["REQUISITANTE", "SECRETARIO"],
       slaDiasUteis: 3,
       gates: [{ tipo: "documento", documentoTipo: "DFD", assinadoPorQualquer: ["REQUISITANTE", "SECRETARIO"], descricao: "DFD juntado e assinado pelo responsável pela demanda" }],
-      avancos: [{ para: "AUTORIZACAO", rotulo: "Enviar para autorização" }],
+      avancos: [{ para: "APROVACAO_SECRETARIO", rotulo: "Enviar ao secretário" }],
       devolucoes: [],
     },
     {
-      chave: "AUTORIZACAO",
-      nome: "3. Em autorização",
-      descricao: "Secretário da pasta e ordenador de despesa autorizam o prosseguimento.",
-      setor: "GAB",
-      papeis: ["ORDENADOR", "SECRETARIO"],
+      chave: "APROVACAO_SECRETARIO",
+      nome: "Aprovação do secretário",
+      descricao: "O secretário confirma que a demanda é da pasta e que faz sentido agora, e assina o DFD.",
+      setor: null,
+      papeis: ["SECRETARIO"],
       slaDiasUteis: 2,
-      gates: [doc("DESPACHO_AUTORIZACAO", ["ORDENADOR"], "Despacho de autorização assinado pelo ordenador")],
-      avancos: [{ para: "INSTRUCAO", rotulo: "Autorizar e enviar a compras" }],
+      gates: [doc("DFD", ["SECRETARIO"], "DFD assinado pelo secretário da pasta")],
+      avancos: [{ para: "AUTUACAO", rotulo: "Aprovar e enviar ao protocolo" }],
       devolucoes: [{ para: "DEMANDA", rotulo: "Devolver ao requisitante", motivoObrigatorio: true }],
     },
     {
+      chave: "AUTUACAO",
+      nome: "Autuação",
+      descricao: "O protocolo confere o pedido, registra assunto, interessado e classificação e encaminha ao gabinete.",
+      setor: "PROT",
+      papeis: ["PROTOCOLO"],
+      slaDiasUteis: 1,
+      gates: [doc("TERMO_AUTUACAO", undefined, "Capa e termo de abertura do processo")],
+      avancos: [{ para: "AUTORIZACAO", rotulo: "Autuar e enviar ao gabinete" }],
+      devolucoes: [{ para: "DEMANDA", rotulo: "Pedido incompleto: devolver à secretaria", motivoObrigatorio: true }],
+    },
+    {
+      chave: "AUTORIZACAO",
+      nome: "Em autorização",
+      descricao: "O ordenador de despesa decide se a prefeitura vai gastar com isso agora.",
+      setor: "GAB",
+      papeis: ["ORDENADOR"],
+      slaDiasUteis: 3,
+      gates: [doc("DESPACHO_AUTORIZACAO", ["ORDENADOR"], "Despacho de autorização assinado pelo ordenador")],
+      avancos: [{ para: "INSTRUCAO", rotulo: "Autorizar e enviar a compras" }],
+      devolucoes: [{ para: "DEMANDA", rotulo: "Indeferir: devolver à secretaria", motivoObrigatorio: true }],
+    },
+    // ---- Planejamento
+    {
       chave: "INSTRUCAO",
-      nome: "4. Em instrução (compras)",
-      descricao: "Compras verifica o PCA, elabora ETP e TR e faz a pesquisa de preços.",
+      nome: "Em instrução (compras)",
+      descricao: "Pesquisa de preços, estudo técnico, termo de referência e definição do caminho da contratação.",
       setor: "COMPRAS",
       papeis: ["COMPRAS"],
       slaDiasUteis: 10,
       gates: [
-        doc("ETP", undefined, "Estudo Técnico Preliminar"),
-        doc("TR", undefined, "Termo de Referência"),
-        doc("PESQUISA_PRECOS", undefined, "Pesquisa de preços com ao menos 3 fontes"),
+        doc("ETP", undefined, "Estudo Técnico Preliminar e mapa de riscos"),
+        { tipo: "documento", documentoTipo: "TR", assinadoPorQualquer: ["REQUISITANTE", "SECRETARIO"], descricao: "Termo de referência assinado pela área técnica" },
+        regra("PESQUISA_PRECOS", "Pesquisa de preços com ao menos 3 fontes ou justificativa (art. 23)"),
       ],
       avancos: [{ para: "VERIFICACAO_ORCAMENTARIA", rotulo: "Enviar à contabilidade" }],
       devolucoes: [{ para: "DEMANDA", rotulo: "Devolver ao requisitante", motivoObrigatorio: true }],
     },
+    // ---- Orçamento
     {
       chave: "VERIFICACAO_ORCAMENTARIA",
-      nome: "5. Verificação orçamentária",
-      descricao: "Contabilidade informa dotação, saldo e impacto (LRF arts. 16–17).",
+      nome: "Verificação orçamentária",
+      descricao: "Contabilidade indica a dotação (órgão, ação, natureza e fonte) e confirma o saldo.",
       setor: "CONTAB",
       papeis: ["CONTABILIDADE"],
       slaDiasUteis: 2,
@@ -227,11 +309,12 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     },
     {
       chave: "ALTERACAO_ORCAMENTARIA",
-      nome: "5b. Em alteração orçamentária",
+      nome: "Em alteração orçamentária",
       descricao: "Pedido de crédito adicional por decreto (dentro do limite da LOA) ou lei.",
       setor: "CONTAB",
       papeis: ["CONTABILIDADE", "ORDENADOR"],
       slaDiasUteis: 5,
+      opcional: true,
       gates: [
         doc("PEDIDO_ALTERACAO_ORCAMENTARIA", undefined, "Pedido com fonte do recurso e demonstrativo das dotações"),
         doc("DECRETO_CREDITO", ["ORDENADOR"], "Decreto ou lei de crédito adicional assinado"),
@@ -241,8 +324,8 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     },
     {
       chave: "RESERVADO",
-      nome: "6. Reservado (pré-empenho)",
-      descricao: "Nota de reserva emitida; o valor é abatido da dotação.",
+      nome: "Reservado (pré-empenho)",
+      descricao: "Nota de reserva emitida; o valor é bloqueado na dotação.",
       setor: "CONTAB",
       papeis: ["CONTABILIDADE"],
       slaDiasUteis: 1,
@@ -250,9 +333,10 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
       avancos: [{ para: "CONTROLE_INTERNO", rotulo: "Enviar ao controle interno" }],
       devolucoes: [],
     },
+    // ---- Conformidade
     {
       chave: "CONTROLE_INTERNO",
-      nome: "7. Em controle interno",
+      nome: "Em controle interno",
       descricao: "Checklist de conformidade (ETP, TR, estimativa, dotação, segregação).",
       setor: "CGM",
       papeis: ["CONTROLE_INTERNO"],
@@ -263,41 +347,123 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     },
     {
       chave: "PARECER_JURIDICO",
-      nome: "8. Em parecer jurídico",
-      descricao: "Controle prévio de legalidade do edital, minuta ou dispensa (art. 53).",
+      nome: "Em parecer jurídico",
+      descricao: "Controle prévio de legalidade do edital e da minuta, ou da contratação direta (art. 53).",
       setor: "PGM",
       papeis: ["JURIDICO"],
       slaDiasUteis: 5,
-      gates: [doc("PARECER_JURIDICO", ["JURIDICO"], "Parecer jurídico assinado")],
-      avancos: [{ para: "CONTRATACAO", rotulo: "Favorável: iniciar contratação" }],
+      gates: [
+        doc("PARECER_JURIDICO", ["JURIDICO"], "Parecer jurídico assinado"),
+        regra("MODALIDADE_DEFINIDA", "Modalidade da contratação definida por compras"),
+      ],
+      avancos: [
+        { para: "PUBLICACAO_EDITAL", rotulo: "Favorável: publicar o edital", quando: { campo: "modalidade", valores: ["LICITACAO"] } },
+        { para: "INSTRUCAO_DIRETA", rotulo: "Favorável: instruir a contratação direta", quando: { campo: "modalidade", valores: ["DISPENSA_VALOR", "OUTRA_DIRETA"] } },
+      ],
       devolucoes: [{ para: "INSTRUCAO", rotulo: "Desfavorável: devolver a compras", motivoObrigatorio: true }],
     },
+    // ---- Escolha do fornecedor: licitação
     {
-      chave: "CONTRATACAO",
-      nome: "9. Em contratação",
-      descricao: "Licitação ou contratação direta: aviso/edital, sessão, habilitação, adjudicação.",
+      chave: "PUBLICACAO_EDITAL",
+      nome: "Publicação do edital",
+      descricao: "Edital no PNCP, no site e no diário oficial; o sistema confere o prazo mínimo até a abertura (art. 55).",
       setor: "COMPRAS",
       papeis: ["COMPRAS"],
-      slaDiasUteis: 20,
-      gates: [doc("EDITAL", undefined, "Edital ou aviso publicado"), doc("ATA_SESSAO", undefined, "Ata da sessão com resultado")],
-      avancos: [{ para: "HOMOLOGADO", rotulo: "Enviar para homologação" }],
+      slaDiasUteis: 8,
+      ramo: "LICITACAO",
+      gates: [doc("EDITAL", undefined, "Edital e aviso de licitação"), regra("PRAZO_EDITAL", "Abertura respeita o prazo mínimo do art. 55, em dia útil")],
+      avancos: [{ para: "IMPUGNACOES", rotulo: "Edital publicado: abrir prazo de impugnações" }],
+      devolucoes: [],
+    },
+    {
+      chave: "IMPUGNACOES",
+      nome: "Impugnações e esclarecimentos",
+      descricao: "Impugnações até 3 dias úteis antes da abertura; resposta em até 3 dias úteis, publicada (art. 164).",
+      setor: "COMPRAS",
+      papeis: ["COMPRAS"],
+      slaDiasUteis: 3,
+      ramo: "LICITACAO",
+      gates: [regra("IMPUGNACOES", "Abertura alcançada e impugnações tempestivas respondidas")],
+      avancos: [{ para: "SESSAO_DISPUTA", rotulo: "Abrir a sessão de disputa" }],
+      devolucoes: [{ para: "PUBLICACAO_EDITAL", rotulo: "Republicar o edital", motivoObrigatorio: true }],
+    },
+    {
+      chave: "SESSAO_DISPUTA",
+      nome: "Disputa e habilitação",
+      descricao: "Lances na plataforma eletrônica, julgamento e habilitação do primeiro colocado; o sistema registra o resultado.",
+      setor: "COMPRAS",
+      papeis: ["COMPRAS"],
+      slaDiasUteis: 1,
+      ramo: "LICITACAO",
+      gates: [doc("ATA_SESSAO", undefined, "Ata da sessão"), regra("RESULTADO_SESSAO", "Resultado com vencedor, CNPJ e valor")],
+      avancos: [{ para: "RECURSOS", rotulo: "Abrir prazo de recursos" }],
       devolucoes: [{ para: "INSTRUCAO", rotulo: "Deserta ou fracassada: refazer", motivoObrigatorio: true }],
     },
     {
+      chave: "RECURSOS",
+      nome: "Recursos",
+      descricao: "Intenção na sessão, razões em 3 dias úteis e contrarrazões em mais 3 (art. 165).",
+      setor: "COMPRAS",
+      papeis: ["COMPRAS"],
+      slaDiasUteis: 6,
+      ramo: "LICITACAO",
+      gates: [regra("RECURSOS", "Todos os recursos decididos")],
+      avancos: [{ para: "HOMOLOGADO", rotulo: "Enviar para homologação" }],
+      devolucoes: [{ para: "SESSAO_DISPUTA", rotulo: "Recurso provido: refazer o julgamento", motivoObrigatorio: true }],
+    },
+    {
       chave: "HOMOLOGADO",
-      nome: "10. Homologação",
-      descricao: "Autoridade competente homologa; resultado publicado no PNCP.",
+      nome: "Adjudicação e homologação",
+      descricao: "A autoridade confirma o resultado e o vencedor (art. 71).",
       setor: "GAB",
       papeis: ["ORDENADOR"],
       slaDiasUteis: 2,
-      gates: [doc("TERMO_HOMOLOGACAO", ["ORDENADOR"], "Termo de homologação assinado")],
-      avancos: [{ para: "CONTRATADO", rotulo: "Homologar e contratar" }],
-      devolucoes: [{ para: "CONTRATACAO", rotulo: "Devolver à contratação", motivoObrigatorio: true }],
+      ramo: "LICITACAO",
+      gates: [doc("TERMO_HOMOLOGACAO", ["ORDENADOR"], "Termo de adjudicação e homologação assinado")],
+      avancos: [{ para: "EMPENHADO", rotulo: "Homologar e enviar para empenho" }],
+      devolucoes: [{ para: "SESSAO_DISPUTA", rotulo: "Devolver à sessão", motivoObrigatorio: true }],
+    },
+    // ---- Escolha do fornecedor: contratação direta
+    {
+      chave: "INSTRUCAO_DIRETA",
+      nome: "Instrução da contratação direta",
+      descricao: "Justificativa do preço e da escolha do fornecedor e documentos de habilitação; na dispensa por valor, aviso de 3 dias úteis (art. 75, §3º).",
+      setor: "COMPRAS",
+      papeis: ["COMPRAS"],
+      slaDiasUteis: 3,
+      ramo: "DIRETA",
+      gates: [regra("AVISO_DISPENSA", "Aviso de 3 dias úteis cumprido ou dispensa do aviso justificada")],
+      avancos: [{ para: "AUTORIZACAO_DIRETA", rotulo: "Enviar para autorização do ordenador" }],
+      devolucoes: [{ para: "INSTRUCAO", rotulo: "Rever o caminho da contratação", motivoObrigatorio: true }],
+    },
+    {
+      chave: "AUTORIZACAO_DIRETA",
+      nome: "Autorização da contratação direta",
+      descricao: "O ordenador autoriza a contratação direta e o ato é publicado no site oficial (art. 72, parágrafo único).",
+      setor: "GAB",
+      papeis: ["ORDENADOR"],
+      slaDiasUteis: 2,
+      ramo: "DIRETA",
+      gates: [doc("ATO_AUTORIZACAO_DIRETA", ["ORDENADOR"], "Ato de autorização assinado pelo ordenador")],
+      avancos: [{ para: "EMPENHADO", rotulo: "Autorizar e enviar para empenho" }],
+      devolucoes: [{ para: "INSTRUCAO_DIRETA", rotulo: "Devolver a compras", motivoObrigatorio: true }],
+    },
+    // ---- Contrato
+    {
+      chave: "EMPENHADO",
+      nome: "Empenhado",
+      descricao: "A reserva vira empenho em nome do fornecedor escolhido (Lei 4.320, arts. 58 a 61).",
+      setor: "CONTAB",
+      papeis: ["CONTABILIDADE"],
+      slaDiasUteis: 2,
+      gates: [doc("NOTA_EMPENHO", ["CONTABILIDADE", "ORDENADOR"], "Nota de empenho assinada por contador e ordenador")],
+      avancos: [{ para: "CONTRATADO", rotulo: "Enviar para assinatura do contrato" }],
+      devolucoes: [{ para: "ALTERACAO_ORCAMENTARIA", rotulo: "Empenho maior que a reserva", motivoObrigatorio: true }],
     },
     {
       chave: "CONTRATADO",
-      nome: "11. Contratado",
-      descricao: "Contrato assinado, gestor e fiscal nomeados por portaria, publicação no PNCP (condição de eficácia).",
+      nome: "Contratado",
+      descricao: "Contrato assinado, gestor e fiscal designados por portaria, extrato no PNCP (condição de eficácia).",
       setor: "COMPRAS",
       papeis: ["COMPRAS"],
       slaDiasUteis: 5,
@@ -307,28 +473,19 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
         doc("PUBLICACAO_PNCP", undefined, "Publicação no PNCP (20 dias úteis licitação / 10 direta)"),
         { tipo: "campo", campo: "contratacao", descricao: "Fornecedor, CNPJ, valor contratado e fonte de recurso informados" },
       ],
-      avancos: [{ para: "EMPENHADO", rotulo: "Enviar para empenho" }],
+      avancos: [{ para: "EXECUCAO", rotulo: "Contrato publicado: iniciar a execução" }],
       devolucoes: [],
     },
-    {
-      chave: "EMPENHADO",
-      nome: "12. Empenhado",
-      descricao: "Nota de empenho assinada pelo contador e pelo ordenador (Lei 4.320, art. 60).",
-      setor: "CONTAB",
-      papeis: ["CONTABILIDADE"],
-      slaDiasUteis: 2,
-      gates: [doc("NOTA_EMPENHO", ["CONTABILIDADE", "ORDENADOR"], "Nota de empenho assinada por contador e ordenador")],
-      avancos: [{ para: "EXECUCAO", rotulo: "Enviar ordem ao fornecedor e acompanhar" }],
-      devolucoes: [{ para: "ALTERACAO_ORCAMENTARIA", rotulo: "Empenho maior que a reserva", motivoObrigatorio: true }],
-    },
+    // ---- Execução e pagamento
     {
       chave: "EXECUCAO",
-      nome: "13. Em execução",
-      descricao: "Fiscal recebe, mede e atesta a nota fiscal; almoxarifado confere; patrimônio tomba.",
+      nome: "Em execução",
+      descricao: "Ordem de fornecimento; o fiscal recebe, confere e atesta a nota fiscal.",
       setor: "LIVRE",
       papeis: ["FISCAL", "REQUISITANTE"],
       slaDiasUteis: 5,
       gates: [
+        doc("ORDEM_FORNECIMENTO", undefined, "Ordem de fornecimento ou de serviço ao fornecedor"),
         doc("NOTA_FISCAL", undefined, "Nota fiscal do fornecedor"),
         doc("ATESTO", ["FISCAL"], "Atesto do fiscal do contrato"),
         doc("CERTIDOES", undefined, "Certidões de regularidade vigentes"),
@@ -338,31 +495,42 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     },
     {
       chave: "LIQUIDADO",
-      nome: "14. Liquidado",
-      descricao: "Verificação do direito do credor (Lei 4.320, art. 63); data da liquidação define a ordem cronológica.",
+      nome: "Liquidado",
+      descricao: "Verificação do direito do credor (Lei 4.320, art. 63); a data da liquidação define a ordem cronológica.",
       setor: "CONTAB",
       papeis: ["CONTABILIDADE"],
-      slaDiasUteis: 10,
+      slaDiasUteis: 5,
       gates: [doc("NOTA_LIQUIDACAO", ["ORDENADOR"], "Nota de liquidação assinada pelo ordenador")],
       avancos: [{ para: "FILA_PAGAMENTO", rotulo: "Enviar à tesouraria" }],
       devolucoes: [{ para: "EXECUCAO", rotulo: "Documento faltante: devolver ao fiscal", motivoObrigatorio: true }],
     },
     {
       chave: "FILA_PAGAMENTO",
-      nome: "15. Na fila cronológica",
-      descricao: "Posição por fonte de recurso e data de liquidação (Lei 14.133, art. 141).",
+      nome: "Na fila cronológica",
+      descricao: "Posição por fonte de recurso e data de liquidação; pular a fila exige justificativa publicada (Lei 14.133, art. 141).",
       setor: "TES",
       papeis: ["TESOURARIA"],
       slaDiasUteis: 20,
       filaCronologica: true,
       gates: [doc("ORDEM_PAGAMENTO", ["ORDENADOR", "TESOURARIA"], "Ordem de pagamento assinada pelo ordenador e pela tesouraria")],
-      avancos: [{ para: "PAGO", rotulo: "Registrar pagamento" }],
+      avancos: [{ para: "PAGAMENTO_ENVIADO", rotulo: "Enviar ao banco" }],
       devolucoes: [],
     },
     {
+      chave: "PAGAMENTO_ENVIADO",
+      nome: "Enviado ao banco",
+      descricao: "Pagamento enviado; só vira pago quando o banco confirma.",
+      setor: "TES",
+      papeis: ["TESOURARIA"],
+      slaDiasUteis: 2,
+      gates: [regra("RETORNO_BANCARIO", "Retorno do banco confirmando o pagamento")],
+      avancos: [{ para: "PAGO", rotulo: "Banco confirmou: registrar pagamento" }],
+      devolucoes: [{ para: "FILA_PAGAMENTO", rotulo: "Banco recusou", motivoObrigatorio: true }],
+    },
+    {
       chave: "PAGO",
-      nome: "16. Pago",
-      descricao: "Ordem bancária executada; comprovante juntado; fornecedor avisado.",
+      nome: "Pago",
+      descricao: "Pagamento confirmado pelo banco; comprovante juntado; fornecedor avisado.",
       setor: "TES",
       papeis: ["TESOURARIA"],
       slaDiasUteis: 2,
@@ -372,7 +540,7 @@ export const WORKFLOW_COMPRA: WorkflowDef = {
     },
     {
       chave: "ARQUIVADO",
-      nome: "18. Arquivado",
+      nome: "Arquivado",
       descricao: "Processo encerrado; dados na transparência e na remessa ao TCE; indicadores consolidados.",
       setor: "PROT",
       papeis: ["PROTOCOLO", "ADMIN"],

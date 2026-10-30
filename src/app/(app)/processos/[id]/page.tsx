@@ -5,8 +5,8 @@ import { ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileText, Lock, PenL
 import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { carregarProcesso, avaliarGates, podeAgir, verificarCadeia } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, caminhoPrincipal, nomeEtapa, type Papel } from "@/lib/workflow";
+import { carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
+import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoPrincipal, nomeEtapa, type Papel } from "@/lib/workflow";
 import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
@@ -33,7 +33,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const { doc: docSugerido } = await searchParams;
   const p = await carregarProcesso(u.municipioId, id);
   if (!p) notFound();
-  const gates = avaliarGates(p);
+  const gates = avaliarGates(p, await feriadosDo(u.municipioId));
+  const avancos = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null);
   const pode = podeAgir(u, p);
   const cadeia = verificarCadeia(p.eventos);
   const listaSetores = await db.query.setores.findMany({ where: eq(setores.municipioId, u.municipioId), orderBy: setores.nome });
@@ -144,7 +145,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                 {p.estado.gates.length > 0 && (
                   <ul className="mt-4 space-y-2">
                     {gates.map((g, i) => {
-                      const nomeDoc = g.gate.tipo === "documento" ? (g.gate.descricao ?? DOCUMENTO_TIPOS[g.gate.documentoTipo]) : (g.gate.descricao ?? g.gate.campo);
+                      const nomeDoc = g.gate.tipo === "documento" ? (g.gate.descricao ?? DOCUMENTO_TIPOS[g.gate.documentoTipo]) : g.gate.tipo === "campo" ? (g.gate.descricao ?? g.gate.campo) : g.gate.descricao;
                       return (
                         <li key={i} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${g.ok ? "border-ok/20 bg-ok-soft/50" : "border-line bg-white"}`}>
                           {g.ok ? <CheckCircle2 size={20} className="shrink-0 text-ok" /> : <Circle size={20} className="shrink-0 text-line-2" />}
@@ -199,7 +200,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
 
                 {pode ? (
                   <div className="mt-6 space-y-4">
-                    {p.estado.avancos.length > 0 && (
+                    {avancos.length > 0 && (
                       <ActionForm action={avancarAction}>
                         <input type="hidden" name="processoId" value={p.id} />
                         <label className="label" htmlFor="despacho">
@@ -207,7 +208,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                         </label>
                         <textarea id="despacho" name="despacho" className="input" rows={2} placeholder="Ex.: Segue com a pesquisa de preços atualizada." />
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {p.estado.avancos.map((t, i) => (
+                          {avancos.map((t, i) => (
                             <SubmitButton
                               key={t.para}
                               name="para"

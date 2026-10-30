@@ -79,7 +79,7 @@ export default async function FluxosPage() {
                               ) : (
                                 e.gates.map((g, k) => (
                                   <dd key={k} className="text-ink">
-                                    {g.tipo === "documento" ? (DOCUMENTO_TIPOS[g.documentoTipo] ?? g.documentoTipo) : g.campo}
+                                    {g.tipo === "documento" ? (DOCUMENTO_TIPOS[g.documentoTipo] ?? g.documentoTipo) : g.tipo === "campo" ? g.campo : g.descricao}
                                     {g.tipo === "documento" && g.assinadoPor?.length ? (
                                       <span className="text-ink-3"> — assinado por {g.assinadoPor.map((p) => PAPEL_NOME[p]).join(" e ")}</span>
                                     ) : null}

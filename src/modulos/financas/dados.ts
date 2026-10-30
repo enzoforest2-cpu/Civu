@@ -570,7 +570,7 @@ export async function processosParaEmpenho(municipioId: string, ano: number) {
       ),
     ),
   });
-  const ordem = ["CONTRATADO", "EMPENHADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGO", "ARQUIVADO"];
+  const ordem = ["CONTRATADO", "EMPENHADO", "EXECUCAO", "LIQUIDADO", "FILA_PAGAMENTO", "PAGAMENTO_ENVIADO", "PAGO", "ARQUIVADO"];
   return lista
     .filter((p) => ordem.includes(p.estadoAtual))
     .map((p) => {

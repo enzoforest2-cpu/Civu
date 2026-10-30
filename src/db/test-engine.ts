@@ -12,7 +12,7 @@ const origLoad = (Module as unknown as { _load: (req: string, ...a: unknown[]) =
 
 async function main() {
   const { db } = await import("./index");
-  const { usuarios, unidadesGestoras, tiposProcesso, eventos } = await import("./schema");
+  const { usuarios, unidadesGestoras, tiposProcesso, eventos, processos } = await import("./schema");
   const { eq, and } = await import("drizzle-orm");
   const engine = await import("../lib/engine");
   const { getSessionUser: _g } = await import("../lib/auth");
@@ -28,6 +28,8 @@ async function main() {
     };
   }
   const requisitante = await sessao("99999999999");
+  const secretario = await sessao("88888888888");
+  const protocolo = await sessao("22222222222");
   const prefeita = await sessao("11111111111");
   const compras = await sessao("33333333333");
   const contador = await sessao("44444444444");
@@ -45,17 +47,28 @@ async function main() {
   await esperaErro("abrir sem campo obrigatório", () => engine.abrirProcesso(requisitante, { tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: "Teste", metadados: {} }));
   const p = await engine.abrirProcesso(requisitante, {
     tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: "TESTE — aquisição de cadeiras", urgencia: "NORMAL",
-    metadados: { objeto: "20 cadeiras", justificativa: "teste", quantidade: "20", valorEstimado: "6000", dataPretendida: "2026-12-01", prioridade: "BAIXA", noPCA: "SIM" },
+    metadados: { objeto: "20 cadeiras", natureza: "EQUIPAMENTOS", modalidade: "DISPENSA_VALOR", justificativa: "teste", quantidade: "20", valorEstimado: "6000", dataPretendida: "2026-12-01", prioridade: "BAIXA", noPCA: "SIM" },
   });
   ok(`processo aberto ${p.numero} no estado ${p.estadoAtual}`);
 
   // 2. avançar sem DFD → bloqueado
-  await esperaErro("avançar sem DFD", () => engine.avancar(requisitante, p.id, "AUTORIZACAO"));
+  await esperaErro("avançar sem DFD", () => engine.avancar(requisitante, p.id, "APROVACAO_SECRETARIO"));
   const dfd = await engine.juntarDocumento(requisitante, p.id, "DFD", "DFD cadeiras", "Objeto: 20 cadeiras...");
-  await esperaErro("avançar com DFD sem assinatura", () => engine.avancar(requisitante, p.id, "AUTORIZACAO"));
+  await esperaErro("avançar com DFD sem assinatura", () => engine.avancar(requisitante, p.id, "APROVACAO_SECRETARIO"));
   await engine.assinarDocumento(requisitante, dfd.id, "REQUISITANTE");
-  await esperaErro("compras tentando agir na etapa do requisitante", () => engine.avancar(compras, p.id, "AUTORIZACAO"));
-  await engine.avancar(requisitante, p.id, "AUTORIZACAO", "Segue para autorização.");
+  await esperaErro("compras tentando agir na etapa do requisitante", () => engine.avancar(compras, p.id, "APROVACAO_SECRETARIO"));
+  await esperaErro("pular a aprovação do secretário", () => engine.avancar(requisitante, p.id, "AUTORIZACAO"));
+  await engine.avancar(requisitante, p.id, "APROVACAO_SECRETARIO", "Segue para o secretário.");
+
+  // 2b. secretário assina o DFD e envia ao protocolo, que autua
+  await esperaErro("requisitante agindo na etapa do secretário", () => engine.avancar(requisitante, p.id, "AUTUACAO"));
+  await esperaErro("secretário avança sem assinar o DFD", () => engine.avancar(secretario, p.id, "AUTUACAO"));
+  await engine.assinarDocumento(secretario, dfd.id, "SECRETARIO");
+  await engine.avancar(secretario, p.id, "AUTUACAO", "Aprovado.");
+  await engine.receber(protocolo, p.id);
+  await esperaErro("autuar sem termo de autuação", () => engine.avancar(protocolo, p.id, "AUTORIZACAO"));
+  await engine.juntarDocumento(protocolo, p.id, "TERMO_AUTUACAO", "Termo de autuação", "Autuado.");
+  await engine.avancar(protocolo, p.id, "AUTORIZACAO", "Segue para autorização.");
   let c = await engine.carregarProcesso(p.municipioId, p.id);
   ok(`avançou para ${c!.estadoAtual}, setor ${c!.setorAtual?.sigla}, recebido=${c!.recebidoEm ? "sim" : "não"}, prazo ${c!.prazoEtapaEm?.toISOString().slice(0, 10)}`);
 
@@ -76,13 +89,22 @@ async function main() {
   c = await engine.carregarProcesso(p.municipioId, p.id);
   ok(`devolvido → ${c!.estadoAtual} (${c!.setorAtual?.sigla}), ${c!.eventos.length} eventos`);
 
-  // 5. requisitante reenvia (DFD já assinado continua válido) e vai até contabilidade
+  // 5. requisitante reenvia (DFD já assinado e termo de autuação continuam válidos) e vai até contabilidade
   await engine.receber(requisitante, p.id);
-  await engine.avancar(requisitante, p.id, "AUTORIZACAO");
+  await engine.avancar(requisitante, p.id, "APROVACAO_SECRETARIO");
+  await engine.avancar(secretario, p.id, "AUTUACAO");
+  await engine.receber(protocolo, p.id);
+  await engine.avancar(protocolo, p.id, "AUTORIZACAO");
   await engine.receber(prefeita, p.id);
   await engine.avancar(prefeita, p.id, "INSTRUCAO");
   await engine.receber(compras, p.id);
-  for (const [t, ti] of [["ETP", "ETP"], ["TR", "TR"], ["PESQUISA_PRECOS", "3 cotações"]]) await engine.juntarDocumento(compras, p.id, t, ti, "...");
+  const docsInstrucao: Record<string, { id: string }> = {};
+  for (const [t, ti] of [["ETP", "ETP"], ["TR", "TR"], ["PESQUISA_PRECOS", "3 cotações"]]) docsInstrucao[t] = await engine.juntarDocumento(compras, p.id, t, ti, "...");
+  await engine.assinarDocumento(requisitante, docsInstrucao.TR.id, "REQUISITANTE");
+  // pesquisa de preços estruturada (a ação do motor que grava isto vem na etapa seguinte do plano)
+  const atual = await engine.carregarProcesso(p.municipioId, p.id);
+  const pesquisaPrecos = { fontes: [{ fonte: "PNCP", data: "2026-10-01", valor: 300 }, { fonte: "Cotação A", data: "2026-10-02", valor: 310 }, { fonte: "Cotação B", data: "2026-10-03", valor: 295 }] };
+  await db.update(processos).set({ metadados: { ...((atual!.metadados ?? {}) as Record<string, unknown>), pesquisaPrecos } }).where(eq(processos.id, p.id));
   await engine.avancar(compras, p.id, "VERIFICACAO_ORCAMENTARIA");
   await engine.receber(contador, p.id);
   await engine.juntarDocumento(contador, p.id, "CERTIDAO_DOTACAO", "Certidão", "04.122.0002.2010 — 4.4.90.52 — fonte 1500 — saldo R$ 50.000");

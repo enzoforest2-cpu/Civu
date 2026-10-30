@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { eventos, gestaoAlertas, gestaoExecucoes, gestaoRegras, processos, setores, type GestaoRegra } from "@/db/schema";
 import type { SessaoUsuario } from "@/lib/auth";
 import { ErroFluxo, avancar, carregarProcesso, receber, tramitar } from "@/lib/engine";
-import { getEstado, type WorkflowDef } from "@/lib/workflow";
+import { avancosDisponiveis, getEstado, type WorkflowDef } from "@/lib/workflow";
 import { avaliarRegra, type Disparo, type FotoProcesso, type RegraAvaliavel } from "./avaliador";
 import { registrarAuditoria } from "./auditoria";
 
@@ -48,7 +48,8 @@ export async function fotografarProcessos(municipioId: string): Promise<FotoProc
     const tipo = tipos.find((t) => t.id === p.tipoId);
     const def = tipo?.definicao as WorkflowDef | undefined;
     const est = def ? getEstado(def, p.estadoAtual) : undefined;
-    const prox = def && est?.avancos[0] ? getEstado(def, est.avancos[0].para) : undefined;
+    const av = def && est ? avancosDisponiveis(def, est, p.metadados as Record<string, unknown> | null)[0] : undefined;
+    const prox = def && av ? getEstado(def, av.para) : undefined;
     const ex = (p.metadados as Record<string, unknown> | null)?.exigencia as { texto: string; prazo: string } | undefined;
     return {
       id: p.id,
@@ -89,7 +90,8 @@ async function encaminhar(u: SessaoUsuario, regra: GestaoRegra, d: Disparo): Pro
     let p = await carregarProcesso(u.municipioId, d.processoId);
     if (!p) return { ...base, resultado: "FALHA", detalhe: "Processo não encontrado." };
     if (p.estado.setor !== "LIVRE") {
-      const prox = p.estado.avancos[0] ? getEstado(p.def, p.estado.avancos[0].para) : undefined;
+      const av = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null)[0];
+      const prox = av ? getEstado(p.def, av.para) : undefined;
       if (prox?.setor !== "LIVRE") return { ...base, resultado: "IGNORADO", detalhe: "Nesta etapa o processo só se movimenta pelo fluxo." };
       if (!p.recebidoEm) await receber(u, p.id);
       await avancar(u, p.id, prox.chave, texto);
