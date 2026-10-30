@@ -7,6 +7,7 @@ import { Navegacao, type GrupoNav } from "@/components/navegacao";
 import { GRUPOS, ITENS_GESTAO } from "@/lib/modulos";
 import { Avatar } from "@/components/ui";
 import { Marca, MarcaCompleta } from "@/components/marca";
+import { LinkAjuda } from "@/modulos/gestao/componentes/link-ajuda";
 
 export const dynamic = "force-dynamic";
 
@@ -68,9 +69,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <input name="q" className="input !rounded-full !bg-white !py-2.5 !pl-10" placeholder="Buscar processo por número ou assunto" />
             <input type="hidden" name="situacao" value="todos" />
           </form>
-          <Link href="/processos/novo" className="btn btn-primary !rounded-full">
-            Abrir processo
-          </Link>
+          <div className="flex shrink-0 items-center gap-1">
+            <LinkAjuda />
+            <Link href="/processos/novo" className="btn btn-primary !rounded-full">
+              Abrir processo
+            </Link>
+          </div>
         </header>
         <main className="mx-auto max-w-[1280px] px-4 py-7 sm:px-10 sm:py-9">{children}</main>
       </div>
