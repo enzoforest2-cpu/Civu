@@ -24,7 +24,7 @@ export const PRAZO_MINIMO_EDITAL: Record<TipoObjetoEdital, number> = {
   OBRA_INTEGRADA: 60,
 };
 
-const ROTULO_TIPO: Record<TipoObjetoEdital, string> = {
+export const ROTULO_TIPO: Record<TipoObjetoEdital, string> = {
   BENS_MENOR_PRECO: "compra de bens por menor preço",
   BENS_OUTROS: "compra de bens (demais critérios)",
   SERVICOS_COMUNS: "serviços e obras comuns",

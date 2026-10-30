@@ -1,7 +1,8 @@
 import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, Send, Undo2, CheckCircle2, Landmark, Building2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { fmtDataHora, fmtMoeda } from "@/lib/dates";
-import { DOCUMENTO_TIPOS, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
+import { dataBr } from "./etapas/util";
+import { DOCUMENTO_TIPOS, MODALIDADES, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
 
 type Ev = {
   id: string;
@@ -106,6 +107,49 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
           case "DESPACHO":
             titulo = "Observação";
             detalhe = d.texto;
+            break;
+          // Etapas da contratação registradas pelo motor (dados conforme engine.ts)
+          case "MODALIDADE":
+            titulo = `Definiu a modalidade: ${MODALIDADES[d.para ?? ""] ?? d.para ?? "—"}`;
+            detalhe = d.justificativa;
+            break;
+          case "PESQUISA_PRECOS": {
+            const n = Array.isArray((e.dados as { fontes?: unknown } | null)?.fontes) ? (e.dados as { fontes: unknown[] }).fontes.length : 0;
+            titulo = `Registrou a pesquisa de preços (${n === 1 ? "1 fonte" : `${n} fontes`})`;
+            detalhe = d.valorEstimado ? `Valor estimado: ${fmtMoeda(d.valorEstimado)}` : d.justificativa;
+            break;
+          }
+          case "EDITAL":
+            titulo = `Publicou o edital ${d.numero ?? ""}`.trim();
+            detalhe = d.aberturaEm ? `Abertura em ${dataBr(d.aberturaEm)}${d.plataforma ? ` · ${d.plataforma}` : ""}` : undefined;
+            break;
+          case "IMPUGNACAO":
+            titulo = `Registrou impugnação de ${d.autor ?? "—"}`;
+            detalhe = (e.dados as { tempestiva?: boolean } | null)?.tempestiva ? "No prazo" : "Fora do prazo";
+            break;
+          case "RESPOSTA_IMPUGNACAO":
+            titulo = `Respondeu a impugnação de ${d.autor ?? "—"}`;
+            detalhe = d.resposta;
+            break;
+          case "RESULTADO_SESSAO":
+            titulo = d.situacao === "VENCEDOR" ? `Resultado da sessão: vencedor ${d.fornecedor ?? ""}`.trim() : `Resultado da sessão: ${d.situacao === "DESERTA" ? "deserta" : "fracassada"}`;
+            detalhe = d.situacao === "VENCEDOR" && d.valor ? fmtMoeda(d.valor) : undefined;
+            break;
+          case "RECURSO":
+            titulo = `Registrou intenção de recurso de ${d.recorrente ?? "—"}`;
+            detalhe = d.razoesAte ? `Razões até ${dataBr(d.razoesAte)} · contrarrazões até ${dataBr(d.contrarrazoesAte)}` : undefined;
+            break;
+          case "DECISAO_RECURSO":
+            titulo = `Decidiu o recurso de ${d.recorrente ?? "—"}: ${(e.dados as { provido?: boolean } | null)?.provido ? "provido" : "não provido"}`;
+            detalhe = d.decisao;
+            break;
+          case "AVISO_DISPENSA":
+            titulo = d.publicadoEm ? `Publicou o aviso de dispensa em ${dataBr(d.publicadoEm)}` : "Registrou dispensa sem aviso";
+            detalhe = d.justificativaSemAviso;
+            break;
+          case "RETORNO_BANCARIO":
+            titulo = (e.dados as { aceito?: boolean } | null)?.aceito ? "Banco confirmou o pagamento" : "Banco recusou o pagamento";
+            detalhe = d.autenticacao ?? d.motivo;
             break;
           default:
             titulo = e.tipo;

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileText, Lock, PenLine, Send, ShieldCheck, ShieldAlert, Undo2, Plus, ListOrdered } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowRight, CheckCircle2, Circle, FileText, Lock, PenLine, Send, ShieldCheck, ShieldAlert, Undo2, Plus, ListOrdered } from "lucide-react";
 import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoPrincipal, nomeEtapa, type Papel } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeEtapa, ramoDaModalidade, type Papel } from "@/lib/workflow";
 import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
@@ -19,6 +19,7 @@ import { db as dbInteressado } from "@/db";
 import type { Exigencia } from "@/lib/engine";
 import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction, contratacaoAction, remessaTceAction } from "@/app/actions";
 import { Timeline } from "./timeline";
+import { PainelDaEtapa } from "./etapas";
 
 const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; texto: string }> = {
   cumprida: { tone: "ok", texto: "Cumprida" },
@@ -33,7 +34,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const { doc: docSugerido } = await searchParams;
   const p = await carregarProcesso(u.municipioId, id);
   if (!p) notFound();
-  const gates = avaliarGates(p, await feriadosDo(u.municipioId));
+  const feriados = await feriadosDo(u.municipioId);
+  const gates = avaliarGates(p, feriados);
   const avancos = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null);
   const pode = podeAgir(u, p);
   const cadeia = verificarCadeia(p.eventos);
@@ -42,13 +44,17 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const camposMeta = p.def.camposAbertura ?? [];
   const noMeuSetor = p.setorAtualId === u.setorId;
   const podeTramitarLivre = !p.encerradoEm && (p.estado.setor === "LIVRE" || u.papeis.includes("ADMIN") || u.papeis.includes("PROTOCOLO"));
+  // Trilho: só as etapas que valem para a modalidade do processo; o ramo escolhido conta como caminho normal
+  const caminho = caminhoDoProcesso(p.def, meta);
+  const ordemCaminho = caminho.map((e) => e.chave);
+  const ramo = ramoDaModalidade(meta.modalidade);
   const principal = caminhoPrincipal(p.def);
   const visitadas = p.eventos.map((e) => e.paraEstado).filter((x): x is string => !!x);
-  const estacoes = p.def.estados.map((e) => ({
+  const estacoes = caminho.map((e) => ({
     chave: e.chave,
     nome: nomeEtapa(e.nome),
     setor: e.setor && e.setor !== "LIVRE" ? listaSetores.find((s) => s.sigla === e.setor)?.nome.replace(/^(Secretaria|Setor) de /, "") : null,
-    opcional: !principal.includes(e.chave),
+    opcional: !!e.opcional || (!principal.includes(e.chave) && !(ramo && e.ramo === ramo)),
   }));
   const pendentes = gates.filter((g) => !g.ok);
   const prontoParaAvancar = pendentes.length === 0;
@@ -60,8 +66,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   // Conformidade: limite de dispensa, dados da contratação, fila cronológica e obrigações
   const tipoCompra = p.tipo.chave === "COMPRA";
   const contratacao = meta.contratacao as Contratacao | undefined;
-  const idxContratado = principal.indexOf("CONTRATADO");
-  const chegouContratacao = tipoCompra && idxContratado >= 0 && (principal.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
+  const idxContratado = ordemCaminho.indexOf("CONTRATADO");
+  const chegouContratacao = tipoCompra && idxContratado >= 0 && (ordemCaminho.indexOf(p.estadoAtual) >= idxContratado || !!p.encerradoEm);
   const podeContratacao = !p.encerradoEm && chegouContratacao && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
   const exigencia = meta.exigencia as Exigencia | undefined;
@@ -200,7 +206,14 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
 
                 {pode ? (
                   <div className="mt-6 space-y-4">
-                    {avancos.length > 0 && (
+                    {avancos.length === 0 && p.estadoAtual === "PARECER_JURIDICO" && (
+                      <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3.5 text-[14px] text-ink">
+                        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warn" />
+                        <div>Compras ainda não definiu a modalidade. Devolva a compras para definir.</div>
+                      </div>
+                    )}
+                    {/* Enviado ao banco: o retorno registrado no painel da etapa já move o processo; o botão de avanço seria um segundo "Banco confirmou" sempre travado */}
+                    {avancos.length > 0 && !(tipoCompra && p.estadoAtual === "PAGAMENTO_ENVIADO") && (
                       <ActionForm action={avancarAction}>
                         <input type="hidden" name="processoId" value={p.id} />
                         <label className="label" htmlFor="despacho">
@@ -283,6 +296,9 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               </div>
             </section>
           )}
+
+          {/* Painel da etapa (edital, impugnações, sessão, recursos, aviso, retorno do banco…) */}
+          <PainelDaEtapa p={p} pode={pode} feriados={feriados} />
 
           {/* Documentos */}
           <section id="documentos" className="panel">
