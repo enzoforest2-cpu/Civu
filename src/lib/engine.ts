@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { assinaturas, documentos, eventos, feriados, processos, setores, tiposProcesso } from "@/db/schema";
@@ -8,6 +8,9 @@ import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
 import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
 import {
+  MIN_JUSTIFICATIVA,
+  impugnacaoTempestiva,
+  prazosRecurso,
   regraAvisoDispensa,
   regraImpugnacoes,
   regraModalidadeDefinida,
@@ -24,6 +27,7 @@ import {
   type ResultadoRegra,
   type ResultadoSessao,
   type RetornoBancario,
+  type FontePreco,
 } from "./regras-fluxo";
 import { analisarFracionamento, sistemaTce } from "./conformidade";
 import { aFrenteNaFila, cnpjValido } from "./pagamentos";
@@ -341,26 +345,62 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
   }
 
   return db.transaction(async (tx) => {
-    const setorDestinoId = await setorDoEstado(tx, u.municipioId, destino, p.abertoPor.setorId, p.setorAtualId);
-    const mudaSetor = setorDestinoId !== p.setorAtualId;
-    await tx
-      .update(processos)
-      .set({
-        estadoAtual: destino.chave,
-        setorAtualId: setorDestinoId,
-        recebidoEm: mudaSetor ? null : new Date(),
-        prazoEtapaEm: destino.slaDiasUteis > 0 ? addDiasUteis(new Date(), destino.slaDiasUteis, fer) : null,
-        encerradoEm: destino.final ? new Date() : null,
-      })
-      .where(eq(processos.id, p.id));
-    await registrarEvento(tx, p.id, u.id, destino.final ? "ENCERRAMENTO" : "MUDANCA_ESTADO", {
-      deEstado: p.estadoAtual,
-      paraEstado: destino.chave,
-      deSetorId: p.setorAtualId,
-      paraSetorId: setorDestinoId,
-      dados: quebraOrdem ? { rotulo: trans.rotulo, despacho: despacho?.trim() || null, quebraOrdem } : { rotulo: trans.rotulo, despacho: despacho?.trim() || null },
-    });
+    await moverEstado(tx, u, p, destino, fer, destino.final ? "ENCERRAMENTO" : "MUDANCA_ESTADO", quebraOrdem ? { rotulo: trans.rotulo, despacho: despacho?.trim() || null, quebraOrdem } : { rotulo: trans.rotulo, despacho: despacho?.trim() || null }, { encerra: true });
   });
+}
+
+/** Move o processo para outro estado dentro de uma transação: atualiza estado, setor e prazo e grava o evento. Único lugar que faz isso. */
+async function moverEstado(
+  tx: Tx,
+  u: SessaoUsuario,
+  p: ProcessoCompleto,
+  destino: EstadoDef,
+  fer: Set<string>,
+  tipoEvento: string,
+  dados: Record<string, unknown>,
+  opts: { meta?: Record<string, unknown>; encerra?: boolean } = {},
+) {
+  const setorDestinoId = await setorDoEstado(tx, u.municipioId, destino, p.abertoPor.setorId, p.setorAtualId);
+  await tx
+    .update(processos)
+    .set({
+      estadoAtual: destino.chave,
+      setorAtualId: setorDestinoId,
+      recebidoEm: setorDestinoId === p.setorAtualId ? new Date() : null,
+      prazoEtapaEm: destino.slaDiasUteis > 0 ? addDiasUteis(new Date(), destino.slaDiasUteis, fer) : null,
+      ...(opts.encerra ? { encerradoEm: destino.final ? new Date() : null } : {}),
+      ...(opts.meta ? { metadados: opts.meta } : {}),
+    })
+    .where(eq(processos.id, p.id));
+  await registrarEvento(tx, p.id, u.id, tipoEvento, { deEstado: p.estadoAtual, paraEstado: destino.chave, deSetorId: p.setorAtualId, paraSetorId: setorDestinoId, dados });
+}
+
+const ETAPAS_DE_LICITACAO = new Set(["IMPUGNACOES", "SESSAO_DISPUTA", "RECURSOS", "HOMOLOGADO"]);
+
+/**
+ * Ao voltar uma etapa, o que valia na rodada anterior sai de `metadados` e vai para um histórico (os eventos continuam no livro).
+ * Sem isso, um edital, um resultado de sessão ou um retorno do banco antigos continuariam satisfazendo as travas da etapa nova.
+ */
+function limparAoDevolver(meta: Record<string, unknown>, de: string, para: string): Record<string, unknown> {
+  const m = { ...meta };
+  const arquivar = (chave: string, item: unknown) => {
+    m[chave] = [...((m[chave] as unknown[] | undefined) ?? []), { ...(item as object), arquivadoEm: new Date().toISOString() }];
+  };
+  if (para === "PUBLICACAO_EDITAL" && (m.edital || m.impugnacoes)) {
+    arquivar("historicoEditais", { edital: m.edital ?? null, impugnacoes: m.impugnacoes ?? [] });
+    delete m.edital;
+    delete m.impugnacoes;
+  }
+  if (["PUBLICACAO_EDITAL", "SESSAO_DISPUTA", "INSTRUCAO"].includes(para) && ETAPAS_DE_LICITACAO.has(de) && (m.resultadoSessao || m.recursos)) {
+    arquivar("historicoSessoes", { resultadoSessao: m.resultadoSessao ?? null, recursos: m.recursos ?? [] });
+    delete m.resultadoSessao;
+    delete m.recursos;
+  }
+  if (de === "PAGAMENTO_ENVIADO" && para === "FILA_PAGAMENTO" && m.retornoBancario) {
+    arquivar("historicoRetornos", m.retornoBancario);
+    delete m.retornoBancario;
+  }
+  return m;
 }
 
 export async function devolver(u: SessaoUsuario, processoId: string, paraEstado: string, motivo: string) {
@@ -370,27 +410,18 @@ export async function devolver(u: SessaoUsuario, processoId: string, paraEstado:
   const trans = p.estado.devolucoes.find((t) => t.para === paraEstado);
   if (!trans) throw new ErroFluxo("Devolução inválida para o estado atual.");
   if (trans.motivoObrigatorio && !motivo?.trim()) throw new ErroFluxo("Informe o motivo da devolução.");
-  const destino = getEstado(p.def, paraEstado)!;
   const fer = await feriadosDo(u.municipioId);
   return db.transaction(async (tx) => {
-    const setorDestinoId = await setorDoEstado(tx, u.municipioId, destino, p.abertoPor.setorId, p.setorAtualId);
-    await tx
-      .update(processos)
-      .set({
-        estadoAtual: destino.chave,
-        setorAtualId: setorDestinoId,
-        recebidoEm: setorDestinoId === p.setorAtualId ? new Date() : null,
-        prazoEtapaEm: destino.slaDiasUteis > 0 ? addDiasUteis(new Date(), destino.slaDiasUteis, fer) : null,
-      })
-      .where(eq(processos.id, p.id));
-    await registrarEvento(tx, p.id, u.id, "DEVOLUCAO", {
-      deEstado: p.estadoAtual,
-      paraEstado: destino.chave,
-      deSetorId: p.setorAtualId,
-      paraSetorId: setorDestinoId,
-      dados: { rotulo: trans.rotulo, motivo: motivo.trim() },
-    });
+    const meta = await travarMetadados(tx, p);
+    await devolverNaTx(tx, u, p, trans.para, trans.rotulo, motivo ?? "", fer, meta);
   });
+}
+
+/** Devolução dentro de uma transação já aberta (usada por `devolver` e pelas ações que devolvem como consequência). */
+async function devolverNaTx(tx: Tx, u: SessaoUsuario, p: ProcessoCompleto, paraEstado: string, rotulo: string, motivo: string, fer: Set<string>, meta: Record<string, unknown>) {
+  const destino = getEstado(p.def, paraEstado)!;
+  const limpo = limparAoDevolver(meta, p.estadoAtual, paraEstado);
+  await moverEstado(tx, u, p, destino, fer, "DEVOLUCAO", { rotulo, motivo: motivo.trim() }, { meta: limpo });
 }
 
 /** Tramitação livre: envia o processo a outro setor sem mudar de estado (estados LIVRE ou despacho interno). */
@@ -398,6 +429,8 @@ export async function tramitar(u: SessaoUsuario, processoId: string, paraSetorId
   const p = await carregarProcesso(u.municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
+  if (!getEstado(p.def, p.estadoAtual) && !temPapel(u, "ADMIN"))
+    throw new ErroFluxo(`Este processo está numa etapa que saiu do fluxo ("${p.estadoAtual}"). Só o administrador pode movimentá-lo: peça a ele que o reencaminhe.`);
   if (p.estado.setor !== "LIVRE" && !temPapel(u, "ADMIN", "PROTOCOLO"))
     throw new ErroFluxo("Nesta etapa o processo só se movimenta pelo fluxo (avançar ou devolver).");
   if (p.setorAtualId && p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN", "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
@@ -580,6 +613,242 @@ export async function responderExigencia(municipioId: string, processoId: string
   return db.transaction(async (tx) => {
     await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, p.id));
     await registrarEvento(tx, p.id, sys.id, "RESPOSTA_EXIGENCIA", { dados: { texto: resposta.texto.trim(), pessoaId: resposta.pessoaId, nome: resposta.nome } });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Ações das etapas da contratação (licitação, contratação direta e pagamento)
+// Cada ação checa papel e etapa, lê e grava `metadados` com a linha do processo travada
+// e registra o evento na mesma transação. Quem lê as chaves são as travas de `avaliarRegra`.
+// ---------------------------------------------------------------------------
+
+/** Trava a linha do processo, confere que ele continua onde estava e devolve os metadados atuais (evita perder gravação concorrente). */
+async function travarMetadados(tx: Tx, p: ProcessoCompleto): Promise<Record<string, unknown>> {
+  const [atual] = await tx
+    .select({ estado: processos.estadoAtual, setor: processos.setorAtualId, meta: processos.metadados })
+    .from(processos)
+    .where(eq(processos.id, p.id))
+    .for("update");
+  if (!atual || atual.estado !== p.estadoAtual || atual.setor !== p.setorAtualId)
+    throw new ErroFluxo("O processo mudou de etapa enquanto você trabalhava. Recarregue a página e tente de novo.");
+  return { ...((atual.meta as Record<string, unknown> | null) ?? {}) };
+}
+
+type CtxAcao = { tx: Tx; p: ProcessoCompleto; meta: Record<string, unknown>; fer: Set<string> };
+
+async function agirNoProcesso<T>(u: SessaoUsuario, processoId: string, estados: string[], fn: (c: CtxAcao) => Promise<T>): Promise<T> {
+  const p = await carregarProcesso(u.municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
+  if (!podeAgir(u, p)) throw new ErroFluxo("Você não tem papel para agir nesta etapa.");
+  if (!estados.includes(p.estadoAtual)) {
+    const nomes = estados.map((e) => getEstado(p.def, e)?.nome ?? e).join(" ou ");
+    throw new ErroFluxo(`Esta ação só vale na etapa ${nomes}. O processo está em "${p.estado.nome}".`);
+  }
+  const fer = await feriadosDo(u.municipioId);
+  return db.transaction(async (tx) => {
+    const meta = await travarMetadados(tx, p);
+    return fn({ tx, p, meta, fer });
+  });
+}
+
+async function gravarMeta(tx: Tx, processoId: string, meta: Record<string, unknown>) {
+  await tx.update(processos).set({ metadados: meta }).where(eq(processos.id, processoId));
+}
+
+function dataIso(v: unknown, rotulo: string): string {
+  const s = typeof v === "string" ? v.trim() : "";
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + "T12:00:00Z") : null;
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw new ErroFluxo(`${rotulo}: informe uma data válida no formato AAAA-MM-DD.`);
+  return s;
+}
+
+function texto(v: unknown, rotulo: string, min = 1): string {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (s.length < min) throw new ErroFluxo(min > 1 ? `${rotulo}: escreva pelo menos ${min} caracteres.` : `Preencha: ${rotulo}.`);
+  return s;
+}
+
+function mediana(valores: number[]): number {
+  const v = [...valores].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return Math.round((v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2) * 100) / 100;
+}
+
+/** Compras define a forma de contratação (licitação ou direta); a escolha fica justificada no livro. */
+export async function definirModalidade(u: SessaoUsuario, processoId: string, modalidade: string, justificativa: string) {
+  if (!MODALIDADES[modalidade] || modalidade === "A_DEFINIR") throw new ErroFluxo("Escolha a modalidade: licitação, dispensa por valor ou outra contratação direta.");
+  const just = texto(justificativa, "Justificativa da modalidade", MIN_JUSTIFICATIVA);
+  return agirNoProcesso(u, processoId, ["INSTRUCAO"], async ({ tx, p, meta }) => {
+    const anterior = typeof meta.modalidade === "string" ? meta.modalidade : null;
+    await gravarMeta(tx, p.id, { ...meta, modalidade, modalidadeJustificativa: just });
+    await registrarEvento(tx, p.id, u.id, "MODALIDADE", { dados: { de: anterior, para: modalidade, justificativa: just } });
+  });
+}
+
+/** Registra as fontes da pesquisa de preços (art. 23) e recalcula o valor estimado como a mediana delas. */
+export async function registrarPesquisaPrecos(u: SessaoUsuario, processoId: string, input: PesquisaPrecos) {
+  const fontes: FontePreco[] = (input.fontes ?? []).map((f, i) => {
+    const valor = Number(f.valor);
+    if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo(`Fonte ${i + 1}: informe o valor pesquisado, maior que zero.`);
+    return { fonte: texto(f.fonte, `Nome da fonte ${i + 1}`), data: dataIso(f.data, `Data da fonte ${i + 1}`), valor };
+  });
+  const justificativa = input.justificativa?.trim() || undefined;
+  return agirNoProcesso(u, processoId, ["INSTRUCAO"], async ({ tx, p, meta }) => {
+    const pesquisa: PesquisaPrecos = { fontes, ...(justificativa ? { justificativa } : {}) };
+    const novo: Record<string, unknown> = { ...meta, pesquisaPrecos: pesquisa };
+    let valorEstimado: string | null = null;
+    if (fontes.length) {
+      valorEstimado = mediana(fontes.map((f) => f.valor)).toFixed(2);
+      novo.valorEstimado = valorEstimado;
+    }
+    await gravarMeta(tx, p.id, novo);
+    await registrarEvento(tx, p.id, u.id, "PESQUISA_PRECOS", { dados: { ...pesquisa, valorEstimado, valorEstimadoAnterior: meta.valorEstimado ?? null } });
+  });
+}
+
+/** Publica (ou corrige) o edital. Só passa se a abertura respeitar o prazo mínimo do art. 55. */
+export async function publicarEdital(u: SessaoUsuario, processoId: string, input: Edital) {
+  return agirNoProcesso(u, processoId, ["PUBLICACAO_EDITAL"], async ({ tx, p, meta, fer }) => {
+    const edital: Edital = {
+      numero: texto(input.numero, "Número do edital"),
+      tipoObjeto: input.tipoObjeto,
+      publicadoEm: dataIso(input.publicadoEm, "Data de publicação"),
+      aberturaEm: dataIso(input.aberturaEm, "Data de abertura"),
+      plataforma: texto(input.plataforma, "Plataforma de publicação"),
+    };
+    const r = regraPrazoEdital(edital, fer);
+    if (!r.ok) throw new ErroFluxo(r.motivo);
+    const anterior = (meta.edital as Edital | undefined)?.numero ?? null;
+    await gravarMeta(tx, p.id, { ...meta, edital });
+    await registrarEvento(tx, p.id, u.id, "EDITAL", { dados: { ...edital, substitui: anterior } });
+  });
+}
+
+/** Registra uma impugnação recebida; a tempestividade (3 dias úteis antes da abertura, art. 164) é calculada aqui. */
+export async function registrarImpugnacao(u: SessaoUsuario, processoId: string, input: { autor: string; texto: string; recebidaEm: string }) {
+  return agirNoProcesso(u, processoId, ["PUBLICACAO_EDITAL", "IMPUGNACOES"], async ({ tx, p, meta, fer }) => {
+    const edital = meta.edital as Edital | undefined;
+    if (!edital) throw new ErroFluxo("Publique o edital antes de registrar impugnações.");
+    const recebidaEm = dataIso(input.recebidaEm, "Data de recebimento");
+    const imp: Impugnacao = {
+      id: randomUUID(),
+      autor: texto(input.autor, "Autor da impugnação"),
+      texto: texto(input.texto, "Texto da impugnação"),
+      recebidaEm,
+      tempestiva: impugnacaoTempestiva(recebidaEm, edital.aberturaEm, fer),
+    };
+    const lista = [...((meta.impugnacoes as Impugnacao[] | undefined) ?? []), imp];
+    await gravarMeta(tx, p.id, { ...meta, impugnacoes: lista });
+    await registrarEvento(tx, p.id, u.id, "IMPUGNACAO", { dados: imp });
+  });
+}
+
+/** Responde uma impugnação. Se for acolhida e mudar as propostas, o edital volta a ser publicado com prazo novo. */
+export async function responderImpugnacao(u: SessaoUsuario, processoId: string, id: string, r: { resposta: string; acolhida: boolean; alteraPropostas: boolean }) {
+  return agirNoProcesso(u, processoId, ["PUBLICACAO_EDITAL", "IMPUGNACOES"], async ({ tx, p, meta, fer }) => {
+    const lista = (meta.impugnacoes as Impugnacao[] | undefined) ?? [];
+    const alvo = lista.find((i) => i.id === id);
+    if (!alvo) throw new ErroFluxo("Impugnação não encontrada neste processo. Atualize a página e escolha outra.");
+    if (alvo.resposta?.trim()) throw new ErroFluxo("Esta impugnação já foi respondida.");
+    const resposta = texto(r.resposta, "Resposta à impugnação");
+    const respondida: Impugnacao = { ...alvo, resposta, acolhida: !!r.acolhida, alteraPropostas: !!r.acolhida && !!r.alteraPropostas, respondidaEm: hojeIso() };
+    const novo = { ...meta, impugnacoes: lista.map((i) => (i.id === id ? respondida : i)) };
+    await registrarEvento(tx, p.id, u.id, "RESPOSTA_IMPUGNACAO", {
+      dados: { id, autor: alvo.autor, tempestiva: alvo.tempestiva, resposta, acolhida: respondida.acolhida, alteraPropostas: respondida.alteraPropostas },
+    });
+    if (!(respondida.acolhida && respondida.alteraPropostas)) return gravarMeta(tx, p.id, novo);
+    // Acolhida com mudança nas propostas: o edital e as impugnações vão para o histórico e a publicação é refeita
+    const motivo = "Impugnação acolhida: republicar o edital com prazo novo";
+    if (p.estadoAtual === "IMPUGNACOES") return devolverNaTx(tx, u, p, "PUBLICACAO_EDITAL", "Republicar o edital", motivo, fer, novo);
+    await gravarMeta(tx, p.id, limparAoDevolver(novo, p.estadoAtual, "PUBLICACAO_EDITAL"));
+  });
+}
+
+/** Resultado da sessão pública. Com vencedor, os dados dele já preenchem a contratação. */
+export async function registrarResultadoSessao(u: SessaoUsuario, processoId: string, input: ResultadoSessao) {
+  if (!["VENCEDOR", "DESERTA", "FRACASSADA"].includes(input.situacao)) throw new ErroFluxo("Escolha a situação da sessão: vencedor, deserta ou fracassada.");
+  const ataEm = dataIso(input.ataEm, "Data da ata");
+  let resultado: ResultadoSessao = { situacao: input.situacao, ataEm };
+  if (input.situacao === "VENCEDOR") {
+    const cnpj = String(input.cnpj ?? "").replace(/\D/g, "");
+    const valor = Number(input.valor);
+    if (!cnpjValido(cnpj)) throw new ErroFluxo("CNPJ do vencedor inválido. Confira os 14 dígitos.");
+    if (!Number.isFinite(valor) || valor <= 0) throw new ErroFluxo("Informe o valor da proposta vencedora, maior que zero.");
+    resultado = { situacao: "VENCEDOR", fornecedor: texto(input.fornecedor, "Razão social do vencedor", 3), cnpj, valor, ataEm };
+  }
+  return agirNoProcesso(u, processoId, ["SESSAO_DISPUTA"], async ({ tx, p, meta }) => {
+    const novo: Record<string, unknown> = { ...meta, resultadoSessao: resultado };
+    if (resultado.situacao === "VENCEDOR") {
+      const atual = (meta.contratacao as Record<string, unknown> | undefined) ?? {};
+      novo.contratacao = { ...atual, fornecedor: resultado.fornecedor, cnpj: resultado.cnpj, valor: Number(resultado.valor).toFixed(2) };
+    }
+    await gravarMeta(tx, p.id, novo);
+    await registrarEvento(tx, p.id, u.id, "RESULTADO_SESSAO", { dados: { ...resultado } });
+  });
+}
+
+/** Intenção de recurso do licitante (art. 165): calcula os prazos de razões e contrarrazões. */
+export async function registrarRecurso(u: SessaoUsuario, processoId: string, input: { recorrente: string; intencaoEm: string }) {
+  return agirNoProcesso(u, processoId, ["SESSAO_DISPUTA", "RECURSOS"], async ({ tx, p, meta, fer }) => {
+    if ((meta.resultadoSessao as ResultadoSessao | undefined)?.situacao !== "VENCEDOR") throw new ErroFluxo("Registre o resultado da sessão com vencedor antes de registrar recursos.");
+    const intencaoEm = dataIso(input.intencaoEm, "Data da intenção de recorrer");
+    const rec: Recurso = { id: randomUUID(), recorrente: texto(input.recorrente, "Nome do recorrente"), intencaoEm, ...prazosRecurso(intencaoEm, fer) };
+    await gravarMeta(tx, p.id, { ...meta, recursos: [...((meta.recursos as Recurso[] | undefined) ?? []), rec] });
+    await registrarEvento(tx, p.id, u.id, "RECURSO", { dados: rec });
+  });
+}
+
+/** Decisão do recurso. Recurso provido não avança sozinho: quem decide devolve à sessão com o motivo. */
+export async function decidirRecurso(u: SessaoUsuario, processoId: string, id: string, d: { decisao: string; provido: boolean }) {
+  return agirNoProcesso(u, processoId, ["RECURSOS"], async ({ tx, p, meta }) => {
+    const lista = (meta.recursos as Recurso[] | undefined) ?? [];
+    const alvo = lista.find((r) => r.id === id);
+    if (!alvo) throw new ErroFluxo("Recurso não encontrado neste processo. Atualize a página e escolha outro.");
+    if (alvo.decididoEm) throw new ErroFluxo("Este recurso já foi decidido.");
+    const decisao = texto(d.decisao, "Decisão do recurso");
+    const decidido: Recurso = { ...alvo, decisao, provido: !!d.provido, decididoEm: hojeIso() };
+    await gravarMeta(tx, p.id, { ...meta, recursos: lista.map((r) => (r.id === id ? decidido : r)) });
+    await registrarEvento(tx, p.id, u.id, "DECISAO_RECURSO", { dados: { id, recorrente: alvo.recorrente, decisao, provido: decidido.provido } });
+  });
+}
+
+/** Aviso de contratação direta por dispensa de valor (art. 75, §3º), ou justificativa de por que não houve aviso. */
+export async function publicarAvisoDispensa(u: SessaoUsuario, processoId: string, input: AvisoDispensa) {
+  const publicadoEm = input.publicadoEm?.trim() ? dataIso(input.publicadoEm, "Data de publicação do aviso") : undefined;
+  const justificativaSemAviso = input.justificativaSemAviso?.trim() || undefined;
+  if (!publicadoEm && !justificativaSemAviso) throw new ErroFluxo(`Informe a data de publicação do aviso ou uma justificativa de pelo menos ${MIN_JUSTIFICATIVA} caracteres.`);
+  if (justificativaSemAviso && justificativaSemAviso.length < MIN_JUSTIFICATIVA) throw new ErroFluxo(`Justificativa: escreva pelo menos ${MIN_JUSTIFICATIVA} caracteres.`);
+  return agirNoProcesso(u, processoId, ["INSTRUCAO_DIRETA"], async ({ tx, p, meta }) => {
+    const aviso: AvisoDispensa = { ...(publicadoEm ? { publicadoEm } : {}), ...(justificativaSemAviso ? { justificativaSemAviso } : {}) };
+    await gravarMeta(tx, p.id, { ...meta, avisoDispensa: aviso });
+    await registrarEvento(tx, p.id, u.id, "AVISO_DISPENSA", { dados: { ...aviso } });
+  });
+}
+
+/**
+ * Retorno do banco sobre o pagamento enviado. Aceito: o processo vai a PAGO. Rejeitado: volta à fila de pagamentos com o motivo,
+ * a rejeição sai de `metadados.retornoBancario` (vai para `historicoRetornos`) e o reenvio começa limpo. A posição na fila não muda:
+ * ela vem da data da liquidação, não da data da devolução (ver `filaDePagamentos`).
+ */
+export async function registrarRetornoBancario(u: SessaoUsuario, processoId: string, input: { aceito: boolean; autenticacao?: string; motivo?: string }) {
+  const p0 = await carregarProcesso(u.municipioId, processoId);
+  if (p0 && !p0.encerradoEm && p0.estadoAtual !== "PAGAMENTO_ENVIADO" && podeAgir(u, p0))
+    throw new ErroFluxo("O retorno do banco só se registra com o pagamento enviado. Este processo não está aguardando retorno: se o pagamento já foi confirmado ou devolvido à fila, não há o que registrar.");
+  return agirNoProcesso(u, processoId, ["PAGAMENTO_ENVIADO"], async ({ tx, p, meta, fer }) => {
+    if (meta.retornoBancario) throw new ErroFluxo("Já existe retorno do banco para este envio.");
+    const retorno: RetornoBancario = { aceito: !!input.aceito, em: new Date().toISOString() };
+    if (input.aceito) {
+      if (input.autenticacao?.trim()) retorno.autenticacao = input.autenticacao.trim();
+    } else {
+      retorno.motivo = texto(input.motivo, "Motivo da recusa do banco");
+    }
+    await registrarEvento(tx, p.id, u.id, "RETORNO_BANCARIO", { dados: { ...retorno } });
+    if (retorno.aceito) {
+      const pago = getEstado(p.def, "PAGO")!;
+      return moverEstado(tx, u, p, pago, fer, "MUDANCA_ESTADO", { rotulo: "Banco confirmou o pagamento", despacho: retorno.autenticacao ?? null }, { meta: { ...meta, retornoBancario: retorno }, encerra: true });
+    }
+    await devolverNaTx(tx, u, p, "FILA_PAGAMENTO", "Banco recusou", `Banco recusou: ${retorno.motivo}`, fer, { ...meta, retornoBancario: retorno });
   });
 }
 

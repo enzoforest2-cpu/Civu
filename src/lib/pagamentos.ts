@@ -40,13 +40,14 @@ export async function filaDePagamentos(municipioId: string) {
   const estados = await estadosDeFila(municipioId);
   const lista = await db.query.processos.findMany({
     where: eq(processos.municipioId, municipioId),
-    with: { eventos: { columns: { paraEstado: true, criadoEm: true, seq: true } } },
+    with: { eventos: { columns: { paraEstado: true, deEstado: true, criadoEm: true, seq: true } } },
   });
   const itens: Omit<ItemFila, "posicao">[] = [];
   for (const p of lista) {
     const cfg = estados.get(p.tipoId);
     if (!cfg || p.estadoAtual !== cfg.fila || p.encerradoEm) continue;
-    const entrada = [...p.eventos].sort((a, b) => b.seq - a.seq).find((e) => e.paraEstado === cfg.fila);
+    // A posição é a data da liquidação: a volta do banco (deEstado = estado de envio) não conta como nova entrada na fila.
+    const entrada = [...p.eventos].sort((a, b) => b.seq - a.seq).find((e) => e.paraEstado === cfg.fila && e.deEstado !== cfg.pago);
     const c = ((p.metadados as Record<string, unknown> | null)?.contratacao ?? {}) as Contratacao;
     const fonte = c.fonte ?? "SEM_FONTE";
     itens.push({
