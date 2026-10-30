@@ -3,7 +3,8 @@
 // Aumente DEMO_VERSAO sempre que mudar dados de demonstração: o deploy recria a base de exemplo.
 import type { ModuloDemo } from "./contexto";
 import { portalDemo } from "./portal";
+import { servicosDemo } from "../../modulos/servicos/demo";
 
 export const DEMO_VERSAO = 2;
 
-export const MODULOS_DEMO: ModuloDemo[] = [portalDemo];
+export const MODULOS_DEMO: ModuloDemo[] = [portalDemo, servicosDemo];
