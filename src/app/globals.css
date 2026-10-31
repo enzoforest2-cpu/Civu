@@ -39,7 +39,7 @@
   --color-warn-soft: #fff1d6;
   --color-bad: #c0272f;
   --color-bad-soft: #fde6e8;
-  /* tons escuros para hover de fundos com texto branco: warn-2 8,8:1 e bad-2 8,1:1 com branco */
+  /* tons escuros para hover de fundos com texto branco: warn-2 9,0:1 e bad-2 8,4:1 com branco */
   --color-warn-2: #6b3f00;
   --color-bad-2: #961d24;
 }
