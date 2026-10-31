@@ -2,10 +2,12 @@
 // Executar: npm run db:seed
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { WORKFLOWS_PADRAO, type WorkflowDef } from "../lib/workflow";
+import { WORKFLOWS_PADRAO } from "../lib/workflow";
+import type { CompraDemo } from "./demo/compras";
+import { COMPRAS_CONFORMIDADE, cnpj } from "./valor";
 import type { DemoCtx } from "./demo/contexto";
 
 export const SLUG_DEMO = "vale-das-araucarias";
@@ -75,7 +77,7 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     ["88888888888", "Dr. Marcos Secretário", "saude@valedasaraucarias.rs.gov.br", "Secretário de Saúde", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SESAU"],
     ["99999999999", "Fernanda Requisitante", "ubs@valedasaraucarias.rs.gov.br", "Coordenadora de UBS", ["REQUISITANTE"], "SESAU"],
     ["10101010101", "Paulo Educação", "educacao@valedasaraucarias.rs.gov.br", "Secretário de Educação", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SEDUC"],
-    ["12121212121", "Sandra Administração", "admin@valedasaraucarias.rs.gov.br", "Secretária de Administração", ["SECRETARIO", "REQUISITANTE", "ORDENADOR"], "SEMAD"],
+    ["12121212121", "Sandra Administração", "admin@valedasaraucarias.rs.gov.br", "Secretária de Administração", ["SECRETARIO", "REQUISITANTE", "ORDENADOR", "FISCAL"], "SEMAD"],
   ];
   // usuário de sistema que registra o que chega pelo portal e pelo WhatsApp (não faz login)
   usuariosDef.push(["00000000000", "Atendimento digital", "atendimento@valedasaraucarias.rs.gov.br", "Canal digital", ["PROTOCOLO"], "PROT"]);
@@ -106,281 +108,13 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     { municipioId: mun.id, data: `${ano}-12-25`, nome: "Natal" },
   ]);
 
-  // ---- processos de exemplo, com eventos encadeados em datas passadas ----
-  const compra = WORKFLOWS_PADRAO[0].definicao as WorkflowDef;
-  let seqNum = 0;
+  // ---- processos de compra de exemplo, criados pelo motor em datas passadas (src/db/demo/compras.ts) ----
   const dia = (n: number) => new Date(Date.now() - n * 86400_000);
-
-  type Passo = { estado: string; setor: string; diasAtras: number; devolucao?: string };
-  async function criarCompra(
-    assunto: string,
-    requisitante: string,
-    setorReq: string,
-    meta: Record<string, unknown>,
-    passos: Passo[],
-    opts: { urgencia?: string; recebido?: boolean; prazoAtrasado?: boolean; encerrado?: boolean; docs?: [string, string, string][] } = {},
-  ) {
-    seqNum += 1;
-    const numero = `${ano}/${String(seqNum).padStart(6, "0")}`;
-    const ultimo = passos[passos.length - 1];
-    const [p] = await db
-      .insert(schema.processos)
-      .values({
-        municipioId: mun.id,
-        unidadeGestoraId: ug.id,
-        tipoId: tipos.COMPRA,
-        ano,
-        sequencial: seqNum,
-        numero,
-        assunto,
-        descricao: String(meta.justificativa ?? ""),
-        urgencia: opts.urgencia ?? "NORMAL",
-        estadoAtual: ultimo.estado,
-        setorAtualId: setores[ultimo.setor],
-        recebidoEm: opts.recebido === false ? null : dia(ultimo.diasAtras),
-        prazoEtapaEm: opts.prazoAtrasado ? dia(3) : new Date(Date.now() + 4 * 86400_000),
-        abertoPorId: usuarios[requisitante],
-        abertoEm: dia(passos[0].diasAtras),
-        encerradoEm: opts.encerrado ? dia(ultimo.diasAtras) : null,
-        metadados: meta,
-      })
-      .returning();
-    let hashAnterior: string | null = null;
-    let seq = 0;
-    for (let i = 0; i < passos.length; i++) {
-      const ps = passos[i];
-      const anterior = passos[i - 1];
-      seq += 1;
-      const tipo = i === 0 ? "ABERTURA" : ps.devolucao ? "DEVOLUCAO" : ps.estado === "ARQUIVADO" ? "ENCERRAMENTO" : "MUDANCA_ESTADO";
-      const criadoEm = dia(ps.diasAtras);
-      const campos: Record<string, unknown> = { paraEstado: ps.estado, paraSetorId: setores[ps.setor] };
-      if (anterior) {
-        campos.deEstado = anterior.estado;
-        campos.deSetorId = setores[anterior.setor];
-      }
-      campos.dados = ps.devolucao ? { rotulo: ps.devolucao, motivo: ps.devolucao } : i === 0 ? { numero, tipo: "COMPRA" } : { rotulo: "Avanço" };
-      const corpo = canon({ processoId: p.id, seq, tipo, autorId: usuarios[requisitante], ...campos, criadoEm: criadoEm.toISOString() });
-      const hash = sha((hashAnterior ?? "") + corpo);
-      await db
-        .insert(schema.eventos)
-        .values({
-          processoId: p.id,
-          seq,
-          tipo,
-          autorId: usuarios[requisitante],
-          deEstado: (campos.deEstado as string) ?? null,
-          paraEstado: ps.estado,
-          deSetorId: (campos.deSetorId as string) ?? null,
-          paraSetorId: setores[ps.setor],
-          dados: campos.dados as object,
-          hashAnterior,
-          hash,
-          criadoEm,
-        });
-      hashAnterior = hash;
-    }
-    for (const [tipo, titulo, conteudo] of opts.docs ?? []) {
-      await db
-        .insert(schema.documentos)
-        .values({ processoId: p.id, tipo, titulo, conteudo, hash: sha(conteudo), criadoPorId: usuarios[requisitante], criadoEm: dia(passos[0].diasAtras) });
-    }
-    return p;
-  }
-
-  const dfdTexto = (obj: string) =>
-    `DOCUMENTO DE FORMALIZAÇÃO DE DEMANDA\n\nObjeto: ${obj}\nJustificativa: atendimento da demanda da unidade conforme planejamento.\nQuantidade: conforme planilha anexa.\nPrioridade: ALTA.`;
-
-  // 1. Compra parada na contabilidade há dias (atrasada, não recebida)
-  await criarCompra(
-    "Aquisição de medicamentos básicos para as UBS",
-    "99999999999",
-    "SESAU",
-    {
-      objeto: "Medicamentos da RENAME para 4 UBS",
-      justificativa: "Estoque da farmácia básica abaixo de 15 dias de cobertura.",
-      quantidade: "lote trimestral",
-      valorEstimado: 184500,
-      dataPretendida: `${ano}-12-01`,
-      prioridade: "ALTA",
-      noPCA: "SIM",
-    },
-    [
-      { estado: "DEMANDA", setor: "SESAU", diasAtras: 21 },
-      { estado: "APROVACAO_SECRETARIO", setor: "SESAU", diasAtras: 21 },
-      { estado: "AUTUACAO", setor: "PROT", diasAtras: 20 },
-      { estado: "AUTORIZACAO", setor: "GAB", diasAtras: 19 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 17 },
-      { estado: "VERIFICACAO_ORCAMENTARIA", setor: "CONTAB", diasAtras: 9 },
-    ],
-    {
-      urgencia: "URGENTE",
-      recebido: false,
-      prazoAtrasado: true,
-      docs: [
-        ["DFD", "DFD — medicamentos UBS", dfdTexto("Medicamentos da RENAME")],
-        ["DESPACHO_AUTORIZACAO", "Autorizo o prosseguimento", "Autorizo a instrução do processo. Prefeita."],
-        ["ETP", "ETP — medicamentos", "Estudo técnico preliminar..."],
-        ["TR", "Termo de referência", "Termo de referência..."],
-        [
-          "PESQUISA_PRECOS",
-          "Pesquisa de preços (3 fontes)",
-          "BPS: R$ 180.200; contratação similar Sobral: R$ 186.900; cotação fornecedor: R$ 190.100. Média: R$ 185.733.",
-        ],
-      ],
-    },
-  );
-
-  // 2. Compra devolvida pelo controle interno (em instrução de novo)
-  await criarCompra(
-    "Contratação de serviço de transporte escolar — rota rural",
-    "10101010101",
-    "SEDUC",
-    {
-      objeto: "Transporte escolar 3 rotas rurais",
-      justificativa: "Fim do contrato anterior em dezembro.",
-      quantidade: "3 rotas, 200 dias letivos",
-      valorEstimado: 612000,
-      dataPretendida: `${ano + 1}-02-01`,
-      prioridade: "ALTA",
-      noPCA: "SIM",
-    },
-    [
-      { estado: "DEMANDA", setor: "SEDUC", diasAtras: 40 },
-      { estado: "APROVACAO_SECRETARIO", setor: "SEDUC", diasAtras: 40 },
-      { estado: "AUTUACAO", setor: "PROT", diasAtras: 39 },
-      { estado: "AUTORIZACAO", setor: "GAB", diasAtras: 38 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 36 },
-      { estado: "VERIFICACAO_ORCAMENTARIA", setor: "CONTAB", diasAtras: 25 },
-      { estado: "RESERVADO", setor: "CONTAB", diasAtras: 24 },
-      { estado: "CONTROLE_INTERNO", setor: "CGM", diasAtras: 23 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 20, devolucao: "Saneamento: devolver a compras" },
-    ],
-    {
-      docs: [
-        ["DFD", "DFD — transporte escolar", dfdTexto("Transporte escolar")],
-        ["DESPACHO_AUTORIZACAO", "Autorizo", "Autorizo."],
-        ["ETP", "ETP", "..."],
-        ["TR", "TR", "..."],
-        ["PESQUISA_PRECOS", "Pesquisa de preços", "..."],
-        ["CERTIDAO_DOTACAO", "Certidão de dotação", "12.361.0012.2034 — 3.3.90.39 — fonte 1540. Saldo: R$ 700.000."],
-        ["NOTA_RESERVA", "Nota de reserva 0045", "Reserva R$ 612.000"],
-      ],
-    },
-  );
-
-  // 3. Compra em parecer jurídico
-  await criarCompra(
-    "Reforma da cobertura da Escola Municipal Padre Cícero",
-    "10101010101",
-    "SEDUC",
-    {
-      objeto: "Reforma de telhado, 850 m²",
-      justificativa: "Infiltrações em 6 salas.",
-      quantidade: "1 obra",
-      valorEstimado: 128000,
-      dataPretendida: `${ano}-12-15`,
-      prioridade: "MEDIA",
-      noPCA: "NAO",
-    },
-    [
-      { estado: "DEMANDA", setor: "SEDUC", diasAtras: 30 },
-      { estado: "APROVACAO_SECRETARIO", setor: "SEDUC", diasAtras: 30 },
-      { estado: "AUTUACAO", setor: "PROT", diasAtras: 29 },
-      { estado: "AUTORIZACAO", setor: "GAB", diasAtras: 29 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 27 },
-      { estado: "VERIFICACAO_ORCAMENTARIA", setor: "CONTAB", diasAtras: 15 },
-      { estado: "RESERVADO", setor: "CONTAB", diasAtras: 14 },
-      { estado: "CONTROLE_INTERNO", setor: "CGM", diasAtras: 13 },
-      { estado: "PARECER_JURIDICO", setor: "PGM", diasAtras: 8 },
-    ],
-    { prazoAtrasado: true },
-  );
-
-  // 4. Compra em execução (aguardando atesto)
-  await criarCompra(
-    "Aquisição de gêneros alimentícios — merenda escolar",
-    "10101010101",
-    "SEDUC",
-    {
-      objeto: "Gêneros alimentícios PNAE",
-      justificativa: "Alimentação escolar do 2º semestre.",
-      quantidade: "ver TR",
-      valorEstimado: 310000,
-      dataPretendida: `${ano}-08-01`,
-      prioridade: "ALTA",
-      noPCA: "SIM",
-    },
-    [
-      { estado: "DEMANDA", setor: "SEDUC", diasAtras: 120 },
-      { estado: "APROVACAO_SECRETARIO", setor: "SEDUC", diasAtras: 120 },
-      { estado: "AUTUACAO", setor: "PROT", diasAtras: 119 },
-      { estado: "AUTORIZACAO", setor: "GAB", diasAtras: 118 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 116 },
-      { estado: "VERIFICACAO_ORCAMENTARIA", setor: "CONTAB", diasAtras: 100 },
-      { estado: "RESERVADO", setor: "CONTAB", diasAtras: 99 },
-      { estado: "CONTROLE_INTERNO", setor: "CGM", diasAtras: 98 },
-      { estado: "PARECER_JURIDICO", setor: "PGM", diasAtras: 95 },
-      { estado: "SESSAO_DISPUTA", setor: "COMPRAS", diasAtras: 88 },
-      { estado: "HOMOLOGADO", setor: "GAB", diasAtras: 60 },
-      { estado: "EMPENHADO", setor: "CONTAB", diasAtras: 59 },
-      { estado: "CONTRATADO", setor: "COMPRAS", diasAtras: 58 },
-      { estado: "EXECUCAO", setor: "SEDUC", diasAtras: 50 },
-    ],
-  );
-
-  // 5. Compra concluída (paga e arquivada)
-  await criarCompra(
-    "Material de expediente para a Secretaria de Administração",
-    "12121212121",
-    "SEMAD",
-    {
-      objeto: "Papel A4, toner e material de escritório",
-      justificativa: "Reposição semestral.",
-      quantidade: "ver planilha",
-      valorEstimado: 23800,
-      dataPretendida: `${ano}-06-01`,
-      prioridade: "BAIXA",
-      noPCA: "SIM",
-    },
-    [
-      { estado: "DEMANDA", setor: "SEMAD", diasAtras: 160 },
-      { estado: "APROVACAO_SECRETARIO", setor: "SEMAD", diasAtras: 160 },
-      { estado: "AUTUACAO", setor: "PROT", diasAtras: 159 },
-      { estado: "AUTORIZACAO", setor: "GAB", diasAtras: 159 },
-      { estado: "INSTRUCAO", setor: "COMPRAS", diasAtras: 157 },
-      { estado: "VERIFICACAO_ORCAMENTARIA", setor: "CONTAB", diasAtras: 150 },
-      { estado: "RESERVADO", setor: "CONTAB", diasAtras: 149 },
-      { estado: "CONTROLE_INTERNO", setor: "CGM", diasAtras: 148 },
-      { estado: "PARECER_JURIDICO", setor: "PGM", diasAtras: 146 },
-      { estado: "INSTRUCAO_DIRETA", setor: "COMPRAS", diasAtras: 140 },
-      { estado: "AUTORIZACAO_DIRETA", setor: "GAB", diasAtras: 125 },
-      { estado: "EMPENHADO", setor: "CONTAB", diasAtras: 124 },
-      { estado: "CONTRATADO", setor: "COMPRAS", diasAtras: 122 },
-      { estado: "EXECUCAO", setor: "SEMAD", diasAtras: 120 },
-      { estado: "LIQUIDADO", setor: "CONTAB", diasAtras: 100 },
-      { estado: "FILA_PAGAMENTO", setor: "TES", diasAtras: 98 },
-      { estado: "PAGAMENTO_ENVIADO", setor: "TES", diasAtras: 76 },
-      { estado: "PAGO", setor: "TES", diasAtras: 75 },
-      { estado: "ARQUIVADO", setor: "PROT", diasAtras: 74 },
-    ],
-    { encerrado: true },
-  );
-
-  // 6. Demanda recém-aberta, sem DFD assinado
-  await criarCompra(
-    "Aquisição de 2 ar-condicionados para a UBS Centro",
-    "99999999999",
-    "SESAU",
-    {
-      objeto: "2 aparelhos split 18.000 BTU",
-      justificativa: "Sala de vacina sem climatização adequada.",
-      quantidade: "2",
-      valorEstimado: 7800,
-      dataPretendida: `${ano}-12-20`,
-      prioridade: "MEDIA",
-      noPCA: "NAO",
-    },
-    [{ estado: "DEMANDA", setor: "SESAU", diasAtras: 1 }],
+  const { criarComprasDemo } = await import("./demo/compras");
+  const baseCompras = { municipioId: mun.id, usuarios, tipos, ugs: { "01": ug.id, "02": ug2.id }, setores };
+  await criarComprasDemo(db, baseCompras, COMPRAS_SEED(ano));
+  let seqNum = Number(
+    (await db.select({ n: sql<number>`coalesce(max(${schema.processos.sequencial}), 0)` }).from(schema.processos).where(and(eq(schema.processos.municipioId, mun.id), eq(schema.processos.ano, ano))))[0].n,
   );
 
   // 7. Requerimento de tramitação livre
@@ -453,7 +187,8 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     }
   }
 
-  await db.execute(sql`select 1`);
+  // compras que alimentam o limite de dispensa, a fila cronológica e as obrigações (PNCP e TCE)
+  await criarComprasDemo(db, baseCompras, COMPRAS_CONFORMIDADE(ano));
 
   // ---- pessoas e empresas fictícias dos portais ----
   const end = (logradouro: string, numero: string, bairro: string) => ({ logradouro, numero, bairro, cidade: "Vale das Araucárias", uf: "RS", cep: "95200-000" });
@@ -507,4 +242,95 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     empresas,
     dia,
   };
+}
+
+/** Compras de exemplo do município: uma em cada situação típica (atrasada, devolvida, em parecer, em execução, paga, recém-aberta). */
+function COMPRAS_SEED(ano: number): CompraDemo[] {
+  return [
+    {
+      // 1. Parada na contabilidade há dias (atrasada, não recebida)
+      assunto: "Aquisição de medicamentos básicos para as UBS",
+      req: "99999999999",
+      meta: {
+        objeto: "Medicamentos da RENAME para 4 UBS", natureza: "MEDICAMENTOS", modalidade: "LICITACAO",
+        justificativa: "Estoque da farmácia básica abaixo de 15 dias de cobertura.", quantidade: "lote trimestral",
+        valorEstimado: 184500, dataPretendida: `${ano}-12-01`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "VERIFICACAO_ORCAMENTARIA",
+      periodo: [21, 9],
+      urgencia: "URGENTE",
+      recebido: false,
+    },
+    {
+      // 2. Devolvida pelo controle interno para saneamento (em instrução de novo)
+      assunto: "Contratação de serviço de transporte escolar — rota rural",
+      req: "10101010101",
+      meta: {
+        objeto: "Transporte escolar 3 rotas rurais", natureza: "TRANSPORTE", modalidade: "LICITACAO",
+        justificativa: "Fim do contrato anterior em dezembro.", quantidade: "3 rotas, 200 dias letivos",
+        valorEstimado: 612000, dataPretendida: `${ano + 1}-02-01`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "CONTROLE_INTERNO",
+      periodo: [40, 23],
+      atual: ["CHECKLIST_CI"],
+      devolucao: {
+        para: "INSTRUCAO",
+        motivo: "ETP sem o mapa de riscos e termo de referência sem a quilometragem de cada rota, que sustenta o preço estimado. Complementar e reenviar.",
+        diasAtras: 6,
+      },
+    },
+    {
+      // 3. Em parecer jurídico, com o prazo vencido
+      assunto: "Reforma da cobertura da Escola Municipal Padre Cícero",
+      req: "10101010101",
+      meta: {
+        objeto: "Reforma de telhado, 850 m²", natureza: "SERVICO_ENGENHARIA", modalidade: "DISPENSA_VALOR",
+        justificativa: "Infiltrações em 6 salas.", quantidade: "1 obra",
+        valorEstimado: 128000, dataPretendida: `${ano}-12-15`, prioridade: "MEDIA", noPCA: "NAO",
+      },
+      ate: "PARECER_JURIDICO",
+      periodo: [30, 8],
+    },
+    {
+      // 4. Em execução: ordem de fornecimento e nota fiscal com o fiscal, aguardando o atesto
+      assunto: "Aquisição de gêneros alimentícios — merenda escolar",
+      req: "10101010101",
+      meta: {
+        objeto: "Gêneros alimentícios PNAE", natureza: "GENEROS_ALIMENTICIOS", modalidade: "LICITACAO",
+        justificativa: "Alimentação escolar do 2º semestre.", quantidade: "ver TR",
+        valorEstimado: 310000, dataPretendida: `${ano}-08-01`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "EXECUCAO",
+      periodo: [120, 50],
+      contratacao: { fornecedor: "Cooperativa Agricultura Familiar do Vale Ltda", cnpj: cnpj("234561780001"), valor: "298400.00", fonte: "EDUCACAO" },
+      atual: ["ORDEM_FORNECIMENTO", "ENVIO_FISCAL", "NOTA_FISCAL"],
+    },
+    {
+      // 5. Concluída: paga, com remessa ao TCE, e arquivada
+      assunto: "Material de expediente para a Secretaria de Administração",
+      req: "12121212121",
+      meta: {
+        objeto: "Papel A4, toner e material de escritório", natureza: "MATERIAL_EXPEDIENTE", modalidade: "DISPENSA_VALOR",
+        justificativa: "Reposição semestral.", quantidade: "ver planilha",
+        valorEstimado: 23800, dataPretendida: `${ano}-06-01`, prioridade: "BAIXA", noPCA: "SIM",
+      },
+      ate: "ARQUIVADO",
+      periodo: [160, 74],
+      contratacao: { fornecedor: "Papelaria Central do Norte Ltda", cnpj: cnpj("112223330001"), valor: "23800.00", fonte: "ORDINARIOS" },
+      remessa: true,
+    },
+    {
+      // 6. Demanda recém-aberta: DFD juntado, ainda sem assinatura
+      assunto: "Aquisição de 2 ar-condicionados para a UBS Centro",
+      req: "99999999999",
+      meta: {
+        objeto: "2 aparelhos split 18.000 BTU", natureza: "EQUIPAMENTOS", modalidade: "DISPENSA_VALOR",
+        justificativa: "Sala de vacina sem climatização adequada.", quantidade: "2",
+        valorEstimado: 7800, dataPretendida: `${ano}-12-20`, prioridade: "MEDIA", noPCA: "NAO",
+      },
+      ate: "DEMANDA",
+      periodo: [1, 1],
+      atual: ["DFD"],
+    },
+  ];
 }
