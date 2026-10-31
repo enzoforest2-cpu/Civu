@@ -1,6 +1,7 @@
 // Dados de demonstração do módulo de finanças para o município fictício de ~38 mil habitantes na Serra gaúcha.
 // Receita anual prevista de ~R$ 233 milhões (bruta), pessoal perto de 50% da RCL, saúde ~22% e educação ~27%.
 // A execução vai de janeiro até hoje; os processos de compra da demonstração recebem reservas e empenhos coerentes.
+import { randomUUID } from "crypto";
 import { eq, inArray } from "drizzle-orm";
 import type { DemoCtx, ModuloDemo } from "../../db/demo/contexto";
 import {
@@ -285,32 +286,34 @@ export const financasDemo: ModuloDemo = {
     const chaveDot = (u: string, acao: string, nat: string, fonte: string) => `${u}|${acao}|${nat}|${fonte}`;
     const dotId: Record<string, string> = {};
     const dotValor: Record<string, number> = {};
+    // dotações gravadas num insert só, com os ids gerados aqui
+    const dotRows: (typeof finDotacoes.$inferInsert)[] = [];
     for (const [u, fn, sub, prog, acao, nat, fonte, mil] of DOTACOES) {
       const un = UNIDADES[u];
-      const [d] = await db
-        .insert(finDotacoes)
-        .values({
-          municipioId,
-          unidadeGestoraId: ctx.ugs[un.ug],
-          ano,
-          orgao: un.orgao,
-          orgaoNome: un.orgaoNome,
-          unidade: un.unidade,
-          unidadeNome: un.unidadeNome,
-          funcao: fn,
-          subfuncao: sub,
-          programa: prog,
-          programaNome: PROGRAMAS[prog],
-          acao,
-          acaoNome: ACOES[acao],
-          natureza: nat,
-          fonte,
-          valorInicial: mil * 1000,
-        })
-        .returning();
+      const d = { id: randomUUID() };
+      dotRows.push({
+        id: d.id,
+        municipioId,
+        unidadeGestoraId: ctx.ugs[un.ug],
+        ano,
+        orgao: un.orgao,
+        orgaoNome: un.orgaoNome,
+        unidade: un.unidade,
+        unidadeNome: un.unidadeNome,
+        funcao: fn,
+        subfuncao: sub,
+        programa: prog,
+        programaNome: PROGRAMAS[prog],
+        acao,
+        acaoNome: ACOES[acao],
+        natureza: nat,
+        fonte,
+        valorInicial: mil * 1000,
+      });
       dotId[chaveDot(u, acao, nat, fonte)] = d.id;
       dotValor[d.id] = mil * 1000;
     }
+    await db.insert(finDotacoes).values(dotRows);
     const D = (u: string, acao: string, nat: string, fonte: string) => {
       const id = dotId[chaveDot(u, acao, nat, fonte)];
       if (!id) throw new Error(`Dotação não encontrada: ${u} ${acao} ${nat} ${fonte}`);

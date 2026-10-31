@@ -55,9 +55,28 @@ async function main() {
   const atual = (await q<{ versao: number }>(`select versao from tramite.demo_versao where id = 1`))[0]?.versao ?? 0;
   if (atual >= DEMO_VERSAO && !forcar) return console.log(`Demonstração na versão ${atual}; nada a fazer.`);
 
+  // Antes de apagar qualquer coisa: as compras da demonstração cabem nas datas de hoje? (períodos, prazo do edital, aviso da dispensa, quebra de ordem)
+  const { validarCompras, hojeDaCarga } = await import("./demo/compras");
+  const { feriadosDemo } = await import("./demo/feriados");
+  const { COMPRAS_SEED } = await import("./seed");
+  const { COMPRAS_CONFORMIDADE: CONFORMIDADE } = await import("./valor");
+  const { WORKFLOW_COMPRA } = await import("../lib/workflow");
+  const regras = await import("../lib/regras-fluxo");
+  const ano = new Date().getFullYear();
+  const hoje = hojeDaCarga();
+  const conferencia = validarCompras([...COMPRAS_SEED(ano), ...CONFORMIDADE(ano)], WORKFLOW_COMPRA, hoje, new Set(feriadosDemo(ano).map((f) => f.data)), regras);
+  for (const a of conferencia.avisos) console.log(`Aviso: ${a}`);
+  if (conferencia.problemas.length) {
+    throw new Error(`Demonstração não recarregada (nada foi apagado): as datas de ${hoje} não comportam as compras de exemplo.\n- ${conferencia.problemas.join("\n- ")}`);
+  }
+  console.log(`Datas da demonstração conferidas para ${hoje} (${conferencia.planos.length} compras).`);
+
   const tabelas = (await q<{ t: string }>(`select tablename t from pg_tables where schemaname = 'tramite' and tablename <> 'demo_versao'`)).map((r) => `tramite."${r.t}"`);
   if (tabelas.length) await q(`truncate ${tabelas.join(", ")} restart identity cascade`);
 
+  // Feriados e setores não mudam durante a carga: o motor os lê uma vez só
+  const { cacheDeCarga } = await import("../lib/engine");
+  cacheDeCarga(true);
   const { seedBase } = await import("./seed");
   const ctx = await seedBase(db);
   console.log("Município de exemplo criado.");
@@ -77,6 +96,7 @@ async function main() {
     await m.aplicar(ctx);
     console.log(`Demonstração: ${m.nome}.`);
   }
+  cacheDeCarga(false);
   await q(`insert into tramite.demo_versao (id, versao) values (1, ${DEMO_VERSAO}) on conflict (id) do update set versao = excluded.versao, aplicada_em = now()`);
   console.log(`Demonstração atualizada para a versão ${DEMO_VERSAO}.`);
 }

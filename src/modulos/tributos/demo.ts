@@ -1,6 +1,7 @@
 // Dados de demonstração do módulo de tributos: cidade da Serra gaúcha com ~300 imóveis, IPTU do exercício,
 // ~80 ITBIs em 24 meses, inscrições municipais com alvarás, ISS, dívida ativa e parcelamentos.
 // Determinístico na estrutura (gerador com semente); as datas acompanham o dia em que a carga é feita.
+import { randomUUID } from "crypto";
 import type { DemoCtx, ModuloDemo } from "@/db/demo/contexto";
 import * as s from "@/db/schema";
 import { WORKFLOW_ALVARA, CHAVE_FLUXO_ALVARA, SIGLA_SETOR_TRIBUTOS } from "./fluxo";
@@ -274,6 +275,10 @@ export const tributosDemo: ModuloDemo = {
     vendidos.sort((a, b) => a.data.getTime() - b.data.getTime());
     const transacoes: { bairro: string; uso: string; m2: number; data: Date }[] = [];
     const contItbi: Record<number, number> = {};
+    // gravados em lote depois do laço (três inserts em vez de três por venda)
+    const lancItbi: (typeof s.tribLancamentos.$inferInsert)[] = [];
+    const parcItbi: (typeof s.tribParcelas.$inferInsert)[] = [];
+    const itbis: (typeof s.tribItbi.$inferInsert)[] = [];
     for (const v of vendidos) {
       const im = v.im;
       const lin = linhas[imoveis.indexOf(im)];
@@ -299,25 +304,24 @@ export const tributosDemo: ModuloDemo = {
       let lancamentoId: string | null = null;
       const quitadoEm = v.situacao === "PAGO" ? new Date(v.data.getTime() + Math.floor(entre(2, 12)) * 86400000) : null;
       if (avaliado) {
-        const [l] = await db
-          .insert(s.tribLancamentos)
-          .values({
-            municipioId: mid,
-            tributo: "ITBI",
-            exercicio: exAno,
-            imovelId: im.id,
-            contribuintePessoaId: v.comprador.id,
-            descricao: `${numero} — ${lin.logradouro}, ${lin.numero}${lin.complemento ? " " + lin.complemento : ""}`,
-            baseCalculo: mem.baseCalculo,
-            aliquota: ITBI_ALIQUOTA,
-            valor: mem.valorImposto,
-            memoria: mem,
-            situacao: quitadoEm ? "PAGO" : "ABERTO",
-            lancadoEm: new Date(v.data.getTime() + 86400000),
-          })
-          .returning();
+        const l = { id: randomUUID() };
+        lancItbi.push({
+          id: l.id,
+          municipioId: mid,
+          tributo: "ITBI",
+          exercicio: exAno,
+          imovelId: im.id,
+          contribuintePessoaId: v.comprador.id,
+          descricao: `${numero} — ${lin.logradouro}, ${lin.numero}${lin.complemento ? " " + lin.complemento : ""}`,
+          baseCalculo: mem.baseCalculo,
+          aliquota: ITBI_ALIQUOTA,
+          valor: mem.valorImposto,
+          memoria: mem,
+          situacao: quitadoEm ? "PAGO" : "ABERTO",
+          lancadoEm: new Date(v.data.getTime() + 86400000),
+        });
         lancamentoId = l.id;
-        await db.insert(s.tribParcelas).values({
+        parcItbi.push({
           lancamentoId: l.id,
           numero: 0,
           vencimento: iso(new Date(v.data.getTime() + 31 * 86400000)),
@@ -327,7 +331,7 @@ export const tributosDemo: ModuloDemo = {
           valorPago: quitadoEm ? mem.valorImposto : null,
         });
       }
-      await db.insert(s.tribItbi).values({
+      itbis.push({
         municipioId: mid,
         numero,
         imovelId: im.id!,
@@ -365,6 +369,9 @@ export const tributosDemo: ModuloDemo = {
         (im as ImovelGerado & { trocouEm?: Date }).trocouEm = quitadoEm;
       }
     }
+    if (lancItbi.length) await db.insert(s.tribLancamentos).values(lancItbi);
+    if (parcItbi.length) await db.insert(s.tribParcelas).values(parcItbi);
+    if (itbis.length) await db.insert(s.tribItbi).values(itbis);
 
     // ---- proprietários ----
     const props: (typeof s.tribProprietarios.$inferInsert)[] = [];

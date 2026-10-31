@@ -3,7 +3,7 @@
 // e as assinaturas que as travas de cada etapa exigem, e para na etapa indicada sem o trabalho dela feito
 // (salvo o que `atual` listar). Assim a demonstração nunca mostra documento de etapa futura nem documento
 // de etapa vencida sem a assinatura exigida, e a cadeia de eventos é a do motor.
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { SessaoUsuario } from "../../lib/auth";
 import { caminhoDoProcesso, type Papel, type WorkflowDef } from "../../lib/workflow";
@@ -71,20 +71,173 @@ export function planejar(caminho: string[], inicio: number, fim: number): number
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Datas da demonstração: planejadas e conferidas antes de qualquer gravação (src/db/deploy.ts valida antes do truncate)
+// ---------------------------------------------------------------------------
+
+const somaDias = (iso: string, n: number) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400_000).toISOString().slice(0, 10);
+const diasEntre = (de: string, ate: string) => Math.round((Date.parse(ate + "T12:00:00Z") - Date.parse(de + "T12:00:00Z")) / 86400_000);
+
+/** Dia de hoje no fuso dos municípios atendidos (o mesmo de hojeIso no motor), pela hora real mesmo com o relógio simulado ligado. */
+export const hojeDaCarga = () => new Date(agoraReal()).toLocaleDateString("en-CA", { timeZone: "America/Fortaleza" });
+
+/** Dias corridos mínimos para o caminho caber: os mínimos legais (MINIMO) e cerca de um dia útil por etapa. */
+function minimoDoCaminho(caminho: string[]) {
+  const trechos = caminho.slice(0, -1);
+  return trechos.reduce((a, e) => a + (MINIMO[e] ?? 0), 0) + Math.ceil((trechos.length * 7) / 5);
+}
+
+/** Maior período (dias atrás da abertura) que uma compra da demonstração pode pedir. */
+export const PERIODO_MAXIMO = 160;
+
+/**
+ * Período do processo dentro do ano corrente. Uma compra aberta no ano anterior sai do limite de dispensa do exercício e
+ * muda a numeração; por isso, se `inicio` cai antes do primeiro dia útil do ano, o período é comprimido para começar nele,
+ * na mesma proporção para o tempo parado na etapa atual. Compras que já cabem no ano ficam como estão (a história de quem
+ * está parado há N dias não muda). Só no começo de janeiro, quando nem o mínimo do caminho cabe no ano, o período original
+ * fica (o histórico começa no ano anterior, que também tem feriados cadastrados).
+ */
+export function periodoNoAno(periodo: [number, number], caminho: string[], disponivel: number): [number, number] {
+  const [inicio, fim] = periodo;
+  if (inicio <= disponivel) return periodo;
+  const minimo = minimoDoCaminho(caminho);
+  if (disponivel < minimo) return periodo;
+  let f = Math.round((fim * disponivel) / inicio);
+  if (disponivel - f < minimo) f = Math.max(0, disponivel - minimo);
+  return [disponivel, f];
+}
+
+export type PlanoCompra = {
+  c: CompraDemo;
+  caminho: string[];
+  periodo: [number, number];
+  /** Data (AAAA-MM-DD, sempre dia útil) em que o processo entra em cada etapa do caminho; a primeira é a abertura. */
+  datas: string[];
+  devolucaoEm?: string;
+};
+
+/** Planeja as datas de uma lista de compras: caminho, período no ano corrente e entrada em cada etapa num dia útil. */
+export function planejarCompras(lista: CompraDemo[], def: WorkflowDef, hoje: string, fer: Set<string>, diaUtil: (iso: string, f: Set<string>) => boolean): PlanoCompra[] {
+  const utilAte = (iso: string) => {
+    let d = iso;
+    while (!diaUtil(d, fer)) d = somaDias(d, -1);
+    return d;
+  };
+  let inicioAno = `${hoje.slice(0, 4)}-01-01`;
+  while (!diaUtil(inicioAno, fer)) inicioAno = somaDias(inicioAno, 1);
+  const disponivel = diasEntre(inicioAno, hoje);
+  const planos = lista.map((c): PlanoCompra => {
+    const caminhoTodo = caminhoDoProcesso(def, c.meta).filter((e) => !e.opcional).map((e) => e.chave);
+    const caminho = caminhoTodo.slice(0, caminhoTodo.indexOf(c.ate) + 1);
+    if (caminho.at(-1) !== c.ate) throw new Error(`${c.assunto}: etapa ${c.ate} fora do caminho da modalidade ${c.meta.modalidade}.`);
+    const periodo = periodoNoAno(c.periodo, caminho, disponivel);
+    let dias: number[];
+    try {
+      dias = planejar(caminho, periodo[0], periodo[1]);
+    } catch (e) {
+      throw new Error(`${c.assunto}: ${(e as Error).message}`);
+    }
+    const datas: string[] = [];
+    for (const n of dias) {
+      const d = utilAte(somaDias(hoje, -n));
+      datas.push(datas.length && d < datas[datas.length - 1] ? datas[datas.length - 1] : d);
+    }
+    let devolucaoEm: string | undefined;
+    if (c.devolucao) {
+      const d = utilAte(somaDias(hoje, -c.devolucao.diasAtras));
+      devolucaoEm = d < datas[datas.length - 1] ? datas[datas.length - 1] : d;
+    }
+    return { c, caminho, periodo, datas, devolucaoEm };
+  });
+  // Quebra de ordem (art. 141): a compra que sai da fila fora da ordem precisa entrar nela depois de outra da mesma fonte que
+  // ficou parada na fila. Com os períodos comprimidos no começo do ano, a ordem pode inverter: a entrada na fila é empurrada
+  // para o dia útil seguinte ao da outra (e as etapas seguintes, se preciso), sem passar de hoje.
+  planos.forEach((q, i) => {
+    if (!q.c.quebra) return;
+    const iFila = q.caminho.indexOf("FILA_PAGAMENTO");
+    const outras = planos.slice(0, i).filter((o) => o.c.ate === "FILA_PAGAMENTO" && o.c.contratacao?.fonte === q.c.contratacao?.fonte);
+    if (iFila < 0 || !outras.length) return;
+    const naFila = (o: PlanoCompra) => o.datas[o.caminho.indexOf("FILA_PAGAMENTO")];
+    const outra = outras.sort((a, b) => naFila(a).localeCompare(naFila(b)))[0];
+    const antes = naFila(outra);
+    if (q.datas[iFila] > antes) return;
+    let d = somaDias(antes, 1);
+    while (!diaUtil(d, fer)) d = somaDias(d, 1);
+    if (d <= hoje) {
+      for (let k = iFila; k < q.datas.length; k++) if (q.datas[k] < d) q.datas[k] = d;
+      return;
+    }
+    // a outra entrou na fila hoje (fim de janeiro): ela é que entra no dia útil anterior ao da quebra
+    let e = somaDias(q.datas[iFila], -1);
+    while (!diaUtil(e, fer)) e = somaDias(e, -1);
+    const iOutra = outra.caminho.indexOf("FILA_PAGAMENTO");
+    for (let k = 0; k <= iOutra; k++) if (outra.datas[k] > e) outra.datas[k] = e;
+  });
+  return planos;
+}
+
+/**
+ * Confere tudo o que depende da data da carga, sem tocar no banco: caminho de cada compra, períodos, prazo do edital
+ * (aberturaMinima, art. 55), aviso da dispensa (3 dias úteis) e a quebra de ordem da fila (art. 141). Devolve a lista de
+ * problemas (vazia se tudo cabe) e os avisos (compras que, no começo de janeiro, ainda começam no ano anterior).
+ */
+export function validarCompras(lista: CompraDemo[], def: WorkflowDef, hoje: string, fer: Set<string>, regras: typeof import("../../lib/regras-fluxo")) {
+  const problemas: string[] = [];
+  const avisos: string[] = [];
+  let planos: PlanoCompra[] = [];
+  try {
+    planos = planejarCompras(lista, def, hoje, fer, regras.diaUtil);
+  } catch (e) {
+    return { problemas: [(e as Error).message], avisos, planos };
+  }
+  const em = (p: PlanoCompra, etapa: string) => p.datas[p.caminho.indexOf(etapa)];
+  planos.forEach((p, i) => {
+    const nome = p.c.assunto;
+    if (p.c.periodo[0] > PERIODO_MAXIMO) problemas.push(`${nome}: período de ${p.c.periodo[0]} dias passa do máximo de ${PERIODO_MAXIMO}.`);
+    if (p.datas.some((d) => d > hoje)) problemas.push(`${nome}: etapa com data futura.`);
+    if (p.datas[0].slice(0, 4) !== hoje.slice(0, 4)) avisos.push(`${nome}: aberto em ${p.datas[0]}, no ano anterior (o ano corrente ainda não comporta o caminho).`);
+    if (p.caminho.includes("SESSAO_DISPUTA")) {
+      const r = regras.regraPrazoEdital(
+        { numero: "-", tipoObjeto: "BENS_MENOR_PRECO", publicadoEm: em(p, "PUBLICACAO_EDITAL"), aberturaEm: em(p, "SESSAO_DISPUTA"), plataforma: "-" },
+        fer,
+      );
+      if (!r.ok) problemas.push(`${nome}: edital publicado em ${em(p, "PUBLICACAO_EDITAL")} e sessão em ${em(p, "SESSAO_DISPUTA")}: ${r.motivo}`);
+    }
+    const iDir = p.caminho.indexOf("INSTRUCAO_DIRETA");
+    if (iDir >= 0 && iDir < p.caminho.length - 1) {
+      const r = regras.regraAvisoDispensa(p.c.meta.modalidade, { publicadoEm: p.datas[iDir] }, p.datas[iDir + 1], fer);
+      if (!r.ok) problemas.push(`${nome}: aviso da dispensa em ${p.datas[iDir]} e autorização em ${p.datas[iDir + 1]}: ${r.motivo}`);
+    }
+    if (p.c.quebra) {
+      // Para sair da fila fora da ordem, outra compra da mesma fonte, criada antes, precisa estar parada na fila, liquidada num dia anterior
+      const entrada = em(p, "FILA_PAGAMENTO");
+      const fonte = p.c.contratacao?.fonte;
+      const aFrente = planos.slice(0, i).filter((o) => o.c.ate === "FILA_PAGAMENTO" && o.c.contratacao?.fonte === fonte && em(o, "FILA_PAGAMENTO") < entrada);
+      if (!entrada || !aFrente.length) problemas.push(`${nome}: o pagamento fora da ordem precisa de outra compra da fonte ${fonte} liquidada antes (fila em ${entrada}).`);
+    }
+  });
+  return { problemas, avisos, planos };
+}
+
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base, lista: CompraDemo[]) {
   const engine = await import("../../lib/engine");
-  const { aberturaMinima, diaUtil } = await import("../../lib/regras-fluxo");
+  const regras = await import("../../lib/regras-fluxo");
 
+  const sessoes = new Map<string, SessaoUsuario>();
   async function sessao(cpf: string): Promise<SessaoUsuario> {
+    const guardada = sessoes.get(cpf);
+    if (guardada) return guardada;
     const u = await db.query.usuarios.findFirst({ where: eq(s.usuarios.id, base.usuarios[cpf]), with: { setor: true, municipio: true } });
     if (!u) throw new Error(`Usuário ${cpf} não encontrado`);
-    return {
+    const sess: SessaoUsuario = {
       id: u.id, nome: u.nome, cpf: u.cpf, email: u.email, cargo: u.cargo, papeis: u.papeis as Papel[], setorId: u.setorId,
       setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
       municipioId: u.municipioId, municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
     };
+    sessoes.set(cpf, sess);
+    return sess;
   }
   const prefeita = await sessao("11111111111");
   const protocolo = await sessao("22222222222");
@@ -103,42 +256,32 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
   const def = tipo!.definicao as WorkflowDef;
   const fer = await engine.feriadosDo(base.municipioId);
 
-  // Datas: dia local (Fortaleza, como hojeIso) de n dias atrás, às 9h
-  const isoDiasAtras = (n: number) => new Date(agoraReal() - n * 86400_000).toLocaleDateString("en-CA", { timeZone: "America/Fortaleza" });
+  // Datas planejadas antes de gravar (todas em dias úteis e, quando cabe, no ano corrente); o relógio vai às 9h de cada uma
+  const planos = planejarCompras(lista, def, hojeDaCarga(), fer, regras.diaUtil);
   const msDoDia = (iso: string) => Date.parse(`${iso}T09:00:00-03:00`);
-  const diaAnteriorUtil = (iso: string) => {
-    let d = iso;
-    while (!diaUtil(d, fer)) d = new Date(Date.parse(d + "T12:00:00Z") - 86400_000).toISOString().slice(0, 10);
-    return d;
-  };
 
-  const criados: string[] = [];
   let assunto = "";
   let etapa = "";
   try {
-    for (const c of lista) {
+    for (const { c, caminho, datas, devolucaoEm } of planos) {
       assunto = c.assunto;
       const req = await sessao(c.req);
       const sigla = req.setor!.sigla;
       const { sec, fiscal } = pasta[sigla];
       const papelReq: Papel = req.id === sec.id ? "SECRETARIO" : "REQUISITANTE";
-      const caminhoTodo = caminhoDoProcesso(def, c.meta).filter((e) => !e.opcional).map((e) => e.chave);
-      const caminho = caminhoTodo.slice(0, caminhoTodo.indexOf(c.ate) + 1);
-      if (caminho.at(-1) !== c.ate) throw new Error(`${c.assunto}: etapa ${c.ate} fora do caminho da modalidade ${c.meta.modalidade}.`);
-      const dias = planejar(caminho, c.periodo[0], c.periodo[1]);
-      const isoDe = (estado: string) => isoDiasAtras(dias[caminho.indexOf(estado)]);
+      const isoDe = (estado: string) => datas[caminho.indexOf(estado)];
       const ct = c.contratacao;
       const objeto = c.meta.objeto;
 
-      acertar(msDoDia(isoDiasAtras(c.periodo[0])));
+      acertar(msDoDia(datas[0]));
       const proc = await engine.abrirProcesso(req, {
         tipoId: base.tipos.COMPRA, unidadeGestoraId: base.ugs["01"], assunto: c.assunto, descricao: c.meta.justificativa, urgencia: c.urgencia ?? "NORMAL", metadados: c.meta,
       });
       const id = proc.id;
-      criados.push(id);
       const carregar = async () => (await engine.carregarProcesso(base.municipioId, id))!;
 
       /** Junta o documento e colhe as assinaturas que as travas de qualquer etapa pedem para ele. */
+      let dfdId = "";
       const juntar = async (autor: SessaoUsuario, tipoDoc: string, titulo: string, conteudo: string, assinantes: [SessaoUsuario, Papel][] = []) => {
         const d = await engine.juntarDocumento(autor, id, tipoDoc, titulo, conteudo);
         for (const [u, papel] of assinantes) await engine.assinarDocumento(u, d.id, papel);
@@ -147,13 +290,16 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
 
       // Trabalho de cada etapa, na ordem em que acontece. Os ids servem para `atual` (trabalho já feito na etapa em que o processo para).
       const PASSOS: Record<string, [string, () => Promise<unknown>][]> = {
-        DEMANDA: [["DFD", () => juntar(req, "DFD", `DFD — ${objeto}`,
-          `DOCUMENTO DE FORMALIZAÇÃO DE DEMANDA\n\nObjeto: ${objeto}\nJustificativa: ${c.meta.justificativa}\nQuantidade: ${c.meta.quantidade}\nValor estimado: ${brl(c.meta.valorEstimado)}`,
-          // parado na demanda: o DFD está juntado e ainda espera a assinatura
-          c.ate === "DEMANDA" ? [] : [[req, papelReq]])]],
+        DEMANDA: [["DFD", async () => {
+          const d = await juntar(req, "DFD", `DFD — ${objeto}`,
+            `DOCUMENTO DE FORMALIZAÇÃO DE DEMANDA\n\nObjeto: ${objeto}\nJustificativa: ${c.meta.justificativa}\nQuantidade: ${c.meta.quantidade}\nValor estimado: ${brl(c.meta.valorEstimado)}`,
+            // parado na demanda: o DFD está juntado e ainda espera a assinatura
+            c.ate === "DEMANDA" ? [] : [[req, papelReq]]);
+          dfdId = d.id;
+        }]],
         APROVACAO_SECRETARIO: [["DFD_SECRETARIO", async () => {
-          const dfd = (await carregar()).documentos.filter((d) => d.tipo === "DFD").at(-1)!;
-          if (!dfd.assinaturas.some((a) => a.papel === "SECRETARIO")) await engine.assinarDocumento(sec, dfd.id, "SECRETARIO");
+          // quem abre como secretário já assinou o DFD nesse papel
+          if (papelReq !== "SECRETARIO") await engine.assinarDocumento(sec, dfdId, "SECRETARIO");
         }]],
         AUTUACAO: [["TERMO_AUTUACAO", () => juntar(protocolo, "TERMO_AUTUACAO", `Termo de autuação — ${proc.numero}`, `TERMO DE AUTUAÇÃO\n\nProcesso ${proc.numero}\nAssunto: ${c.assunto}\nDFD conferido e assinado pela secretaria.`)]],
         AUTORIZACAO: [["DESPACHO_AUTORIZACAO", () => juntar(prefeita, "DESPACHO_AUTORIZACAO", "Autorizo o prosseguimento", "Autorizo a instrução do processo pelo setor de compras.", [[prefeita, "ORDENADOR"]])]],
@@ -179,8 +325,8 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
           ["EDITAL", () => juntar(compras, "EDITAL", `Edital — ${objeto}`, `EDITAL DE PREGÃO ELETRÔNICO\n\nObjeto: ${objeto}\nCritério: menor preço.`)],
           ["PUBLICAR_EDITAL", async () => {
             const publicadoEm = isoDe("PUBLICACAO_EDITAL");
-            const aberturaEm = diaAnteriorUtil(isoDe("SESSAO_DISPUTA"));
-            if (aberturaEm < aberturaMinima(publicadoEm, "BENS_MENOR_PRECO", fer)) throw new Error(`${c.assunto}: sessão cedo demais para o prazo do edital.`);
+            const aberturaEm = isoDe("SESSAO_DISPUTA");
+            if (aberturaEm < regras.aberturaMinima(publicadoEm, "BENS_MENOR_PRECO", fer)) throw new Error(`${c.assunto}: sessão cedo demais para o prazo do edital.`);
             await engine.publicarEdital(compras, id, { numero: `Pregão Eletrônico ${proc.sequencial}/${proc.ano}`, tipoObjeto: "BENS_MENOR_PRECO", publicadoEm, aberturaEm, plataforma: "Portal Nacional de Contratações Públicas" });
           }],
         ],
@@ -234,11 +380,11 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
           else await engine.avancar(ator(de), id, e, de === "FILA_PAGAMENTO" && c.quebra ? c.quebra : undefined);
         }
         if (final && c.recebido === false) break;
-        if (!(await carregar()).recebidoEm) await engine.receber(ator(e), id);
+        await engine.receber(ator(e), id); // não faz nada se a etapa já chegou recebida (mesmo setor)
         for (const [passo, fazer] of PASSOS[e] ?? []) if (!final || c.atual?.includes(passo)) await fazer();
       }
       if (c.devolucao) {
-        irPara(msDoDia(isoDiasAtras(c.devolucao.diasAtras)));
+        irPara(msDoDia(devolucaoEm!));
         await engine.devolver(ator(c.ate), id, c.devolucao.para, c.devolucao.motivo);
         await engine.receber(ator(c.devolucao.para), id);
       }
@@ -251,14 +397,5 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
     throw new Error(`Demonstração: "${assunto}" na etapa ${etapa}: ${(e as Error).message}`, { cause: e });
   } finally {
     voltarAoPresente();
-  }
-
-  // Abertura e documentos com a data do evento que os registrou (no banco essas colunas têm default now(), fora do relógio simulado)
-  if (criados.length) {
-    const ids = sql`array[${sql.join(criados.map((x) => sql`${x}`), sql`, `)}]::text[]`;
-    await db.execute(sql`update tramite.processos p set aberto_em = e.criado_em from tramite.eventos e
-      where e.processo_id = p.id and e.tipo = 'ABERTURA' and p.id::text = any(${ids})`);
-    await db.execute(sql`update tramite.documentos d set criado_em = e.criado_em from tramite.eventos e
-      where e.processo_id = d.processo_id and e.tipo = 'ANEXO' and e.dados->>'documentoId' = d.id::text and d.processo_id::text = any(${ids})`);
   }
 }

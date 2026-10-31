@@ -9,6 +9,7 @@ import { WORKFLOWS_PADRAO } from "../lib/workflow";
 import type { CompraDemo } from "./demo/compras";
 import { COMPRAS_CONFORMIDADE, cnpj } from "./valor";
 import type { DemoCtx } from "./demo/contexto";
+import { feriadosDemo } from "./demo/feriados";
 
 export const SLUG_DEMO = "vale-das-araucarias";
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -100,13 +101,7 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
   }
 
   const ano = new Date().getFullYear();
-  await db.insert(schema.feriados).values([
-    { municipioId: mun.id, data: `${ano}-09-20`, nome: "Revolução Farroupilha" },
-    { municipioId: mun.id, data: `${ano}-11-02`, nome: "Finados" },
-    { municipioId: mun.id, data: `${ano}-11-15`, nome: "Proclamação da República" },
-    { municipioId: mun.id, data: `${ano}-11-20`, nome: "Consciência Negra" },
-    { municipioId: mun.id, data: `${ano}-12-25`, nome: "Natal" },
-  ]);
+  await db.insert(schema.feriados).values(feriadosDemo(ano).map((f) => ({ municipioId: mun.id, ...f })));
 
   // ---- processos de compra de exemplo, criados pelo motor em datas passadas (src/db/demo/compras.ts) ----
   const dia = (n: number) => new Date(Date.now() - n * 86400_000);
@@ -245,7 +240,7 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
 }
 
 /** Compras de exemplo do município: uma em cada situação típica (atrasada, devolvida, em parecer, em execução, paga, recém-aberta). */
-function COMPRAS_SEED(ano: number): CompraDemo[] {
+export function COMPRAS_SEED(ano: number): CompraDemo[] {
   return [
     {
       // 1. Parada na contabilidade há dias (atrasada, não recebida)

@@ -1,8 +1,8 @@
 import "server-only";
 import { createHash, randomUUID } from "crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/db";
-import { assinaturas, documentos, eventos, feriados, processos, setores, tiposProcesso } from "@/db/schema";
+import { assinaturas, documentos, feriados, processos, setores, tiposProcesso } from "@/db/schema";
 import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
@@ -60,27 +60,43 @@ function canon(v: unknown): string {
   );
 }
 
+/**
+ * Cache de feriados e setores para os scripts de carga da demonstração (src/db/deploy.ts): numa carga, os dois não mudam
+ * e cada ação do motor os relia. Desligado no servidor do Next, onde a leitura é sempre do banco.
+ */
+let cacheCarga: { feriados: Map<string, Set<string>>; setores: Map<string, typeof setores.$inferSelect> } | null = null;
+export function cacheDeCarga(ligar: boolean) {
+  cacheCarga = ligar ? { feriados: new Map(), setores: new Map() } : null;
+}
+
 export async function feriadosDo(municipioId: string): Promise<Set<string>> {
+  const guardado = cacheCarga?.feriados.get(municipioId);
+  if (guardado) return guardado;
   const rows = await db.select({ data: feriados.data }).from(feriados).where(eq(feriados.municipioId, municipioId));
-  return new Set(rows.map((r) => String(r.data)));
+  const set = new Set(rows.map((r) => String(r.data)));
+  cacheCarga?.feriados.set(municipioId, set);
+  return set;
 }
 
 async function setorPorSigla(tx: Tx, municipioId: string, sigla: string) {
+  const chave = municipioId + ":" + sigla;
+  const guardado = cacheCarga?.setores.get(chave);
+  if (guardado) return guardado;
   const s = await tx.query.setores.findFirst({ where: and(eq(setores.municipioId, municipioId), eq(setores.sigla, sigla)) });
   if (!s) throw new ErroFluxo(`Setor ${sigla} não existe neste município. Cadastre-o em Configurações.`);
+  cacheCarga?.setores.set(chave, s);
   return s;
 }
 
-/** Grava um evento no livro, encadeado ao anterior por hash. */
-async function registrarEvento(
-  tx: Tx,
-  processoId: string,
-  autorId: string,
-  tipo: string,
-  campos: { deEstado?: string | null; paraEstado?: string | null; deSetorId?: string | null; paraSetorId?: string | null; dados?: unknown },
-) {
-  const ultimo = await tx.query.eventos.findFirst({ where: eq(eventos.processoId, processoId), orderBy: desc(eventos.seq) });
-  const seq = (ultimo?.seq ?? 0) + 1;
+type CamposEvento = { deEstado?: string | null; paraEstado?: string | null; deSetorId?: string | null; paraSetorId?: string | null; dados?: unknown };
+
+/**
+ * SQL que grava um evento no livro, encadeado ao anterior por hash, numa só ida ao banco: o último evento (seq e hash) é lido
+ * dentro do próprio insert e o hash sai do Postgres (sha256 do hash anterior + corpo canônico), igual ao que `verificarCadeia`
+ * recalcula. O corpo canônico é montado aqui com um marcador no lugar de `seq`. `junto` é outra gravação (insert/update) que
+ * vai no mesmo comando, como CTE: as duas valem ou nenhuma, sem precisar de transação.
+ */
+function sqlEvento(processoId: string, autorId: string, tipo: string, campos: CamposEvento, junto?: SQLWrapper) {
   const criadoEm = new Date();
   const norm: Record<string, unknown> = {};
   if (campos.deEstado != null) norm.deEstado = campos.deEstado;
@@ -88,26 +104,26 @@ async function registrarEvento(
   if (campos.deSetorId != null) norm.deSetorId = campos.deSetorId;
   if (campos.paraSetorId != null) norm.paraSetorId = campos.paraSetorId;
   if (campos.dados != null) norm.dados = campos.dados;
-  const corpo = canon({ processoId, seq, tipo, autorId, ...norm, criadoEm: criadoEm.toISOString() });
-  const hash = sha256((ultimo?.hash ?? "") + corpo);
-  const [ev] = await tx
-    .insert(eventos)
-    .values({
-      processoId,
-      seq,
-      tipo,
-      autorId,
-      deEstado: campos.deEstado ?? null,
-      paraEstado: campos.paraEstado ?? null,
-      deSetorId: campos.deSetorId ?? null,
-      paraSetorId: campos.paraSetorId ?? null,
-      dados: (campos.dados as object) ?? null,
-      hashAnterior: ultimo?.hash ?? null,
-      hash,
-      criadoEm,
-    })
-    .returning();
-  return ev;
+  // "seq" e "tipo" são as duas últimas chaves do corpo canônico (ordem alfabética): o marcador separa o que vem antes e depois do número
+  const MARCA = -918273645;
+  const corpo = canon({ processoId, seq: MARCA, tipo, autorId, ...norm, criadoEm: criadoEm.toISOString() });
+  const corte = corpo.lastIndexOf(`"seq":${MARCA},"tipo":`);
+  const antes = corpo.slice(0, corte + 6);
+  const depois = corpo.slice(corte + 6 + String(MARCA).length);
+  const dados = campos.dados == null ? null : JSON.stringify(campos.dados);
+  return sql`with ${junto ? sql`junto as ${junto},` : sql``}
+    ult as (select seq, hash from tramite.eventos where processo_id = ${processoId} order by seq desc limit 1),
+    n as (select coalesce((select seq from ult), 0) + 1 as seq, (select hash from ult) as anterior)
+    insert into tramite.eventos (id, processo_id, seq, tipo, autor_id, de_estado, para_estado, de_setor_id, para_setor_id, dados, hash_anterior, hash, criado_em)
+    select ${randomUUID()}, ${processoId}, n.seq, ${tipo}, ${autorId}, ${campos.deEstado ?? null}, ${campos.paraEstado ?? null}, ${campos.deSetorId ?? null},
+      ${campos.paraSetorId ?? null}, ${dados}::jsonb, n.anterior,
+      encode(sha256(convert_to(coalesce(n.anterior, '') || ${antes} || n.seq::text || ${depois}, 'UTF8')), 'hex'), ${criadoEm.toISOString()}::timestamptz
+    from n`;
+}
+
+/** Grava um evento no livro dentro de uma transação já aberta. */
+async function registrarEvento(tx: Tx, processoId: string, autorId: string, tipo: string, campos: CamposEvento) {
+  await tx.execute(sqlEvento(processoId, autorId, tipo, campos));
 }
 
 /** Setor responsável por um estado, dado o processo. */
@@ -187,6 +203,7 @@ export async function abrirProcesso(
         recebidoEm: new Date(),
         prazoEtapaEm: inicial.slaDiasUteis > 0 ? addDiasUteis(new Date(), inicial.slaDiasUteis, fer) : null,
         abertoPorId: u.id,
+        abertoEm: new Date(),
         metadados: Object.keys(meta).length ? meta : null,
         interessadoPessoaId: input.externo?.pessoaId ?? null,
         interessadoEmpresaId: input.externo?.empresaId ?? null,
@@ -505,10 +522,8 @@ export async function receber(u: SessaoUsuario, processoId: string) {
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (p.recebidoEm) return;
   if (p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN")) throw new ErroFluxo("O processo não está no seu setor.");
-  return db.transaction(async (tx) => {
-    await tx.update(processos).set({ recebidoEm: new Date() }).where(eq(processos.id, p.id));
-    await registrarEvento(tx, p.id, u.id, "RECEBIMENTO", { paraSetorId: p.setorAtualId });
-  });
+  // um só comando: o recebimento e o evento
+  await db.execute(sqlEvento(p.id, u.id, "RECEBIMENTO", { paraSetorId: p.setorAtualId }, db.update(processos).set({ recebidoEm: new Date() }).where(eq(processos.id, p.id))));
 }
 
 // ---------------------------------------------------------------------------
@@ -521,11 +536,10 @@ export async function juntarDocumento(u: SessaoUsuario, processoId: string, tipo
   if (!titulo.trim() || !conteudo.trim()) throw new ErroFluxo("Título e conteúdo são obrigatórios.");
   const versao = p.documentos.filter((d) => d.tipo === tipo).length + 1;
   const hash = sha256(conteudo);
-  return db.transaction(async (tx) => {
-    const [d] = await tx.insert(documentos).values({ processoId: p.id, tipo, titulo: titulo.trim(), conteudo, versao, hash, criadoPorId: u.id }).returning();
-    await registrarEvento(tx, p.id, u.id, "ANEXO", { dados: { documentoId: d.id, tipo, titulo: d.titulo, versao, hash } });
-    return d;
-  });
+  const d: typeof documentos.$inferSelect = { id: randomUUID(), processoId: p.id, tipo, titulo: titulo.trim(), conteudo, versao, hash, criadoPorId: u.id, criadoEm: new Date() };
+  // um só comando: o documento e o evento
+  await db.execute(sqlEvento(p.id, u.id, "ANEXO", { dados: { documentoId: d.id, tipo, titulo: d.titulo, versao, hash } }, db.insert(documentos).values(d)));
+  return d;
 }
 
 export async function assinarDocumento(u: SessaoUsuario, documentoId: string, papel: Papel) {
@@ -534,10 +548,10 @@ export async function assinarDocumento(u: SessaoUsuario, documentoId: string, pa
   if (!temPapel(u, papel)) throw new ErroFluxo(`Você não pode assinar como ${PAPEL_NOME[papel] ?? papel}: seu perfil não tem esse papel.`);
   const carimbo = new Date().toISOString();
   const hashAssinado = sha256(`${d.hash}|${u.cpf}|${papel}|${carimbo}`);
-  return db.transaction(async (tx) => {
-    await tx.insert(assinaturas).values({ documentoId: d.id, usuarioId: u.id, papel, hashAssinado, criadoEm: new Date(carimbo) });
-    await registrarEvento(tx, d.processoId, u.id, "ASSINATURA", { dados: { documentoId: d.id, tipo: d.tipo, papel, hashAssinado } });
-  });
+  // um só comando: a assinatura e o evento
+  await db.execute(
+    sqlEvento(d.processoId, u.id, "ASSINATURA", { dados: { documentoId: d.id, tipo: d.tipo, papel, hashAssinado } }, db.insert(assinaturas).values({ documentoId: d.id, usuarioId: u.id, papel, hashAssinado, criadoEm: new Date(carimbo) })),
+  );
 }
 
 export async function despachar(u: SessaoUsuario, processoId: string, texto: string) {
