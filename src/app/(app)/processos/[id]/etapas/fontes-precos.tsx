@@ -64,7 +64,7 @@ export function FontesPrecos({ inicial, justificativaInicial }: { inicial: { fon
         <button type="button" className="btn btn-quiet !px-3 !py-1.5 text-[13px]" onClick={() => setLinhas((ls) => [...ls, { k: Math.max(0, ...ls.map((x) => x.k)) + 1, fonte: "", data: "", valor: "" }])}>
           <Plus size={14} /> Adicionar fonte
         </button>
-        <div className="flex flex-wrap items-center gap-3 text-[13.5px]">
+        <div className="flex flex-wrap items-center gap-3 text-[14px]">
           <span className={validas.length >= 3 ? "font-semibold text-ok" : "font-semibold text-warn"}>{validas.length} de 3 fontes</span>
           <span className="text-ink-2">
             Mediana: <strong className="tnum font-semibold text-ink">{med === null ? "—" : fmtMoeda(med)}</strong>

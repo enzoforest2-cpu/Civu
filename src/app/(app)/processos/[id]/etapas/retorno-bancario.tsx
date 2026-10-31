@@ -11,12 +11,12 @@ export function PainelRetornoBancario({ p, pode }: PropsEtapa) {
   const envio = [...p.eventos].reverse().find((e) => e.paraEstado === "PAGAMENTO_ENVIADO");
   const recusas = listaDe<RetornoBancario>(meta.historicoRetornos).filter((r) => r && !r.aceito);
   return (
-    <Panel title="Retorno do banco" action={<Chip tone="warn">{envio ? `Enviado em ${fmtData(envio.criadoEm)}, aguardando o banco` : "Aguardando o banco"}</Chip>}>
+    <Panel id="etapa-retorno" title="Retorno do banco" action={<Chip tone="warn">{envio ? `Enviado em ${fmtData(envio.criadoEm)}, aguardando o banco` : "Aguardando o banco"}</Chip>}>
       <p className="text-[14px] text-ink-2">Enviado ao banco ainda não é pago. Registre aqui o que o banco respondeu (integração bancária simulada).</p>
       {recusas.length > 0 && (
         <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">
           <summary className="px-4 py-3 text-[14px] font-semibold text-ink-2">Recusas anteriores ({recusas.length})</summary>
-          <ul className="space-y-1.5 px-4 pb-4 text-[13.5px] text-ink-2">
+          <ul className="space-y-1.5 px-4 pb-4 text-[14px] text-ink-2">
             {recusas.map((r, i) => (
               <li key={i}>
                 {fmtDataHora(r.em)}: {r.motivo ?? "sem motivo informado"}

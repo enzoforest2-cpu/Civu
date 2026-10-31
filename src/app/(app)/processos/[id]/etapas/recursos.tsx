@@ -9,9 +9,12 @@ import { SoConsulta, dataBr, listaDe, metaDe, type PropsEtapa } from "./util";
 export function PainelRecursos({ p, pode }: PropsEtapa) {
   const lista = listaDe<Recurso>(metaDe(p).recursos);
   const hoje = hojeIso();
+  // Destino do link "Ver recursos" (página do processo): o primeiro recurso que já pode ser decidido; senão o registro de intenção; senão o painel
+  const aDecidir = pode ? lista.findIndex((r) => !r.decididoEm && hoje > r.contrarrazoesAte) : -1;
+  const alvo = "etapa-recursos";
   return (
-    <Panel title="Recursos">
-      <p className="text-[13.5px] text-ink-2">Razões em 3 dias úteis após a intenção e contrarrazões em mais 3 (art. 165). Recurso provido devolve o processo à sessão para refazer o julgamento.</p>
+    <Panel id={pode ? undefined : alvo} title="Recursos">
+      <p className="text-[14px] text-ink-2">Razões em 3 dias úteis após a intenção e contrarrazões em mais 3 (art. 165). Recurso provido devolve o processo à sessão para refazer o julgamento.</p>
       <div className="mt-4">
         {lista.length === 0 ? (
           <Vazio>Nenhuma intenção de recurso registrada na sessão.</Vazio>
@@ -26,7 +29,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                   </div>
                   {r.decididoEm ? <Chip tone={r.provido ? "warn" : "ok"}>{r.provido ? "Provido" : "Não provido"}</Chip> : <Chip>Aguardando decisão</Chip>}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13.5px] text-ink-2">
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-ink-2">
                   <span>
                     Razões até <strong className="tnum font-semibold text-ink">{dataBr(r.razoesAte)}</strong>
                   </span>
@@ -35,15 +38,15 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                   </span>
                 </div>
                 {r.decididoEm ? (
-                  <div className="mt-2 rounded-lg bg-sunken px-3 py-2 text-[13.5px] text-ink">
+                  <div className="mt-2 rounded-lg bg-sunken px-3 py-2 text-[14px] text-ink">
                     <strong className="font-semibold">Decidido em {dataBr(r.decididoEm)}:</strong> {r.decisao}
                   </div>
                 ) : pode && hoje <= r.contrarrazoesAte ? (
-                  <p className="mt-2 text-[13px] text-ink-3">A decisão fica disponível a partir do dia seguinte ao fim das contrarrazões ({dataBr(r.contrarrazoesAte)}).</p>
+                  <p className="mt-2 text-[14px] text-ink-3">A decisão fica disponível a partir do dia seguinte ao fim das contrarrazões ({dataBr(r.contrarrazoesAte)}).</p>
                 ) : (
                   pode && (
-                    <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">
-                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand-2">Decidir</summary>
+                    <details id={n === aDecidir ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50">
+                      <summary className="flex min-h-[44px] items-center px-4 py-2.5 text-[14px] font-semibold text-brand-2">Decidir</summary>
                       <ActionForm action={decidirRecursoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
                         <input type="hidden" name="recursoId" value={r.id} />
@@ -53,7 +56,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                           </label>
                           <textarea id={`dec-${r.id}`} name="decisao" className="input" rows={3} required />
                         </div>
-                        <label className="flex items-center gap-2 text-[14px] text-ink">
+                        <label className="flex min-h-[44px] items-center gap-2 text-[14px] text-ink">
                           <input type="checkbox" name="provido" className="h-4 w-4" /> Recurso provido (volta à sessão para refazer o julgamento)
                         </label>
                         <SubmitButton pendingText="Salvando…">Registrar decisão</SubmitButton>
@@ -67,7 +70,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
         )}
       </div>
       {pode ? (
-        <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
+        <details id={aDecidir < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50">
           <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar intenção de recurso</summary>
           <ActionForm action={registrarRecursoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />

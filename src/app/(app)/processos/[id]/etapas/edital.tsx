@@ -21,7 +21,7 @@ export function PainelEdital({ p, pode, feriados }: PropsEtapa) {
   const edital = meta.edital as Edital | undefined;
   const anteriores = listaDe<{ edital?: Edital | null; impugnacoes?: Impugnacao[]; arquivadoEm?: string }>(meta.historicoEditais).filter((h) => h?.edital);
   return (
-    <Panel title="Edital" action={edital ? <Chip tone="ok">Publicado</Chip> : <Chip tone="warn">A publicar</Chip>}>
+    <Panel id="etapa-edital" title="Edital" action={edital ? <Chip tone="ok">Publicado</Chip> : <Chip tone="warn">A publicar</Chip>}>
       <p className="text-[14px] text-ink-2">O tipo de objeto define o prazo mínimo entre a publicação e a abertura, em dias úteis (Lei 14.133, art. 55).</p>
       {pode ? (
         <EditalForm processoId={p.id} tipos={TIPOS} atual={edital} aberturaInicial={edital ? fraseAbertura(edital, feriados) : undefined} />
@@ -41,7 +41,7 @@ export function PainelEdital({ p, pode, feriados }: PropsEtapa) {
       {anteriores.length > 0 && (
         <details className="mt-5 rounded-xl border border-line open:bg-sunken/50">
           <summary className="px-4 py-3 text-[14px] font-semibold text-ink-2">Editais anteriores ({anteriores.length})</summary>
-          <ul className="space-y-1.5 px-4 pb-4 text-[13.5px] text-ink-2">
+          <ul className="space-y-1.5 px-4 pb-4 text-[14px] text-ink-2">
             {anteriores.map((h, i) => (
               <li key={i}>
                 {h.edital!.numero} · publicado em {dataBr(h.edital!.publicadoEm)}, abertura em {dataBr(h.edital!.aberturaEm)}

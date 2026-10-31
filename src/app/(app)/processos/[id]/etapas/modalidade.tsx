@@ -10,7 +10,7 @@ export function PainelModalidade({ p, pode }: PropsEtapa) {
   const atual = metaDe(p).modalidade;
   const definida = typeof atual === "string" && atual !== "A_DEFINIR" && !!MODALIDADES[atual];
   return (
-    <Panel title={definida ? "Alterar modalidade" : "Modalidade da contratação"}>
+    <Panel id="etapa-modalidade" title={definida ? "Alterar modalidade" : "Modalidade da contratação"}>
       {definida ? (
         <p className="text-[14px] text-ink-2">
           Modalidade atual: <strong className="font-semibold text-ink">{MODALIDADES[atual]}</strong>. Ao trocar entre licitação e contratação direta, o que foi registrado no caminho anterior (aviso de dispensa, edital, sessão) vai para o histórico e precisa ser feito de novo.

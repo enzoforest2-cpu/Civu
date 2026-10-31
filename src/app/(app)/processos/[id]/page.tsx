@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { ETAPAS_CONTRATACAO, ETAPAS_CORRECAO_CONTRATACAO, carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeEtapa, ramoDaModalidade, type Papel } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeEtapa, ramoDaModalidade, type Gate, type Papel } from "@/lib/workflow";
 import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
@@ -20,6 +20,7 @@ import { db as dbInteressado } from "@/db";
 import type { Exigencia } from "@/lib/engine";
 import { avancarAction, devolverAction, receberAction, tramitarAction, juntarDocumentoAction, assinarAction, despacharAction, contratacaoAction, remessaTceAction } from "@/app/actions";
 import { Timeline } from "./timeline";
+import { IrPara } from "./ir-para";
 import { PainelDaEtapa } from "./etapas";
 import { CorrecaoContratacao } from "./etapas/correcao-contratacao";
 
@@ -80,6 +81,47 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const contratacaoIncompleta = !regraContratacao(contratacao, FONTES).ok;
   const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
   const exigencia = meta.exigencia as Exigencia | undefined;
+  const papeisAssina = u.papeis.filter((x) => x !== "ADMIN");
+  // Cada pendência leva ao formulário que a resolve (C1). Sem o formulário na página, não há link.
+  const acaoDaPendencia = (gate: Gate, motivo: string): Acao | null => {
+    if (gate.tipo === "documento") {
+      if (motivo === "Documento não juntado") {
+        return { alvo: "juntar", href: `?doc=${gate.documentoTipo}#juntar`, foco: "[name=titulo]", valores: { tipo: gate.documentoTipo }, rotulo: `Juntar ${nomeCurtoDoc(gate.documentoTipo)}`, icone: "juntar" };
+      }
+      const ultimo = p.documentos.filter((d) => d.tipo === gate.documentoTipo).at(-1);
+      if (!ultimo) return null;
+      const exigidos = [...(gate.assinadoPor ?? []), ...(gate.assinadoPorQualquer ?? [])];
+      const papel = exigidos.find((x) => (papeisAssina as string[]).includes(x) && !ultimo.assinaturas.some((a) => a.papel === x));
+      return { alvo: `doc-${ultimo.id}`, foco: papel ? "[name=senha]" : undefined, valores: papel ? { papel } : undefined, rotulo: "Assinar", icone: "assinar" };
+    }
+    if (gate.tipo === "campo") return { alvo: gate.campo, rotulo: "Preencher", icone: "preencher" };
+    switch (gate.regra) {
+      case "PESQUISA_PRECOS":
+        return { alvo: "etapa-pesquisa", rotulo: "Registrar pesquisa", icone: "preencher" };
+      case "MODALIDADE_DEFINIDA":
+        return p.estadoAtual === "INSTRUCAO"
+          ? { alvo: "etapa-modalidade", rotulo: "Definir modalidade", icone: "preencher" }
+          : pode && p.estado.devolucoes.length > 0
+            ? { alvo: "devolver", rotulo: "Devolver a compras", icone: "devolver" }
+            : null;
+      case "PRAZO_EDITAL":
+        return { alvo: "etapa-edital", rotulo: "Preencher edital", icone: "preencher" };
+      case "IMPUGNACOES":
+        return { alvo: "etapa-impugnacoes", rotulo: "Ver impugnações", icone: "preencher" };
+      case "RESULTADO_SESSAO":
+        return { alvo: "etapa-sessao", rotulo: "Registrar resultado", icone: "preencher" };
+      case "RECURSOS":
+        return { alvo: "etapa-recursos", rotulo: "Ver recursos", icone: "preencher" };
+      case "AVISO_DISPENSA":
+        return { alvo: "etapa-aviso", rotulo: "Registrar aviso", icone: "preencher" };
+      case "RETORNO_BANCARIO":
+        return { alvo: "etapa-retorno", rotulo: "Registrar retorno", icone: "preencher" };
+      case "CONTRATACAO_COMPLETA":
+        return podeContratacao ? { alvo: "contratacao-form", rotulo: "Informar dados", icone: "preencher" } : { alvo: "contratacao", rotulo: "Ver dados", icone: "preencher" };
+      default:
+        return null;
+    }
+  };
   const [pessoaInteressada, empresaInteressada] = await Promise.all([
     p.interessadoPessoaId ? dbInteressado.query.pessoas.findFirst({ where: (x, { eq }) => eq(x.id, p.interessadoPessoaId!) }) : null,
     p.interessadoEmpresaId ? dbInteressado.query.empresas.findFirst({ where: (x, { eq }) => eq(x.id, p.interessadoEmpresaId!) }) : null,
@@ -161,27 +203,25 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <ul className="mt-4 space-y-2">
                     {gates.map((g, i) => {
                       const nomeDoc = g.gate.tipo === "documento" ? (g.gate.descricao ?? DOCUMENTO_TIPOS[g.gate.documentoTipo]) : g.gate.tipo === "campo" ? (g.gate.descricao ?? g.gate.campo) : g.gate.descricao;
+                      const acao = g.ok ? null : acaoDaPendencia(g.gate, g.motivo);
                       return (
-                        <li key={i} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${g.ok ? "border-ok/20 bg-ok-soft/50" : "border-line bg-white"}`}>
+                        <li key={i} className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3 sm:flex-nowrap ${g.ok ? "border-ok/20 bg-ok-soft/50" : "border-line bg-white"}`}>
                           {g.ok ? <CheckCircle2 size={20} className="shrink-0 text-ok" /> : <Circle size={20} className="shrink-0 text-line-2" />}
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:basis-auto">
                             <div className={`text-[14.5px] ${g.ok ? "text-ink-2" : "font-medium text-ink"}`}>{nomeDoc}</div>
                             {!g.ok && <div className="text-[12.5px] text-warn">{g.motivo}</div>}
                           </div>
-                          {!g.ok && g.gate.tipo === "documento" && g.motivo === "Documento não juntado" && (
-                            <Link href={`?doc=${g.gate.documentoTipo}#juntar`} scroll={false} className="btn btn-quiet !px-3 !py-1.5 text-[13px]">
-                              <Plus size={14} /> Juntar
-                            </Link>
-                          )}
-                          {!g.ok && g.gate.tipo === "campo" && (
-                            <a href={`#${g.gate.campo}`} className="btn btn-quiet !px-3 !py-1.5 text-[13px]">
-                              <PenLine size={14} /> Preencher
-                            </a>
-                          )}
-                          {!g.ok && g.gate.tipo === "documento" && g.motivo !== "Documento não juntado" && (
-                            <a href="#documentos" className="btn btn-quiet !px-3 !py-1.5 text-[13px]">
-                              <PenLine size={14} /> Assinar
-                            </a>
+                          {acao && (
+                            <IrPara
+                              alvo={acao.alvo}
+                              href={acao.href}
+                              foco={acao.foco}
+                              valores={acao.valores}
+                              className="btn btn-quiet min-h-[44px] w-full shrink-0 !px-3 !py-1.5 text-[14px] sm:w-auto"
+                            >
+                              {acao.icone === "juntar" ? <Plus size={15} aria-hidden /> : acao.icone === "devolver" ? <Undo2 size={15} aria-hidden /> : <PenLine size={15} aria-hidden />}
+                              {acao.rotulo}
+                            </IrPara>
                           )}
                         </li>
                       );
@@ -252,7 +292,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                     )}
                     <div className="flex flex-wrap gap-2 border-t border-line pt-4">
                       {p.estado.devolucoes.length > 0 && (
-                        <details className="group w-full rounded-xl border border-line open:bg-sunken/50">
+                        <details id="devolver" className="group w-full rounded-xl border border-line open:bg-sunken/50">
                           <summary className="flex items-center gap-2 px-4 py-3 text-[14px] font-semibold text-ink-2 hover:text-ink">
                             <Undo2 size={16} /> Devolver com pendência
                           </summary>
@@ -260,8 +300,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                             <input type="hidden" name="processoId" value={p.id} />
                             <div className="grid gap-3 md:grid-cols-[260px_1fr]">
                               <div>
-                                <label className="label">Para onde volta</label>
-                                <select name="para" className="input">
+                                <label className="label" htmlFor="dev-para">
+                                  Para onde volta
+                                </label>
+                                <select id="dev-para" name="para" className="input">
                                   {p.estado.devolucoes.map((t) => (
                                     <option key={t.para} value={t.para}>
                                       {t.rotulo}
@@ -270,8 +312,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                                 </select>
                               </div>
                               <div>
-                                <label className="label">O que precisa ser corrigido</label>
-                                <input name="motivo" className="input" placeholder="Ex.: Falta a terceira cotação de preço" />
+                                <label className="label" htmlFor="dev-motivo">
+                                  O que precisa ser corrigido
+                                </label>
+                                <input id="dev-motivo" name="motivo" className="input" placeholder="Ex.: Falta a terceira cotação de preço" />
                               </div>
                             </div>
                             <div className="mt-3">
@@ -322,7 +366,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               <ul className="divide-y divide-line border-t border-line">
                 {p.documentos.map((d) => (
                   <li key={d.id}>
-                    <details className="group">
+                    <details id={`doc-${d.id}`} className="group">
                       <summary className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f4f8f6]">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-2">
                           <FileText size={18} />
@@ -357,8 +401,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                             <input type="hidden" name="documentoId" value={d.id} />
                             <div className="flex flex-wrap items-end gap-3">
                               <div>
-                                <label className="label">Assinar como</label>
-                                <select name="papel" className="input !w-auto">
+                                <label className="label" htmlFor={`assinar-papel-${d.id}`}>
+                                  Assinar como
+                                </label>
+                                <select id={`assinar-papel-${d.id}`} name="papel" className="input !w-auto">
                                   {u.papeis
                                     .filter((x) => x !== "ADMIN")
                                     .map((x) => (
@@ -369,8 +415,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                                 </select>
                               </div>
                               <div>
-                                <label className="label">Sua senha</label>
-                                <input name="senha" type="password" className="input !w-56" required autoComplete="current-password" />
+                                <label className="label" htmlFor={`assinar-senha-${d.id}`}>
+                                  Sua senha
+                                </label>
+                                <input id={`assinar-senha-${d.id}`} name="senha" type="password" className="input !w-56" required autoComplete="current-password" />
                               </div>
                               <SubmitButton className="btn btn-primary" pendingText="Assinando…">
                                 <PenLine size={16} /> Assinar documento
@@ -394,8 +442,10 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <input type="hidden" name="processoId" value={p.id} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="label">Tipo de documento</label>
-                      <select name="tipo" className="input" defaultValue={tipoDocPadrao} key={tipoDocPadrao}>
+                      <label className="label" htmlFor="juntar-tipo">
+                        Tipo de documento
+                      </label>
+                      <select id="juntar-tipo" name="tipo" className="input" defaultValue={tipoDocPadrao} key={tipoDocPadrao}>
                         {Object.entries(DOCUMENTO_TIPOS).map(([k, v]) => (
                           <option key={k} value={k}>
                             {v}
@@ -404,13 +454,17 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       </select>
                     </div>
                     <div>
-                      <label className="label">Título</label>
-                      <input name="titulo" className="input" required placeholder="Ex.: Pesquisa de preços — 3 cotações" />
+                      <label className="label" htmlFor="juntar-titulo">
+                        Título
+                      </label>
+                      <input id="juntar-titulo" name="titulo" className="input" required placeholder="Ex.: Pesquisa de preços — 3 cotações" />
                     </div>
                   </div>
                   <div className="mt-4">
-                    <label className="label">Conteúdo</label>
-                    <textarea name="conteudo" className="input" rows={6} required placeholder="Escreva ou cole o texto do documento." />
+                    <label className="label" htmlFor="juntar-conteudo">
+                      Conteúdo
+                    </label>
+                    <textarea id="juntar-conteudo" name="conteudo" className="input" rows={6} required placeholder="Escreva ou cole o texto do documento." />
                     <p className="hint">Envio de PDF e imagens chega na próxima versão.</p>
                   </div>
                   <div className="mt-4">
@@ -469,7 +523,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                 </div>
               </div>
               {exigencia ? (
-                <div className="mt-4 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13.5px] text-ink">
+                <div className="mt-4 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[14px] text-ink">
                   <strong className="font-semibold">Aguardando o interessado até {fmtData(exigencia.prazo)}:</strong> {exigencia.texto}
                 </div>
               ) : (
@@ -529,7 +583,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <p className="text-[14px] text-ink-2">Ainda não informados. Eles definem a fila de pagamento e a remessa ao Tribunal de Contas.</p>
                 )}
                 {podeContratacao && (
-                  <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta}>
+                  <details id="contratacao-form" className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta}>
                     <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">{!contratacao ? "Informar dados" : contratacaoIncompleta ? "Completar dados" : "Corrigir dados"}</summary>
                     <ActionForm action={contratacaoAction} className="space-y-3 px-4 pb-4" resetOnOk={false}>
                       <input type="hidden" name="processoId" value={p.id} />
@@ -613,9 +667,15 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       </ActionForm>
                     )}
                     {o.chave === "PNCP" && o.situacao !== "cumprida" && (
-                      <Link href="?doc=PUBLICACAO_PNCP#juntar" scroll={false} className="mt-2 inline-flex text-[13px] font-semibold text-brand-2 hover:underline">
+                      <IrPara
+                        alvo="juntar"
+                        href="?doc=PUBLICACAO_PNCP#juntar"
+                        foco="[name=titulo]"
+                        valores={{ tipo: "PUBLICACAO_PNCP" }}
+                        className="alvo-toque mt-2 inline-flex text-[14px] font-semibold text-brand-2 hover:underline"
+                      >
                         Juntar comprovante do PNCP
-                      </Link>
+                      </IrPara>
                     )}
                   </li>
                 ))}
@@ -693,4 +753,15 @@ function EnviarSetor({ processoId, setores }: { processoId: string; setores: { i
       </ActionForm>
     </details>
   );
+}
+
+type Acao = { alvo: string; href?: string; foco?: string; valores?: Record<string, string>; rotulo: string; icone: "juntar" | "assinar" | "preencher" | "devolver" };
+
+/** Nome curto do tipo de documento para o botão: a sigla quando há ("ETP"), senão o nome sem o parêntese, em minúscula. */
+function nomeCurtoDoc(tipo: string): string {
+  const n = DOCUMENTO_TIPOS[tipo] ?? tipo;
+  const sigla = n.match(/\(([A-Z]{2,})\)$/);
+  if (sigla) return sigla[1];
+  const base = n.replace(/\s*\(.*\)$/, "");
+  return base.charAt(0).toLowerCase() + base.slice(1);
 }

@@ -13,7 +13,7 @@ export function PainelPesquisaPrecos({ p, pode }: PropsEtapa) {
   const fontes = listaDe<{ fonte: string; data: string; valor: number }>(pesquisa?.fontes);
   const r = regraPesquisaPrecos(pesquisa);
   return (
-    <Panel title="Pesquisa de preços" action={pesquisa ? <Chip tone={r.ok ? "ok" : "warn"}>{r.ok ? "Completa" : "Incompleta"}</Chip> : undefined}>
+    <Panel id="etapa-pesquisa" title="Pesquisa de preços" action={pesquisa ? <Chip tone={r.ok ? "ok" : "warn"}>{r.ok ? "Completa" : "Incompleta"}</Chip> : undefined}>
       <p className="text-[14px] text-ink-2">
         Registre ao menos 3 fontes (art. 23). O valor estimado do processo passa a ser a mediana das fontes
         {meta.valorEstimado ? (

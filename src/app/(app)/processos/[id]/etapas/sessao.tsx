@@ -18,7 +18,7 @@ export function PainelSessao({ p, pode }: PropsEtapa) {
   const r = meta.resultadoSessao as ResultadoSessao | undefined;
   const sit = r ? SITUACAO[r.situacao] : undefined;
   return (
-    <Panel title="Sessão de disputa" action={sit ? <Chip tone={sit.tone}>{sit.texto}</Chip> : undefined}>
+    <Panel id="etapa-sessao" title="Sessão de disputa" action={sit ? <Chip tone={sit.tone}>{sit.texto}</Chip> : undefined}>
       <p className="text-[14px] text-ink-2">A disputa acontece na plataforma; aqui fica o resultado.</p>
       {r && (
         <dl className="mt-4 grid gap-3 rounded-xl border border-line px-4 py-3 sm:grid-cols-2">

@@ -9,7 +9,7 @@ import { SoConsulta, dataBr, metaDe, type PropsEtapa } from "./util";
 export function PainelAvisoDispensa({ p, pode, feriados }: PropsEtapa) {
   const aviso = metaDe(p).avisoDispensa as AvisoDispensa | undefined;
   return (
-    <Panel title="Aviso de dispensa" action={aviso ? <Chip tone="ok">Registrado</Chip> : <Chip tone="warn">A publicar</Chip>}>
+    <Panel id="etapa-aviso" title="Aviso de dispensa" action={aviso ? <Chip tone="ok">Registrado</Chip> : <Chip tone="warn">A publicar</Chip>}>
       <p className="text-[14px] text-ink-2">
         Na dispensa por valor, o aviso fica aberto por 3 dias úteis para receber propostas de outros interessados (art. 75, §3º). Sem aviso, registre a justificativa.
       </p>
@@ -19,7 +19,7 @@ export function PainelAvisoDispensa({ p, pode, feriados }: PropsEtapa) {
         </p>
       )}
       {aviso?.justificativaSemAviso && (
-        <p className="mt-3 rounded-lg bg-sunken px-3 py-2 text-[13.5px] text-ink">
+        <p className="mt-3 rounded-lg bg-sunken px-3 py-2 text-[14px] text-ink">
           <strong className="font-semibold">Sem aviso:</strong> {aviso.justificativaSemAviso}
         </p>
       )}

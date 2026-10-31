@@ -10,15 +10,18 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
   const meta = metaDe(p);
   const edital = meta.edital as Edital | undefined;
   const lista = listaDe<Impugnacao>(meta.impugnacoes);
+  // Destino do link "Ver impugnações" (página do processo): a primeira que precisa de resposta; senão o registro de uma nova; senão o painel
+  const aResponder = pode ? lista.findIndex((i) => i.tempestiva && !i.resposta) : -1;
+  const alvo = "etapa-impugnacoes";
   return (
-    <Panel title="Impugnações ao edital">
+    <Panel id={pode ? undefined : alvo} title="Impugnações ao edital">
       {edital && (
         <p className="text-[14.5px] font-semibold text-ink">
           Sessão marcada para {dataBr(edital.aberturaEm)}
           <span className="font-normal text-ink-2"> · edital {edital.numero}</span>
         </p>
       )}
-      <p className="mt-1 text-[13.5px] text-ink-2">
+      <p className="mt-1 text-[14px] text-ink-2">
         Vale a impugnação recebida até 3 dias úteis antes da abertura (art. 164). As que chegaram no prazo precisam de resposta antes da sessão.
       </p>
 
@@ -38,14 +41,14 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
                 </div>
                 <p className="mt-2 text-[14px] break-words text-ink-2">{i.texto}</p>
                 {i.resposta ? (
-                  <div className="mt-2 rounded-lg bg-sunken px-3 py-2 text-[13.5px] text-ink">
+                  <div className="mt-2 rounded-lg bg-sunken px-3 py-2 text-[14px] text-ink">
                     <strong className="font-semibold">{i.acolhida ? (i.alteraPropostas ? "Acolhida, altera as propostas" : "Acolhida") : "Não acolhida"}</strong>
                     {i.respondidaEm ? ` em ${dataBr(i.respondidaEm)}` : ""}: {i.resposta}
                   </div>
                 ) : (
                   pode && (
-                    <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">
-                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand-2">Responder</summary>
+                    <details id={n === aResponder ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50">
+                      <summary className="flex min-h-[44px] items-center px-4 py-2.5 text-[14px] font-semibold text-brand-2">Responder</summary>
                       <ActionForm action={responderImpugnacaoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
                         <input type="hidden" name="impugnacaoId" value={i.id} />
@@ -73,7 +76,7 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
       </div>
 
       {pode ? (
-        <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
+        <details id={aResponder < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50">
           <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar impugnação</summary>
           <ActionForm action={registrarImpugnacaoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />

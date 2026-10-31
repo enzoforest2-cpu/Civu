@@ -22,7 +22,7 @@ export function listaDe<T>(v: unknown): T[] {
 
 /** Aviso para quem só consulta a etapa. */
 export function SoConsulta({ children }: { children?: ReactNode }) {
-  return <p className="mt-3 text-[13px] text-ink-3">{children ?? "Só quem conduz esta etapa registra estes dados. Você pode consultar."}</p>;
+  return <p className="mt-3 text-[14px] text-ink-3">{children ?? "Só quem conduz esta etapa registra estes dados. Você pode consultar."}</p>;
 }
 
 /** Linha de dado: rótulo pequeno e valor. */
