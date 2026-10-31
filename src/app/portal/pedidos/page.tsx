@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requirePortal } from "@/lib/portal";
 import { listarMeusProcessos } from "@/lib/portal-processos";
-import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import { fmtData } from "@/lib/dates";
 import { Chip, Vazio } from "@/components/ui";
 
@@ -20,7 +20,6 @@ export default async function MeusPedidos() {
         ) : (
           <ul className="divide-y divide-line">
             {lista.map((p) => {
-              const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
               return (
                 <li key={p.id}>
                   <Link href={`/portal/pedidos/${p.id}`} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3.5 hover:bg-sunken/60">
@@ -30,7 +29,7 @@ export default async function MeusPedidos() {
                       </span>
                       <span className="block font-medium text-ink">{p.assunto}</span>
                     </span>
-                    {p.encerradoEm ? <Chip tone="ok">Concluído</Chip> : <Chip tone="brand">{etapa ? nomeEtapa(etapa.nome) : p.estadoAtual}</Chip>}
+                    {p.encerradoEm ? <Chip tone="ok">Concluído</Chip> : <Chip tone="brand">{nomeDaEtapa(p.tipo.definicao as WorkflowDef, p.estadoAtual)}</Chip>}
                   </Link>
                 </li>
               );

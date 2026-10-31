@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { Search } from "lucide-react";
 import { db } from "@/db";
 import { municipios, processos, setores } from "@/db/schema";
-import { caminhoDoProcesso, caminhoPrincipal, getEstado, nomeEtapa, ramoDaModalidade, type WorkflowDef } from "@/lib/workflow";
+import { caminhoDoProcesso, caminhoPrincipal, nomeDaEtapa, nomeEtapa, ramoDaModalidade, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
 import { MarcaCompleta } from "@/components/marca";
@@ -39,7 +39,7 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
   const ramo = ramoDaModalidade(metaP.modalidade);
   const principal = def ? caminhoPrincipal(def) : [];
   const caminho = def ? caminhoDoProcesso(def, metaP) : [];
-  const nome = (k: string | null) => (def && k ? nomeEtapa(getEstado(def, k)?.nome ?? k) : "");
+  const nome = (k: string | null) => (def && k ? nomeDaEtapa(def, k) : "");
 
   return (
     <main className="min-h-screen bg-bg">

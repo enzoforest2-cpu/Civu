@@ -4,6 +4,8 @@ import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { eventos, gestaoAuditoria, processos, usuarios } from "@/db/schema";
 import { verificarCadeia } from "@/lib/engine";
+import { PAPEL_NOME, ROTULO_OPCAO, type Papel } from "@/lib/workflow";
+import { GATILHO_ROTULO, GRAVIDADE_ROTULO, NIVEL_ROTULO } from "./avaliador";
 
 type Exec = Pick<typeof db, "insert">;
 
@@ -72,7 +74,20 @@ export const EVENTO_ROTULO: Record<string, string> = {
   REMESSA_TCE: "Remessa ao Tribunal de Contas",
   EXIGENCIA: "Exigência ao interessado",
   RESPOSTA_EXIGENCIA: "Resposta do interessado",
+  MODALIDADE: "Forma de contratação definida",
+  PESQUISA_PRECOS: "Pesquisa de preços registrada",
+  EDITAL: "Edital publicado",
+  IMPUGNACAO: "Impugnação ao edital recebida",
+  RESPOSTA_IMPUGNACAO: "Impugnação respondida",
+  RESULTADO_SESSAO: "Resultado da sessão registrado",
+  RECURSO: "Intenção de recurso registrada",
+  DECISAO_RECURSO: "Recurso decidido",
+  AVISO_DISPENSA: "Aviso de contratação direta publicado",
+  RETORNO_BANCARIO: "Retorno do banco registrado",
 };
+
+/** Rótulo de um tipo de evento para a tela; tipo desconhecido não aparece cru. */
+export const rotuloEvento = (tipo: string) => EVENTO_ROTULO[tipo] ?? "Registro no processo";
 
 export type ItemTrilha = {
   id: string;
@@ -93,7 +108,7 @@ function resumoDados(tipo: string, dados: unknown): string | null {
   if (typeof d.motivo === "string") return d.motivo;
   if (typeof d.titulo === "string") return d.titulo;
   if (typeof d.rotulo === "string") return d.rotulo;
-  if (tipo === "ASSINATURA" && d.papel) return `Assinou como ${d.papel}`;
+  if (tipo === "ASSINATURA" && d.papel) return `Assinou como ${(PAPEL_NOME[d.papel as Papel] ?? "responsável").toLowerCase()}`;
   if (tipo === "REMESSA_TCE" && d.recibo) return `Recibo ${d.recibo}`;
   return null;
 }
@@ -150,7 +165,7 @@ export async function trilha(
         fonte: "PROCESSO",
         quando: r.criadoEm,
         autor: r.autor,
-        acao: EVENTO_ROTULO[r.tipo] ?? r.tipo,
+        acao: rotuloEvento(r.tipo),
         objeto: `${r.numero} · ${r.assunto}`,
         href: `/processos/${r.processoId}`,
         detalhe: resumoDados(r.tipo, r.dados),
@@ -200,7 +215,7 @@ export async function trilha(
         fonte: "ADMINISTRATIVA",
         quando: r.criadoEm,
         autor: r.autor ?? (r.origem === "AUTOMACAO" ? "Automação" : "Sistema"),
-        acao: ACAO_ROTULO[r.acao] ?? r.acao,
+        acao: ACAO_ROTULO[r.acao] ?? "Ação administrativa",
         objeto: r.objetoRotulo ?? r.objetoTipo,
         href: null,
         detalhe: r.justificativa ?? descreverMudanca(r.antes, r.depois),
@@ -209,6 +224,21 @@ export async function trilha(
 
   return out.sort((a, b) => b.quando.getTime() - a.quando.getTime()).slice(0, limite);
 }
+
+/** Nomes dos campos gravados em antes/depois da auditoria administrativa (a tela não mostra a chave crua). */
+const CAMPO_ROTULO: Record<string, string> = {
+  ativa: "Ativa", ativo: "Ativo", versao: "Versão", "versão": "Versão", papeis: "Papéis", setor: "Setor", setorId: "Setor", setorSigla: "Setor",
+  acao: "Ação", nivel: "Nível", gatilho: "Gatilho", parametros: "Parâmetros", acaoParametros: "Parâmetros da ação", gravidade: "Gravidade",
+  dias: "Dias", diasTolerancia: "Tolerância (dias)", palavras: "Palavras", somenteNovos: "Só pedidos novos", despacho: "Despacho",
+  disparos: "Disparos", avaliados: "Processos avaliados", falhas: "Falhas", eventos: "Eventos", integros: "Íntegros", processos: "Processos",
+  verificadoEm: "Verificado em", modo: "Modo", resultados: "Resultados", status: "Situação", ambiente: "Ambiente",
+};
+/** Códigos que aparecem nos valores: papéis, gatilhos, níveis, gravidades e opções do fluxo. */
+const CODIGO_ROTULO: Record<string, string> = {
+  ...ROTULO_OPCAO, ...GRAVIDADE_ROTULO, ...NIVEL_ROTULO, ...GATILHO_ROTULO, ...PAPEL_NOME,
+  ALERTA: "Gerar alerta", ENCAMINHAR: "Encaminhar", AVANCAR: "Avançar", DEVOLVER: "Devolver",
+};
+const rotuloCampo = (k: string) => CAMPO_ROTULO[k] ?? k.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 
 function descreverMudanca(antes: unknown, depois: unknown): string | null {
   if (!antes && !depois) return null;
@@ -219,16 +249,26 @@ function descreverMudanca(antes: unknown, depois: unknown): string | null {
     const va = fmtValor(a[k]);
     const vd = fmtValor(d[k]);
     if (va === vd) continue;
-    partes.push(antes ? `${k}: ${va} → ${vd}` : `${k}: ${vd}`);
+    partes.push(antes ? `${rotuloCampo(k)}: ${va} → ${vd}` : `${rotuloCampo(k)}: ${vd}`);
   }
   return partes.length ? partes.join(" · ") : null;
 }
 
 function fmtValor(v: unknown): string {
   if (v === undefined || v === null) return "—";
-  if (Array.isArray(v)) return v.join(", ") || "nenhum";
+  if (Array.isArray(v)) return v.map((x) => fmtValor(x)).join(", ") || "nenhum";
   if (typeof v === "boolean") return v ? "sim" : "não";
-  if (typeof v === "object") return JSON.stringify(v);
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    // resultado de decisão em lote: número e mensagem
+    if (typeof o.numero === "string") return `${o.numero}${typeof o.mensagem === "string" ? ` (${o.mensagem})` : ""}`;
+    const partes = Object.entries(o).filter(([, x]) => x !== null && x !== undefined).map(([k, x]) => `${rotuloCampo(k).toLowerCase()} ${fmtValor(x)}`);
+    return partes.join(", ") || "—";
+  }
+  if (typeof v === "string") {
+    if (CODIGO_ROTULO[v]) return CODIGO_ROTULO[v];
+    if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return new Date(v).toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
+  }
   return String(v);
 }
 

@@ -83,7 +83,7 @@ async function Matriz({ municipioId }: { municipioId: string }) {
   return (
     <div className="space-y-6">
       <Panel title="Ações da plataforma" pad={false}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Ações da plataforma por papel (tabela que rola para o lado)">
           <table className="lista">
             <thead>
               <tr>
@@ -123,7 +123,7 @@ async function Matriz({ municipioId }: { municipioId: string }) {
         const def = t.definicao as WorkflowDef;
         return (
           <Panel key={t.id} title={`Quem age em cada etapa: ${t.nome}`} pad={false}>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`Quem age em cada etapa: ${t.nome} (tabela que rola para o lado)`}>
               <table className="lista">
                 <thead>
                   <tr>
@@ -174,7 +174,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
         {humanos.map((x) => {
           const editavel = admin && x.id !== euId;
           return (
-            <li key={x.id} className={`py-4 ${x.ativo ? "" : "opacity-70"}`}>
+            <li key={x.id} className={`py-4 ${x.ativo ? "" : "-mx-3 rounded-lg bg-sunken px-3"}`}>
               <div className="flex flex-wrap items-start gap-3">
                 <Avatar nome={x.nome} size={36} />
                 <div className="min-w-0 flex-1">
@@ -189,7 +189,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {(x.papeis as Papel[]).map((p) => (
                       <Chip key={p} tone={p === "ADMIN" ? "warn" : "neutral"}>
-                        {PAPEL_NOME[p] ?? p}
+                        {PAPEL_NOME[p as Papel] ?? "Papel desconhecido"}
                       </Chip>
                     ))}
                   </div>
@@ -295,7 +295,7 @@ async function Trilha({ municipioId, sp }: { municipioId: string; sp: SP }) {
             <Vazio>Nenhum registro encontrado com esses filtros.</Vazio>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Trilha de auditoria (tabela que rola para o lado)">
             <table className="lista">
               <thead>
                 <tr>

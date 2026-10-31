@@ -2,7 +2,7 @@ import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, S
 import type { LucideIcon } from "lucide-react";
 import { fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { dataBr } from "./etapas/util";
-import { DOCUMENTO_TIPOS, FONTES, MODALIDADES, PAPEL_NOME, getEstado, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, MODALIDADES, nomeDaEtapa, nomeDocumento, nomePapel, type WorkflowDef } from "@/lib/workflow";
 
 type Ev = {
   id: string;
@@ -35,7 +35,7 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
 };
 
 export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) {
-  const nome = (k: string | null) => (k ? nomeEtapa(getEstado(def, k)?.nome ?? k) : "");
+  const nome = (k: string | null) => nomeDaEtapa(def, k);
   const lista = [...eventos].reverse();
   return (
     <ol className="relative space-y-5">
@@ -111,8 +111,8 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
             detalhe = d.titulo;
             break;
           case "ASSINATURA":
-            titulo = `Assinou como ${PAPEL_NOME[d.papel as Papel] ?? d.papel}`;
-            detalhe = DOCUMENTO_TIPOS[d.tipo ?? ""] ?? d.tipo;
+            titulo = `Assinou como ${nomePapel(d.papel)}`;
+            detalhe = nomeDocumento(d.tipo);
             break;
           case "DESPACHO":
             titulo = "Observação";

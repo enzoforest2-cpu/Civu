@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { ProcessoCompleto } from "@/lib/engine";
 
 /** Props comuns dos painéis das etapas. */
-export type PropsEtapa = { p: ProcessoCompleto; pode: boolean; feriados: Set<string> };
+/** `abrir`: id do <details> que a página pediu aberto (?abrir=), para as pendências funcionarem sem JavaScript. */
+export type PropsEtapa = { p: ProcessoCompleto; pode: boolean; feriados: Set<string>; abrir?: string };
 
 /** AAAA-MM-DD para dd/mm/aaaa sem passar por fuso. Aceita também data-hora ISO. */
 export function dataBr(iso: string | null | undefined): string {

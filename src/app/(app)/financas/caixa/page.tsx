@@ -118,7 +118,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
                   <strong>{nomeGrupo(s.grupo)}</strong> fica negativa a partir de {fmtIso(s.primeiroNegativo!.data)} e chega a {fmtMoeda(s.min.saldo)} em {fmtIso(s.min.data)}.
                 </div>
               ))}
-              <div className="mt-1 text-[13px] text-bad/80">Antecipe a cobrança do repasse, reprograme medições ou pagamentos dessa fonte. Recurso livre só cobre se houver decisão formal.</div>
+              <div className="mt-1 text-[13px] text-bad">Antecipe a cobrança do repasse, reprograme medições ou pagamentos dessa fonte. Recurso livre só cobre se houver decisão formal.</div>
             </div>
           </div>
         ) : (

@@ -69,7 +69,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
         <div className="min-w-0 space-y-6">
           {/* Saldo */}
           <Panel title="Execução financeira">
-            <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <dl className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Dado rotulo="Valor global">
                 <span className="tnum">{fmtMoeda(fin.global)}</span>
               </Dado>
@@ -82,7 +82,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               <Dado rotulo="Saldo">
                 <span className={`display tnum text-[17px] font-semibold ${fin.pctSaldo < 10 ? "text-bad" : ""}`}>{fmtMoeda(fin.saldo)}</span>
               </Dado>
-            </div>
+            </dl>
             <BarraSaldo fin={fin} />
             <p className="mt-4 text-[14px] text-ink-3">
               Saldo = valor global + aditivos + reajustes − notas atestadas (inclusive as já em liquidação ou pagas). Acréscimos de valor somam{" "}
@@ -216,7 +216,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   </span>
                 }
               >
-                <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <dl className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <Dado rotulo="Executado (físico)">
                     <span className="display tnum text-[20px] font-semibold">{pct(obra.fisico)}</span>
                   </Dado>
@@ -231,7 +231,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   <Dado rotulo="Situação">
                     <Chip tone={SITUACAO_OBRA[obra.situacao].tone}>{SITUACAO_OBRA[obra.situacao].texto}</Chip>
                   </Dado>
-                </div>
+                </dl>
                 <CurvaS obra={obra} />
                 {c.obraMotivo && (
                   <div className="mt-4 rounded-lg bg-warn-soft px-4 py-3 text-[14px] text-ink">
@@ -396,7 +396,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   <li key={a.id} className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-ink">{a.numero}º termo aditivo</span>
-                      <Chip tone="neutral">{TIPOS_ADITIVO[a.tipo] ?? a.tipo}</Chip>
+                      <Chip tone="neutral">{TIPOS_ADITIVO[a.tipo] ?? "Aditivo"}</Chip>
                       {a.acimaDoLimite && (
                         <Chip tone="bad">
                           <AlertTriangle size={12} /> Acima do limite do art. 125
@@ -416,7 +416,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   <li key={a.id} className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-ink">{a.numero}º apostilamento</span>
-                      <Chip tone="neutral">{TIPOS_APOSTILAMENTO[a.tipo] ?? a.tipo}</Chip>
+                      <Chip tone="neutral">{TIPOS_APOSTILAMENTO[a.tipo] ?? "Apostilamento"}</Chip>
                       <span className="text-[13px] text-ink-3">{dl(a.data)}</span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-4 text-[14px] text-ink-2">

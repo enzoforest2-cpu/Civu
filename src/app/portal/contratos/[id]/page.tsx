@@ -50,7 +50,7 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           <section className="panel p-6">
-            <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <dl className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Dado rotulo="Valor atualizado">
                 <span className="display tnum text-[18px] font-semibold">{fmtMoeda(fin.valorAtual)}</span>
               </Dado>
@@ -60,7 +60,7 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
               <Dado rotulo="Pode faturar agora">
                 <span className="display tnum text-[18px] font-semibold">{fmtMoeda(Math.max(0, fin.saldo - fin.aAtestar))}</span>
               </Dado>
-            </div>
+            </dl>
             <BarraSaldo fin={fin} />
             {fin.ativo && (
               <Link href={`/portal/contratos/nota?contrato=${c.id}`} className="btn btn-primary mt-5">

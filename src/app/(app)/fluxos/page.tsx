@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { setores, tiposProcesso } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { Cabecalho, Chip } from "@/components/ui";
-import { DOCUMENTO_TIPOS, PAPEL_NOME, caminhoPrincipal, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { PAPEL_NOME, caminhoPrincipal, nomeDocumento, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
 
 export default async function FluxosPage() {
   const u = await requireUser();
@@ -79,7 +79,7 @@ export default async function FluxosPage() {
                               ) : (
                                 e.gates.map((g, k) => (
                                   <dd key={k} className="text-ink">
-                                    {g.tipo === "documento" ? (DOCUMENTO_TIPOS[g.documentoTipo] ?? g.documentoTipo) : g.tipo === "campo" ? g.campo : g.descricao}
+                                    {g.tipo === "documento" ? nomeDocumento(g.documentoTipo) : g.tipo === "campo" ? (g.descricao ?? "Dado do processo") : g.descricao}
                                     {g.tipo === "documento" && g.assinadoPor?.length ? (
                                       <span className="text-ink-3"> — assinado por {g.assinadoPor.map((p) => PAPEL_NOME[p]).join(" e ")}</span>
                                     ) : null}

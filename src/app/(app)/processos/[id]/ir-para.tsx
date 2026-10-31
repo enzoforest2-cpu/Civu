@@ -8,6 +8,7 @@ const CAMPO = "input:not([type=hidden]):not([disabled]), select:not([disabled]),
  * Leva ao formulário que resolve uma pendência: abre o <details> (o próprio alvo e os que o contêm),
  * rola até ele e põe o foco no primeiro campo. Sem JavaScript, o `href` faz o mesmo papel pela âncora.
  * `valores` pré-preenche selects pelo nome (ex.: tipo de documento a juntar, papel da assinatura).
+ * Sem JavaScript, o link padrão é `?abrir=<alvo>` (e `&papel=`): a página abre o <details> no servidor e pré-seleciona o papel.
  */
 export function IrPara({
   alvo,
@@ -44,7 +45,7 @@ export function IrPara({
     history.replaceState(null, "", `#${alvo}`);
   }
   return (
-    <a href={href ?? `#${alvo}`} onClick={ir} className={className}>
+    <a href={href ?? `?${new URLSearchParams({ abrir: alvo, ...(valores?.papel ? { papel: valores.papel } : {}) })}#${alvo}`} onClick={ir} className={className}>
       {children}
     </a>
   );

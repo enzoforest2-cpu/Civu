@@ -637,6 +637,23 @@ export function nomeEtapa(nome: string): string {
   return nome.replace(/^\d+[a-z]?\.\s*/i, "");
 }
 
+/** Etapas que saíram dos fluxos: nome para a tela quando um processo antigo ainda está (ou esteve) nelas. */
+export const ETAPAS_ANTIGAS: Record<string, string> = {
+  CONTRATACAO: "Contratação (etapa antiga)",
+};
+/** Nome do tipo de documento e do papel para a tela, sem o código cru quando o tipo não é conhecido. */
+export const nomeDocumento = (tipo: string | null | undefined) => (tipo && DOCUMENTO_TIPOS[tipo]) || "Documento";
+export const nomePapel = (papel: string | null | undefined) => (papel && PAPEL_NOME[papel as Papel]) || "Responsável";
+export const ETAPA_FORA_DO_FLUXO = "Etapa antiga (fora do fluxo atual)";
+
+/** Nome da etapa para mostrar ao usuário: nunca a chave interna. Etapa que saiu do fluxo vira "Etapa antiga". */
+export function nomeDaEtapa(def: WorkflowDef | null | undefined, chave: string | null | undefined): string {
+  if (!chave) return "";
+  const e = def ? getEstado(def, chave) : undefined;
+  if (e) return nomeEtapa(e.nome);
+  return ETAPAS_ANTIGAS[chave] ?? ETAPA_FORA_DO_FLUXO;
+}
+
 /** Caminho principal do fluxo: segue sempre o primeiro avanço a partir do estado inicial. Estados fora dele são desvios opcionais. */
 export function caminhoPrincipal(def: WorkflowDef): string[] {
   const out: string[] = [];

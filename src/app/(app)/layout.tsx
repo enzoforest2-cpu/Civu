@@ -4,7 +4,7 @@ import { LogOut, Search } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/app/actions";
 import { Navegacao, type GrupoNav } from "@/components/navegacao";
-import { MenuCelular } from "@/components/menu-celular";
+import { BotaoMenuCelular, GavetaMenuCelular } from "@/components/menu-celular";
 import { GRUPOS, ITENS_GESTAO } from "@/lib/modulos";
 import { Avatar } from "@/components/ui";
 import { Marca, MarcaCompleta } from "@/components/marca";
@@ -61,18 +61,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Marca size={26} />
             <span className="text-[13px] leading-tight text-ink-2">{u.municipio.nome}</span>
           </Link>
-          <MenuCelular
-            grupos={grupos}
-            topo={<span className="min-w-0 truncate text-[14px] font-semibold text-ink">{u.nome}</span>}
-            rodape={
-              <form action={logoutAction}>
-                <button className="btn btn-quiet min-h-[44px] w-full">
-                  <LogOut size={17} aria-hidden /> Sair
-                </button>
-              </form>
-            }
-          />
+          <BotaoMenuCelular />
         </nav>
+        {/* a gaveta fica fora da barra do celular (que some no computador): ver GavetaMenuCelular */}
+        <GavetaMenuCelular
+          grupos={grupos}
+          topo={<span className="min-w-0 truncate text-[14px] font-semibold text-ink">{u.nome}</span>}
+          rodape={
+            <form action={logoutAction}>
+              <button className="btn btn-quiet min-h-[44px] w-full">
+                <LogOut size={17} aria-hidden /> Sair
+              </button>
+            </form>
+          }
+        />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-bg/85 px-4 py-3 backdrop-blur sm:px-10">
           <form action="/processos" className="relative w-full max-w-md">
             <Search size={17} aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-3" />

@@ -6,11 +6,13 @@ import { decidirRecursoAction, registrarRecursoAction } from "./acoes";
 import { SoConsulta, dataBr, listaDe, metaDe, type PropsEtapa } from "./util";
 
 /** Recursos (art. 165): intenção na sessão, razões em 3 dias úteis, contrarrazões em mais 3, decisão. */
-export function PainelRecursos({ p, pode }: PropsEtapa) {
+export function PainelRecursos({ p, pode, abrir }: PropsEtapa) {
   const lista = listaDe<Recurso>(metaDe(p).recursos);
   const hoje = hojeIso();
-  // Destino do link "Ver recursos" (página do processo): o primeiro recurso que já pode ser decidido; senão o registro de intenção; senão o painel
+  // Destino do link "Ver recursos" (página do processo): o primeiro recurso que já pode ser decidido; senão o recurso pendente cujas
+  // contrarrazões ainda correm; só sem recurso pendente, o registro de intenção; para quem só consulta, o painel
   const aDecidir = pode ? lista.findIndex((r) => !r.decididoEm && hoje > r.contrarrazoesAte) : -1;
+  const correndo = pode && aDecidir < 0 ? lista.findIndex((r) => !r.decididoEm) : -1;
   const alvo = "etapa-recursos";
   return (
     <Panel id={pode ? undefined : alvo} title="Recursos">
@@ -21,7 +23,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
         ) : (
           <ul className="space-y-3">
             {lista.map((r, n) => (
-              <li key={`${r.id}-${n}`} className="rounded-xl border border-line px-4 py-3">
+              <li key={`${r.id}-${n}`} id={n === correndo ? alvo : undefined} tabIndex={n === correndo ? -1 : undefined} className="scroll-mt-4 rounded-xl border border-line px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-[14.5px] font-medium text-ink">{r.recorrente}</div>
@@ -45,7 +47,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                   <p className="mt-2 text-[14px] text-ink-3">A decisão fica disponível a partir do dia seguinte ao fim das contrarrazões ({dataBr(r.contrarrazoesAte)}).</p>
                 ) : (
                   pode && (
-                    <details id={n === aDecidir ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50">
+                    <details id={n === aDecidir ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50" open={n === aDecidir && abrir === alvo}>
                       <summary className="flex min-h-[44px] items-center px-4 py-2.5 text-[14px] font-semibold text-brand-2">Decidir</summary>
                       <ActionForm action={decidirRecursoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
@@ -70,7 +72,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
         )}
       </div>
       {pode ? (
-        <details id={aDecidir < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50">
+        <details id={aDecidir < 0 && correndo < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={aDecidir < 0 && correndo < 0 && abrir === alvo}>
           <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar intenção de recurso</summary>
           <ActionForm action={registrarRecursoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />

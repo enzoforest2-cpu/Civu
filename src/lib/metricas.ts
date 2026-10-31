@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { eventos, processos, setores, tiposProcesso } from "@/db/schema";
-import { getEstado, type WorkflowDef } from "./workflow";
+import { nomeDaEtapa, type WorkflowDef } from "./workflow";
 
 export async function painel(municipioId: string) {
   const agora = new Date();
@@ -12,7 +12,7 @@ export async function painel(municipioId: string) {
   ]);
   const nomeEstado = (tipoId: string, chave: string) => {
     const t = tipos.find((x) => x.id === tipoId);
-    return (t && getEstado(t.definicao as WorkflowDef, chave)?.nome) || chave;
+    return nomeDaEtapa(t?.definicao as WorkflowDef | undefined, chave);
   };
   const nomeSetor = (id: string | null) => setoresRows.find((s) => s.id === id)?.nome ?? "Sem setor";
 

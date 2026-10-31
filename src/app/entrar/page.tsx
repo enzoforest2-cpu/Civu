@@ -50,7 +50,7 @@ export default async function EntrarPage() {
                         <span className="block font-semibold text-ink">{p.nome}</span>
                         <span className="block text-[13px] text-ink-2">
                           {p.representacoes.length
-                            ? p.representacoes.map((r) => `${PAPEL_REPRESENTACAO[r.papel] ?? r.papel} de ${r.empresa.nomeFantasia ?? r.empresa.razaoSocial}`).join(" · ")
+                            ? p.representacoes.map((r) => `${PAPEL_REPRESENTACAO[r.papel] ?? "Representante"} de ${r.empresa.nomeFantasia ?? r.empresa.razaoSocial}`).join(" · ")
                             : "Cidadã(o)"}
                           {p.nivelGovbr ? ` · conta ${p.nivelGovbr}` : ""}
                         </span>

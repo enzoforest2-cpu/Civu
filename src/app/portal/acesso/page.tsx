@@ -39,7 +39,7 @@ export default async function AcessoPage() {
                       {r.pessoa.nome} {r.pessoaId === s.pessoa.id && <span className="text-ink-3">(você)</span>}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      <Chip tone="brand">{PAPEL_REPRESENTACAO[r.papel] ?? r.papel}</Chip>
+                      <Chip tone="brand">{PAPEL_REPRESENTACAO[r.papel] ?? "Representante"}</Chip>
                       {(r.escopos as Escopo[]).map((e) => (
                         <Chip key={e}>{ESCOPO_NOME[e] ?? e}</Chip>
                       ))}

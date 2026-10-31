@@ -4,7 +4,7 @@ import { ArrowRight, FolderSearch, KeyRound, Landmark, MessageSquareWarning } fr
 import { requirePortal } from "@/lib/portal";
 import { listarMeusProcessos } from "@/lib/portal-processos";
 import { ATALHOS_PORTAL } from "@/lib/modulos";
-import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import { fmtData } from "@/lib/dates";
 import { Chip } from "@/components/ui";
 import type { Exigencia } from "@/lib/engine";
@@ -80,7 +80,6 @@ export default async function PortalInicio() {
         ) : (
           <ul className="mt-3 divide-y divide-line">
             {abertos.slice(0, 6).map((p) => {
-              const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
               return (
                 <li key={p.id}>
                   <Link href={`/portal/pedidos/${p.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:text-brand-2">
@@ -88,7 +87,7 @@ export default async function PortalInicio() {
                       <span className="tnum text-[13px] text-ink-3">{p.numero}</span>
                       <span className="block font-medium text-ink">{p.assunto}</span>
                     </span>
-                    <Chip tone="brand">{etapa ? nomeEtapa(etapa.nome) : p.estadoAtual}</Chip>
+                    <Chip tone="brand">{nomeDaEtapa(p.tipo.definicao as WorkflowDef, p.estadoAtual)}</Chip>
                   </Link>
                 </li>
               );

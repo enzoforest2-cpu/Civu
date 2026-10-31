@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { setores } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { ETAPAS_CONTRATACAO, ETAPAS_CORRECAO_CONTRATACAO, carregarProcesso, avaliarGates, feriadosDo, podeAgir, verificarCadeia } from "@/lib/engine";
-import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeEtapa, ramoDaModalidade, type Gate, type Papel } from "@/lib/workflow";
+import { DOCUMENTO_TIPOS, FONTES, PAPEL_NOME, ROTULO_OPCAO, avancosDisponiveis, caminhoDoProcesso, caminhoPrincipal, nomeDocumento, nomeEtapa, nomePapel, ramoDaModalidade, type Gate, type Papel } from "@/lib/workflow";
 import { analisarFracionamento, obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { aFrenteNaFila, fmtCnpj, nomeFonte, type Contratacao } from "@/lib/pagamentos";
 import { LimiteDispensa } from "@/components/limite-dispensa";
@@ -31,10 +31,12 @@ const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | 
   pendente: { tone: "neutral", texto: "Pendente" },
 };
 
-export default async function ProcessoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ doc?: string }> }) {
+export default async function ProcessoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ doc?: string; abrir?: string; papel?: string }> }) {
   const u = await requireUser();
   const { id } = await params;
-  const { doc: docSugerido } = await searchParams;
+  // ?abrir=<id> (pendências de "O que fazer agora"): o <details> com esse id já vem aberto do servidor, sem depender de JavaScript;
+  // ?papel=<papel> pré-seleciona o papel da assinatura
+  const { doc: docSugerido, abrir, papel: papelSugerido } = await searchParams;
   const p = await carregarProcesso(u.municipioId, id);
   if (!p) notFound();
   const feriados = await feriadosDo(u.municipioId);
@@ -202,7 +204,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                 {p.estado.gates.length > 0 && (
                   <ul className="mt-4 space-y-2">
                     {gates.map((g, i) => {
-                      const nomeDoc = g.gate.tipo === "documento" ? (g.gate.descricao ?? DOCUMENTO_TIPOS[g.gate.documentoTipo]) : g.gate.tipo === "campo" ? (g.gate.descricao ?? g.gate.campo) : g.gate.descricao;
+                      const nomeDoc = g.gate.tipo === "documento" ? (g.gate.descricao ?? DOCUMENTO_TIPOS[g.gate.documentoTipo]) : g.gate.tipo === "campo" ? (g.gate.descricao ?? "Dado do processo") : g.gate.descricao;
                       const acao = g.ok ? null : acaoDaPendencia(g.gate, g.motivo);
                       return (
                         <li key={i} className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3 sm:flex-nowrap ${g.ok ? "border-ok/20 bg-ok-soft/50" : "border-line bg-white"}`}>
@@ -292,7 +294,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                     )}
                     <div className="flex flex-wrap gap-2 border-t border-line pt-4">
                       {p.estado.devolucoes.length > 0 && (
-                        <details id="devolver" className="group w-full rounded-xl border border-line open:bg-sunken/50">
+                        <details id="devolver" className="group w-full rounded-xl border border-line open:bg-sunken/50" open={abrir === "devolver"}>
                           <summary className="flex items-center gap-2 px-4 py-3 text-[14px] font-semibold text-ink-2 hover:text-ink">
                             <Undo2 size={16} /> Devolver com pendência
                           </summary>
@@ -351,7 +353,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
           )}
 
           {/* Painel da etapa (edital, impugnações, sessão, recursos, aviso, retorno do banco…) */}
-          <PainelDaEtapa p={p} pode={pode} feriados={feriados} />
+          <PainelDaEtapa p={p} pode={pode} feriados={feriados} abrir={abrir} />
 
           {/* Documentos */}
           <section id="documentos" className="panel">
@@ -366,7 +368,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               <ul className="divide-y divide-line border-t border-line">
                 {p.documentos.map((d) => (
                   <li key={d.id}>
-                    <details id={`doc-${d.id}`} className="group">
+                    <details id={`doc-${d.id}`} className="group" open={abrir === `doc-${d.id}`}>
                       <summary className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f4f8f6]">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-2">
                           <FileText size={18} />
@@ -374,7 +376,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[14.5px] font-medium text-ink">{d.titulo}</div>
                           <div className="truncate text-[12.5px] text-ink-3">
-                            {DOCUMENTO_TIPOS[d.tipo] ?? d.tipo} · {d.criadoPor.nome} · {fmtDataHora(d.criadoEm)}
+                            {nomeDocumento(d.tipo)} · {d.criadoPor.nome} · {fmtDataHora(d.criadoEm)}
                             {d.versao > 1 ? ` · versão ${d.versao}` : ""}
                           </div>
                         </div>
@@ -384,7 +386,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                           ) : (
                             d.assinaturas.map((a) => (
                               <Chip key={a.id} tone="ok">
-                                <PenLine size={11} strokeWidth={2.5} /> {a.usuario.nome.split(" ")[0]} · {PAPEL_NOME[a.papel as Papel] ?? a.papel}
+                                <PenLine size={11} strokeWidth={2.5} /> {a.usuario.nome.split(" ")[0]} · {nomePapel(a.papel)}
                               </Chip>
                             ))
                           )}
@@ -404,7 +406,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                                 <label className="label" htmlFor={`assinar-papel-${d.id}`}>
                                   Assinar como
                                 </label>
-                                <select id={`assinar-papel-${d.id}`} name="papel" className="input !w-auto">
+                                <select id={`assinar-papel-${d.id}`} name="papel" className="input !w-auto" defaultValue={abrir === `doc-${d.id}` && papelSugerido && u.papeis.includes(papelSugerido as Papel) ? papelSugerido : undefined}>
                                   {u.papeis
                                     .filter((x) => x !== "ADMIN")
                                     .map((x) => (
@@ -434,7 +436,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
             )}
 
             {!p.encerradoEm && (
-              <details id="juntar" className="border-t border-line" open={!!docSugerido}>
+              <details id="juntar" className="border-t border-line" open={!!docSugerido || abrir === "juntar"}>
                 <summary className="flex items-center gap-2 px-6 py-4 text-[14.5px] font-semibold text-brand-2 hover:text-brand-ink">
                   <Plus size={17} /> Juntar documento
                 </summary>
@@ -583,7 +585,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <p className="text-[14px] text-ink-2">Ainda não informados. Eles definem a fila de pagamento e a remessa ao Tribunal de Contas.</p>
                 )}
                 {podeContratacao && (
-                  <details id="contratacao-form" className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta}>
+                  <details id="contratacao-form" className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta || abrir === "contratacao-form"}>
                     <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">{!contratacao ? "Informar dados" : contratacaoIncompleta ? "Completar dados" : "Corrigir dados"}</summary>
                     <ActionForm action={contratacaoAction} className="space-y-3 px-4 pb-4" resetOnOk={false}>
                       <input type="hidden" name="processoId" value={p.id} />
@@ -759,7 +761,7 @@ type Acao = { alvo: string; href?: string; foco?: string; valores?: Record<strin
 
 /** Nome curto do tipo de documento para o botão: a sigla quando há ("ETP"), senão o nome sem o parêntese, em minúscula. */
 function nomeCurtoDoc(tipo: string): string {
-  const n = DOCUMENTO_TIPOS[tipo] ?? tipo;
+  const n = nomeDocumento(tipo);
   const sigla = n.match(/\(([A-Z]{2,})\)$/);
   if (sigla) return sigla[1];
   const base = n.replace(/\s*\(.*\)$/, "");

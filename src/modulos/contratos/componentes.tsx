@@ -174,7 +174,7 @@ export function TrilhoNota({ s }: { s: SituacaoNota }) {
             {i > 0 && <span className={`h-0.5 w-3 sm:w-5 ${i <= feitoAte ? "bg-brand" : "bg-line-2"}`} aria-hidden />}
             <span
               className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${
-                erro ? "bg-bad-soft text-bad" : feito ? "bg-brand text-white" : corrente ? "bg-brand-soft text-brand-ink ring-1 ring-brand" : "bg-sunken text-ink-3"
+                erro ? "bg-bad-soft text-bad" : feito ? "bg-brand-2 text-white" : corrente ? "bg-brand-soft text-brand-ink ring-1 ring-brand" : "bg-sunken text-ink-3"
               }`}
             >
               {erro ? <X size={11} strokeWidth={3} /> : feito ? <Check size={11} strokeWidth={3} /> : null}

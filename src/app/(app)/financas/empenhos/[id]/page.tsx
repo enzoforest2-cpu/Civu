@@ -7,7 +7,7 @@ import { processos, tiposProcesso } from "@/db/schema";
 import { requireUser, temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { fmtCnpj } from "@/lib/pagamentos";
-import { getEstado, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import { Chip, Panel, Vazio } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { addDiasIso, anoCorrente, caixa, execucao, fmtIso, hojeIso } from "@/modulos/financas/dados";
@@ -242,7 +242,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
               <ul className="space-y-3">
                 {procs.map((p) => {
                   const t = tipos.find((x) => x.id === p.tipoId);
-                  const estado = t ? getEstado(t.definicao as WorkflowDef, p.estadoAtual)?.nome : p.estadoAtual;
+                  const estado = nomeDaEtapa(t?.definicao as WorkflowDef | undefined, p.estadoAtual);
                   return (
                     <li key={p.id}>
                       <Link href={`/processos/${p.id}`} className="tnum font-semibold text-brand-2 hover:underline">

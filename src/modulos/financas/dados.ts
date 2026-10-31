@@ -19,7 +19,7 @@ import {
   tiposProcesso,
   unidadesGestoras,
 } from "@/db/schema";
-import { getEstado, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import {
   CATEGORIAS_RECEITA,
   FUNCOES,
@@ -582,7 +582,7 @@ export async function processosParaEmpenho(municipioId: string, ano: number) {
         numero: p.numero,
         assunto: p.assunto,
         estado: p.estadoAtual,
-        estadoNome: getEstado(t.definicao as WorkflowDef, p.estadoAtual)?.nome ?? p.estadoAtual,
+        estadoNome: nomeDaEtapa(t.definicao as WorkflowDef, p.estadoAtual),
         contratacao,
         empenhos: emps,
         aguardando: emps.length === 0 && (p.estadoAtual === "CONTRATADO" || p.estadoAtual === "EMPENHADO"),

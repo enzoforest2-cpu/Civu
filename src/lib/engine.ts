@@ -7,7 +7,7 @@ import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
 import { numeroBr } from "./numeros";
-import { FONTES, MODALIDADES, PAPEL_NOME, avancosDisponiveis, getEstado, papeisPorExtenso, ramoDaModalidade, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, nomeDaEtapa, nomeDocumento, nomePapel, papeisPorExtenso, ramoDaModalidade, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
 import {
   MIN_JUSTIFICATIVA,
   impugnacaoTempestiva,
@@ -242,7 +242,7 @@ export type ProcessoCompleto = NonNullable<Awaited<ReturnType<typeof carregarPro
 
 /** Processo parado numa etapa que saiu do fluxo (ex.: CONTRATACAO, antes da licitação em etapas): a página abre e só o administrador mexe. */
 function estadoDeReserva(chave: string): EstadoDef {
-  return { chave, nome: "Etapa antiga: " + chave, papeis: ["ADMIN"], avancos: [], devolucoes: [], gates: [], setor: "LIVRE", slaDiasUteis: 0 };
+  return { chave, nome: nomeDaEtapa(null, chave), papeis: ["ADMIN"], avancos: [], devolucoes: [], gates: [], setor: "LIVRE", slaDiasUteis: 0 };
 }
 
 /** Data de hoje (AAAA-MM-DD) no fuso dos municípios atendidos, para as regras de prazo. */
@@ -348,7 +348,7 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
   const pend = avaliarGates(p, fer).filter((g) => !g.ok);
   if (pend.length)
     throw new ErroFluxo(
-      "Faltam requisitos desta etapa: " + pend.map((g) => (g.gate.tipo === "documento" ? `${g.gate.documentoTipo} (${g.motivo})` : g.motivo)).join("; "),
+      "Faltam requisitos desta etapa: " + pend.map((g) => (g.gate.tipo === "documento" ? `${nomeDocumento(g.gate.documentoTipo)} (${g.motivo})` : g.motivo)).join("; "),
     );
   const destino = getEstado(p.def, paraEstado)!;
 
@@ -377,7 +377,7 @@ export async function avancar(u: SessaoUsuario, processoId: string, paraEstado: 
     const pendAtual = avaliarGates(pAtual, fer).filter((g) => !g.ok);
     if (pendAtual.length)
       throw new ErroFluxo(
-        "Faltam requisitos desta etapa: " + pendAtual.map((g) => (g.gate.tipo === "documento" ? `${g.gate.documentoTipo} (${g.motivo})` : g.motivo)).join("; "),
+        "Faltam requisitos desta etapa: " + pendAtual.map((g) => (g.gate.tipo === "documento" ? `${nomeDocumento(g.gate.documentoTipo)} (${g.motivo})` : g.motivo)).join("; "),
       );
     await moverEstado(tx, u, p, destino, fer, destino.final ? "ENCERRAMENTO" : "MUDANCA_ESTADO", quebraOrdem ? { rotulo: trans.rotulo, despacho: despacho?.trim() || null, quebraOrdem } : { rotulo: trans.rotulo, despacho: despacho?.trim() || null }, { encerra: true });
   });
@@ -500,7 +500,7 @@ export async function tramitar(u: SessaoUsuario, processoId: string, paraSetorId
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
   if (!getEstado(p.def, p.estadoAtual) && !temPapel(u, "ADMIN"))
-    throw new ErroFluxo(`Este processo está numa etapa que saiu do fluxo ("${p.estadoAtual}"). Só o administrador pode movimentá-lo: peça a ele que o reencaminhe.`);
+    throw new ErroFluxo(`Este processo está numa etapa que saiu do fluxo (${nomeDaEtapa(null, p.estadoAtual)}). Só o administrador pode movimentá-lo: peça a ele que o reencaminhe.`);
   if (p.estado.setor !== "LIVRE" && !temPapel(u, "ADMIN", "PROTOCOLO"))
     throw new ErroFluxo("Nesta etapa o processo só se movimenta pelo fluxo (avançar ou devolver).");
   if (p.setorAtualId && p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN", "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
@@ -545,7 +545,7 @@ export async function juntarDocumento(u: SessaoUsuario, processoId: string, tipo
 export async function assinarDocumento(u: SessaoUsuario, documentoId: string, papel: Papel) {
   const d = await db.query.documentos.findFirst({ where: eq(documentos.id, documentoId), with: { processo: true } });
   if (!d || d.processo.municipioId !== u.municipioId) throw new ErroFluxo("Documento não encontrado.");
-  if (!temPapel(u, papel)) throw new ErroFluxo(`Você não pode assinar como ${PAPEL_NOME[papel] ?? papel}: seu perfil não tem esse papel.`);
+  if (!temPapel(u, papel)) throw new ErroFluxo(`Você não pode assinar como ${nomePapel(papel).toLowerCase()}: seu perfil não tem esse papel.`);
   const carimbo = new Date().toISOString();
   const hashAssinado = sha256(`${d.hash}|${u.cpf}|${papel}|${carimbo}`);
   // um só comando: a assinatura e o evento

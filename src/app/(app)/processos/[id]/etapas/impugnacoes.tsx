@@ -6,7 +6,7 @@ import { registrarImpugnacaoAction, responderImpugnacaoAction } from "./acoes";
 import { SoConsulta, dataBr, listaDe, metaDe, type PropsEtapa } from "./util";
 
 /** Impugnações ao edital (art. 164): tempestividade calculada pelo motor, resposta com efeito sobre o edital. */
-export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
+export function PainelImpugnacoes({ p, pode, abrir }: PropsEtapa) {
   const meta = metaDe(p);
   const edital = meta.edital as Edital | undefined;
   const lista = listaDe<Impugnacao>(meta.impugnacoes);
@@ -47,7 +47,7 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
                   </div>
                 ) : (
                   pode && (
-                    <details id={n === aResponder ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50">
+                    <details id={n === aResponder ? alvo : undefined} className="mt-3 rounded-xl border border-line open:bg-sunken/50" open={n === aResponder && abrir === alvo}>
                       <summary className="flex min-h-[44px] items-center px-4 py-2.5 text-[14px] font-semibold text-brand-2">Responder</summary>
                       <ActionForm action={responderImpugnacaoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
@@ -76,7 +76,7 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
       </div>
 
       {pode ? (
-        <details id={aResponder < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50">
+        <details id={aResponder < 0 ? alvo : undefined} className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={aResponder < 0 && abrir === alvo}>
           <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar impugnação</summary>
           <ActionForm action={registrarImpugnacaoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />

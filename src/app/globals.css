@@ -39,6 +39,9 @@
   --color-warn-soft: #fff1d6;
   --color-bad: #c0272f;
   --color-bad-soft: #fde6e8;
+  /* tons escuros para hover de fundos com texto branco: warn-2 8,8:1 e bad-2 8,1:1 com branco */
+  --color-warn-2: #6b3f00;
+  --color-bad-2: #961d24;
 }
 
 html,
@@ -272,8 +275,13 @@ main:focus {
   outline: none;
 }
 
-/* Rede de segurança: texto secundário (ink-3) dentro de um fundo soft usa o tom que mantém 4,5:1 */
-:where([class*="bg-brand-soft"], [class*="bg-ok-soft"], [class*="bg-warn-soft"], [class*="bg-bad-soft"]) .text-ink-3:not(:hover) {
+/* Gaveta do menu do celular aberta: o fundo não rola (vale sem JavaScript, pelo estado do popover) */
+html:has(#menu-celular:popover-open) {
+  overflow: hidden;
+}
+
+/* Rede de segurança: texto secundário (ink-3) dentro de um fundo soft usa o tom que mantém 4,5:1 (também no hover) */
+:where([class*="bg-brand-soft"], [class*="bg-ok-soft"], [class*="bg-warn-soft"], [class*="bg-bad-soft"]) .text-ink-3 {
   color: var(--color-ink-3-soft);
 }
 

@@ -229,7 +229,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
                       <div className="text-[12.5px] text-ink-3">{fmtIso(c.decretoData)}</div>
                     </td>
                     <td>
-                      <Chip tone={c.valor < 0 ? "neutral" : "brand"}>{TIPOS_CREDITO[c.tipo] ?? c.tipo}</Chip>
+                      <Chip tone={c.valor < 0 ? "neutral" : "brand"}>{TIPOS_CREDITO[c.tipo] ?? "Crédito adicional"}</Chip>
                     </td>
                     <td className="min-w-[260px]">
                       <Link href={`/financas/orcamento/${c.d.id}`} className="font-medium text-ink hover:text-brand-2 hover:underline">

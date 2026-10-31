@@ -561,7 +561,11 @@ async function main() {
   });
   await db.update(processos).set({ estadoAtual: "CONTRATACAO" }).where(eq(processos.id, velho.id));
   const cv = await carregar(velho.id);
-  if (!cv.estado.nome.startsWith("Etapa antiga")) falha("estado de reserva esperado, veio " + cv.estado.nome);
+  if (cv.estado.nome !== "Contratação (etapa antiga)") falha("estado de reserva com nome da etapa antiga esperado, veio " + cv.estado.nome);
+  await db.update(processos).set({ estadoAtual: "ETAPA_QUE_NUNCA_EXISTIU" }).where(eq(processos.id, velho.id));
+  const sem = await carregar(velho.id);
+  if (sem.estado.nome !== "Etapa antiga (fora do fluxo atual)") falha("etapa desconhecida deveria aparecer como etapa antiga, veio " + sem.estado.nome);
+  await db.update(processos).set({ estadoAtual: "CONTRATACAO" }).where(eq(processos.id, velho.id));
   if (engine.avaliarGates(cv, fer).length !== 0 || disponiveis(cv).length !== 0) falha("estado de reserva não tem travas nem avanços");
   ok(`processo em CONTRATACAO carrega como "${cv.estado.nome}"`);
 

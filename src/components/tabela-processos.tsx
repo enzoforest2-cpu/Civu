@@ -2,7 +2,7 @@
 import { Vazio, NumeroProcesso, Prazo, UrgenciaChip, Chip } from "@/components/ui";
 import { TrilhoMini } from "@/components/trilho";
 import { fmtData, fmtMoeda } from "@/lib/dates";
-import { caminhoPrincipal, getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { caminhoPrincipal, nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 
 export type LinhaProcesso = {
   id: string;
@@ -32,11 +32,10 @@ export function TabelaProcessos({ linhas, vazio = "Nenhum processo encontrado." 
   if (linhas.length === 0) return <Vazio>{vazio}</Vazio>;
   const itens = linhas.map((p) => {
     const def = p.tipo.definicao as WorkflowDef;
-    const estado = getEstado(def, p.estadoAtual);
     const caminho = caminhoPrincipal(def);
     return {
       p,
-      etapa: estado ? nomeEtapa(estado.nome) : p.estadoAtual,
+      etapa: nomeDaEtapa(def, p.estadoAtual),
       total: caminho.length,
       pos: Math.max(0, caminho.indexOf(p.estadoAtual)),
       atrasado: !!p.prazoEtapaEm && p.prazoEtapaEm.getTime() < Date.now() && !p.encerradoEm,

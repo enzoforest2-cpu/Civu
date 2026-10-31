@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { MessageSquareWarning } from "lucide-react";
 import { requirePortal, ErroAcesso } from "@/lib/portal";
 import { EVENTOS_EXTERNOS, carregarMeuProcesso } from "@/lib/portal-processos";
-import { caminhoDoProcesso, caminhoPrincipal, getEstado, nomeEtapa, ramoDaModalidade } from "@/lib/workflow";
+import { caminhoDoProcesso, caminhoPrincipal, nomeDaEtapa, nomeEtapa, ramoDaModalidade } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
 import { Trilho } from "@/components/trilho";
@@ -26,7 +26,7 @@ export default async function MeuPedido({ params }: { params: Promise<{ id: stri
     throw e;
   }
   if (!p) notFound();
-  const nome = (k: string | null) => (k ? nomeEtapa(getEstado(p.def, k)?.nome ?? k) : "");
+  const nome = (k: string | null) => nomeDaEtapa(p.def, k);
   const exig = (p.metadados as { exigencia?: Exigencia } | null)?.exigencia;
   // O interessado vê só movimentações e exigências (lista de tipos permitidos, como em /consulta); despachos, documentos e dados internos ficam na gestão.
   // carregarMeuProcesso já filtra; o filtro aqui garante o mesmo se a página passar a receber eventos de outra fonte.

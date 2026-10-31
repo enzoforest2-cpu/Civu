@@ -24,7 +24,7 @@ export default async function PortalLayout({ children }: { children: React.React
           <div className="flex items-center gap-2">
             {s.representacoes.length > 0 && (
               <form action={agirComoAction} className="flex items-center gap-2">
-                <label htmlFor="empresaId" className="hidden text-[13px] text-ink-3 sm:block">
+                <label htmlFor="empresaId" className="sr-only text-[13px] text-ink-3 sm:not-sr-only">
                   Agindo como
                 </label>
                 <select id="empresaId" name="empresaId" defaultValue={s.empresaAtiva?.id ?? ""} className="input min-h-[44px] !w-auto !py-1.5 text-[14px]">

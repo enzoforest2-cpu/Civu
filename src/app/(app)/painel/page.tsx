@@ -8,7 +8,7 @@ import { requireUser, temPapel } from "@/lib/auth";
 import { painel } from "@/lib/metricas";
 import { obrigacoes, usoDoLimite } from "@/lib/conformidade";
 import { filaDePagamentos } from "@/lib/pagamentos";
-import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtMoeda, relativo } from "@/lib/dates";
 import { Panel, Vazio, NumeroProcesso, Chip, UrgenciaChip, Prazo } from "@/components/ui";
 import { valorDoProcesso } from "@/components/tabela-processos";
@@ -55,8 +55,7 @@ export default async function PainelPage() {
   const maxTempo = Math.max(1, ...m.tempoPorEstado.map((t) => t.mediaDias));
   const primeiroNome = u.nome.replace(/^(Dr|Dra)\.?\s+/i, "").split(" ")[0];
   const nomeEtapaDe = (p: (typeof abertos)[number]) => {
-    const e = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
-    return e ? nomeEtapa(e.nome) : p.estadoAtual;
+    return nomeDaEtapa(p.tipo.definicao as WorkflowDef, p.estadoAtual);
   };
   // Gestão (gabinete, ordenador, secretário, controle interno) começa pela visão da prefeitura; os demais, pelo próprio trabalho
   const visaoGestao = u.setor?.sigla === "GAB" || temPapel(u, "ORDENADOR", "SECRETARIO", "CONTROLE_INTERNO");
@@ -178,7 +177,7 @@ export default async function PainelPage() {
                 <div className="order-3 col-span-2 flex flex-wrap gap-x-1.5 gap-y-[18px] md:order-none md:col-span-1">
                   {s.itens.map((p) => {
                     const atrasado = p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora;
-                    const cor = atrasado ? "bg-bad hover:bg-bad/80" : !p.recebidoEm ? "bg-warn hover:bg-warn/80" : "bg-brand-2 hover:bg-brand-ink";
+                    const cor = atrasado ? "bg-bad hover:bg-bad-2" : !p.recebidoEm ? "bg-warn hover:bg-warn-2" : "bg-brand-2 hover:bg-brand-ink";
                     return (
                       <Link
                         key={p.id}
@@ -305,7 +304,6 @@ export default async function PainelPage() {
             <ul className="divide-y divide-line">
               {atencao.slice(0, 8).map((p) => {
                 const atrasado = p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora;
-                const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
                 return (
                   <li key={p.id} className="flex items-start gap-4 py-3.5">
                     <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${atrasado ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
@@ -318,7 +316,7 @@ export default async function PainelPage() {
                       </div>
                       <div className="truncate text-[14.5px] text-ink">{p.assunto}</div>
                       <div className="text-[13px] text-ink-3">
-                        {etapa ? nomeEtapa(etapa.nome) : p.estadoAtual} · {p.setorAtual?.nome ?? "—"}
+                        {nomeDaEtapa(p.tipo.definicao as WorkflowDef, p.estadoAtual)} · {p.setorAtual?.nome ?? "—"}
                       </div>
                     </div>
                     <div className="shrink-0 text-right text-[13px]">

@@ -8,7 +8,7 @@ import { TabelaProcessos, valorDoProcesso } from "@/components/tabela-processos"
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { receberAction } from "@/app/actions";
 import { fmtDataHora, fmtMoeda } from "@/lib/dates";
-import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
+import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 
 export default async function CaixaPage() {
   const u = await requireUser();
@@ -55,7 +55,6 @@ export default async function CaixaPage() {
           <ul className="grid gap-3 lg:grid-cols-2">
             {aReceber.map((p) => {
               const ult = p.eventos[0];
-              const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
               return (
                 <li key={p.id} className="panel flex flex-col gap-4 border-l-4 !border-l-warn p-5">
                   <div className="min-w-0">
@@ -67,7 +66,7 @@ export default async function CaixaPage() {
                     <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
                       <div>
                         <dt className="text-[12px] text-ink-3">Etapa</dt>
-                        <dd className="text-[14px] font-medium text-ink">{etapa ? nomeEtapa(etapa.nome) : p.estadoAtual}</dd>
+                        <dd className="text-[14px] font-medium text-ink">{nomeDaEtapa(p.tipo.definicao as WorkflowDef, p.estadoAtual)}</dd>
                       </div>
                       <div>
                         <dt className="text-[12px] text-ink-3">Valor</dt>
