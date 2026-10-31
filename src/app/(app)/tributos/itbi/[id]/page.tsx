@@ -62,7 +62,7 @@ export default async function AvaliarItbi({ params }: { params: Promise<{ id: st
               </Campo>
               <Campo rotulo="Financiamento SFH">{it.financiado ? fmtMoeda(it.valorFinanciado) : "Não"}</Campo>
               <Campo rotulo="Imóvel">
-                <Link href={`/tributos/imoveis/${im.id}`} className="tnum font-semibold text-brand hover:underline">
+                <Link href={`/tributos/imoveis/${im.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                   {im.inscricao}
                 </Link>
                 <div className="text-[12.5px] text-ink-3">

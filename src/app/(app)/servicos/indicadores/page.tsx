@@ -191,7 +191,7 @@ export default async function IndicadoresServicos({ searchParams }: { searchPara
                 <li key={c.id} className="border-l-2 border-line pl-4">
                   <Estrelas nota={c.nota} tamanho={13} />
                   <p className="mt-1 text-[14.5px] text-ink">“{c.texto}”</p>
-                  <Link href={`/servicos/${c.id}`} className="text-[12.5px] text-ink-3 hover:text-brand">
+                  <Link href={`/servicos/${c.id}`} className="text-[12.5px] text-ink-3 hover:text-brand-2">
                     {c.servico} · {c.bairro}
                   </Link>
                 </li>

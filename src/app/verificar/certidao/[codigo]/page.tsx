@@ -41,7 +41,7 @@ export default async function VerificarCertidao({ params }: { params: Promise<{ 
             Prefeitura Municipal de {c.municipio.nome} – {c.municipio.uf}
           </div>
           <h1 className="display mt-2 text-[22px] leading-tight font-semibold text-ink sm:text-[26px]">{CERTIDAO_NOME[c.tipo]}</h1>
-          <div className="tnum mt-1 text-[15px] font-semibold text-brand">{c.numero}</div>
+          <div className="tnum mt-1 text-[15px] font-semibold text-brand-2">{c.numero}</div>
         </header>
         <div className="grid gap-6 px-6 py-6 sm:grid-cols-[1fr_auto]">
           <div className="min-w-0 space-y-4 text-[14.5px]">
@@ -79,7 +79,7 @@ export default async function VerificarCertidao({ params }: { params: Promise<{ 
           <div className="flex flex-col items-center gap-1.5">
             <QrCodigo texto={url} tamanho={148} titulo="QR Code para verificar esta certidão" />
             <div className="tnum text-[13px] font-semibold text-ink">{c.codigoVerificacao}</div>
-            <div className="max-w-[160px] text-center text-[11.5px] leading-snug break-all text-ink-3">{url}</div>
+            <div className="max-w-[160px] text-center text-[12px] leading-snug break-all text-ink-3">{url}</div>
           </div>
         </div>
         <footer className="border-t border-line px-6 py-4 text-[12.5px] leading-snug text-ink-3">

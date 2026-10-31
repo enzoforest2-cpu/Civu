@@ -19,7 +19,7 @@ type Ev = {
 
 const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   ABERTURA: { icon: Flag, cor: "bg-brand text-white" },
-  MUDANCA_ESTADO: { icon: ArrowRight, cor: "bg-brand-soft text-brand" },
+  MUDANCA_ESTADO: { icon: ArrowRight, cor: "bg-brand-soft text-brand-2" },
   ENCERRAMENTO: { icon: CheckCircle2, cor: "bg-ok text-white" },
   DEVOLUCAO: { icon: Undo2, cor: "bg-bad-soft text-bad" },
   ENVIO: { icon: Send, cor: "bg-sunken text-ink-2" },
@@ -27,7 +27,7 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   ANEXO: { icon: Paperclip, cor: "bg-sunken text-ink-2" },
   ASSINATURA: { icon: PenLine, cor: "bg-ok-soft text-ok" },
   DESPACHO: { icon: MessageSquare, cor: "bg-sunken text-ink-2" },
-  DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand" },
+  DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand-2" },
   CORRECAO_CONTRATACAO: { icon: Building2, cor: "bg-warn-soft text-warn" },
   REMESSA_TCE: { icon: Landmark, cor: "bg-ok-soft text-ok" },
   EXIGENCIA: { icon: MessageSquare, cor: "bg-warn-soft text-warn" },

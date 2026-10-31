@@ -13,13 +13,13 @@ export function CabecalhoPublico({ slug }: { slug?: string }) {
           </div>
         </div>
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] font-semibold">
-          <Link href={`/fila-de-pagamentos${slug ? `?m=${slug}` : ""}`} className="text-ink-2 hover:text-ink">
+          <Link href={`/fila-de-pagamentos${slug ? `?m=${slug}` : ""}`} className="alvo-toque text-ink-2 hover:text-ink">
             Fila de pagamentos
           </Link>
-          <Link href={`/consulta${slug ? `?m=${slug}` : ""}`} className="text-ink-2 hover:text-ink">
+          <Link href={`/consulta${slug ? `?m=${slug}` : ""}`} className="alvo-toque text-ink-2 hover:text-ink">
             Consultar processo
           </Link>
-          <Link href="/login" className="text-brand hover:underline">
+          <Link href="/login" className="alvo-toque text-brand-2 hover:underline">
             Sou servidor
           </Link>
         </nav>

@@ -36,7 +36,7 @@ export default async function ObrasGestaoPage() {
                   <span className="tnum text-[13px] text-ink-3">Contrato {c.rotulo}</span>
                 </div>
                 <h2 className="mt-2 text-[17px] leading-snug font-semibold text-ink">
-                  <Link href={`/contratos/${c.id}#obra`} className="hover:text-brand">
+                  <Link href={`/contratos/${c.id}#obra`} className="hover:text-brand-2">
                     {c.objeto}
                   </Link>
                 </h2>

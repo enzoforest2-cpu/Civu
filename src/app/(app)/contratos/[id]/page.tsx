@@ -133,7 +133,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                             </span>
                           </div>
                           {s?.processo && (
-                            <Link href={`/processos/${s.processo.id}`} className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+                            <Link href={`/processos/${s.processo.id}`} className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
                               Processo de pagamento <span className="tnum">{s.processo.numero}</span> <ExternalLink size={12} />
                             </Link>
                           )}
@@ -149,7 +149,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               )}
               {podeNota && (
                 <details className="mx-6 mt-2 mb-6 rounded-xl border border-line open:bg-sunken/50">
-                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar nota recebida no balcão</summary>
+                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar nota recebida no balcão</summary>
                   <ActionForm action={notaInternaAction} className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
                     <input type="hidden" name="contratoId" value={c.id} />
                     <div>
@@ -212,7 +212,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               <Panel
                 title={
                   <span className="flex items-center gap-2">
-                    <HardHat size={17} className="text-brand" /> Obra: cronograma físico-financeiro
+                    <HardHat size={17} className="text-brand-2" /> Obra: cronograma físico-financeiro
                   </span>
                 }
               >
@@ -293,7 +293,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                 )}
                 {fiscal && ativo && (
                   <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
-                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar medição do mês</summary>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar medição do mês</summary>
                     <ActionForm action={medicaoAction} className="space-y-3 px-4 pb-4">
                       <input type="hidden" name="contratoId" value={c.id} />
                       <div className="max-w-[220px]">
@@ -328,7 +328,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               <Panel title="Diário de obra">
                 {(fiscal || u.id === c.gestorId) && ativo && (
                   <details className="mb-4 rounded-xl border border-line open:bg-sunken/50">
-                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Novo registro</summary>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Novo registro</summary>
                     <ActionForm action={diarioAction} className="grid gap-3 px-4 pb-4 sm:grid-cols-3">
                       <input type="hidden" name="contratoId" value={c.id} />
                       <div>
@@ -435,13 +435,13 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
             {gerir && (
               <div className="mt-4 space-y-3">
                 <details className="rounded-xl border border-line open:bg-sunken/50">
-                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar termo aditivo</summary>
+                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar termo aditivo</summary>
                   <div className="px-4 pb-4">
                     <FormAditivo contratoId={c.id} natureza={c.natureza} baseLimite={fin.baseLimite} acrescimos={fin.acrescimos} continuo={c.natureza === "SERVICO_CONTINUO"} />
                   </div>
                 </details>
                 <details className="rounded-xl border border-line open:bg-sunken/50">
-                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar apostilamento (reajuste)</summary>
+                  <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar apostilamento (reajuste)</summary>
                   <ActionForm action={apostilamentoAction} className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
                     <input type="hidden" name="contratoId" value={c.id} />
                     <div>
@@ -518,7 +518,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               </Dado>
               <Dado rotulo="Processo de origem">
                 {c.processoOrigem ? (
-                  <Link href={`/processos/${c.processoOrigem.id}`} className="font-semibold text-brand hover:underline">
+                  <Link href={`/processos/${c.processoOrigem.id}`} className="font-semibold text-brand-2 hover:underline">
                     <span className="tnum">{c.processoOrigem.numero}</span>
                     <span className="block text-[12.5px] font-normal text-ink-2">{c.processoOrigem.assunto}</span>
                   </Link>

@@ -42,7 +42,7 @@ export default async function FluxosPage() {
                       {!ultimo && <span aria-hidden className="absolute top-9 bottom-0 left-[21px] w-[2px] bg-line" />}
                       <span
                         className={`display tnum relative z-10 flex h-[44px] w-[44px] items-center justify-center rounded-full text-[15px] font-semibold ${
-                          e.final ? "bg-ok text-white" : opcional ? "border-2 border-dashed border-line-2 bg-white text-ink-3" : "bg-brand text-white"
+                          e.final ? "bg-ok text-white" : opcional ? "border-2 border-dashed border-line-2 bg-white text-ink-3" : "bg-brand-2 text-white"
                         }`}
                       >
                         {i + 1}

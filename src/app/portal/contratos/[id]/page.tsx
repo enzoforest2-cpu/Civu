@@ -108,7 +108,7 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
                         <p className="mt-2 rounded-lg bg-bad-soft px-3 py-2 text-[13.5px] text-ink">
                           <strong className="font-semibold">O que corrigir:</strong> {n.glosaMotivo}{" "}
                           {fin.ativo && (
-                            <Link href={`/portal/contratos/nota?contrato=${c.id}`} className="font-semibold text-brand hover:underline">
+                            <Link href={`/portal/contratos/nota?contrato=${c.id}`} className="font-semibold text-brand-2 hover:underline">
                               Enviar nota corrigida
                             </Link>
                           )}

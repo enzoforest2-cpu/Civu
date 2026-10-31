@@ -165,7 +165,7 @@ export default async function FilaOcorrencias({ searchParams }: { searchParams: 
                           )}
                         </td>
                         <td className="min-w-[200px]">
-                          <Link href={`/servicos/${o.id}`} className="tnum font-semibold text-brand hover:underline">
+                          <Link href={`/servicos/${o.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                             {o.protocolo}
                           </Link>
                           <div className="text-[13.5px] font-medium text-ink">{o.servico.nome}</div>
@@ -191,7 +191,7 @@ export default async function FilaOcorrencias({ searchParams }: { searchParams: 
                           </div>
                           {o.ordem && (
                             <div className="mt-1 text-[12.5px] text-ink-3">
-                              <Link href={`/servicos/ordens/${o.ordem.id}`} className="tnum hover:text-brand hover:underline">
+                              <Link href={`/servicos/ordens/${o.ordem.id}`} className="tnum hover:text-brand-2 hover:underline">
                                 {o.ordem.numero}
                               </Link>
                               {o.ordem.equipe ? ` · ${o.ordem.equipe.nome}` : ""}

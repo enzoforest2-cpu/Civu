@@ -31,6 +31,9 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
 
   return (
     <main className="min-h-screen bg-bg">
+      <a href="#conteudo" className="pular-conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -40,17 +43,17 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
             </div>
           </div>
           <nav className="flex items-center gap-4 text-[14px] font-semibold">
-            <Link href={`/consulta${mun ? `?m=${mun.slug}` : ""}`} className="text-ink-2 hover:text-ink">
+            <Link href={`/consulta${mun ? `?m=${mun.slug}` : ""}`} className="alvo-toque text-ink-2 hover:text-ink">
               Consultar processo
             </Link>
-            <Link href="/login" className="text-brand hover:underline">
+            <Link href="/login" className="alvo-toque text-brand-2 hover:underline">
               Sou servidor
             </Link>
           </nav>
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <div id="conteudo" tabIndex={-1} className="mx-auto max-w-5xl px-4 py-10 outline-none sm:px-6">
         <h1 className="display text-[32px] leading-[1.1] font-semibold text-ink sm:text-[38px]">Fila de pagamentos{mun ? ` de ${mun.nome}` : ""}</h1>
         <p className="mt-2 max-w-3xl text-[15px] text-ink-2">
           A prefeitura paga cada fonte de recurso na ordem em que as despesas foram liquidadas (Lei 14.133, art. 141). Qualquer pagamento fora dessa ordem
@@ -93,7 +96,7 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
                 {meus.map((x) => (
                   <div key={x.processoId} className="rounded-2xl border-2 border-brand bg-brand-soft/50 px-5 py-4">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <span className="display tnum text-[30px] leading-none font-semibold text-brand">{x.posicao}º</span>
+                      <span className="display tnum text-[30px] leading-none font-semibold text-brand-2">{x.posicao}º</span>
                       <span className="text-[15px] text-ink">
                         de {x.filaTotal} na fila de <strong className="font-semibold">{x.fonteNome}</strong>
                       </span>
@@ -127,13 +130,13 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
             <section key={f.fonte} className="panel mt-8 overflow-hidden">
               <header className="flex flex-wrap items-center justify-between gap-2 px-6 pt-5 pb-3">
                 <h2 className="flex items-center gap-2 text-[17px] font-semibold text-ink">
-                  <ListOrdered size={18} className="text-brand" /> {f.fonteNome}
+                  <ListOrdered size={18} className="text-brand-2" /> {f.fonteNome}
                 </h2>
                 <span className="tnum text-[13.5px] text-ink-2">
                   {f.fila.length} {f.fila.length === 1 ? "pagamento" : "pagamentos"} · {fmtMoeda(f.total)}
                 </span>
               </header>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`Fila de pagamentos: ${f.fonteNome}`}>
                 <table className="lista">
                   <thead>
                     <tr>

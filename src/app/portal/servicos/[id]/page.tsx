@@ -40,7 +40,7 @@ export default async function MeuPedidoServico({ params, searchParams }: { param
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link href="/portal/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand">
+      <Link href="/portal/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand-2">
         <ArrowLeft size={16} /> Meus pedidos de serviço
       </Link>
 
@@ -55,7 +55,7 @@ export default async function MeuPedidoServico({ params, searchParams }: { param
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-[14px]">
-        <span className="tnum font-semibold text-brand">Protocolo {o.protocolo}</span>
+        <span className="tnum font-semibold text-brand-2">Protocolo {o.protocolo}</span>
         <StatusChip status={o.status} publico />
       </div>
       <h1 className="display mt-2 text-[26px] leading-tight font-bold text-ink sm:text-[30px]">{o.servico.nome}</h1>

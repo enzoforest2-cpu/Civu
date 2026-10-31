@@ -37,7 +37,7 @@ export default async function MeuPedido({ params }: { params: Promise<{ id: stri
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 text-[14px]">
-        <span className="tnum font-semibold text-brand">Pedido {p.numero}</span>
+        <span className="tnum font-semibold text-brand-2">Pedido {p.numero}</span>
         <Chip tone="brand">{p.tipo.nome}</Chip>
         {p.encerradoEm ? <Chip tone="ok">Concluído em {fmtData(p.encerradoEm)}</Chip> : <Chip>Em andamento</Chip>}
       </div>

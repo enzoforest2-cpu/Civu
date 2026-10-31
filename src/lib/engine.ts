@@ -7,7 +7,7 @@ import type { SessaoUsuario } from "./auth";
 import { temPapel } from "./auth";
 import { addDiasUteis } from "./dates";
 import { numeroBr } from "./numeros";
-import { FONTES, MODALIDADES, avancosDisponiveis, getEstado, ramoDaModalidade, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
+import { FONTES, MODALIDADES, PAPEL_NOME, avancosDisponiveis, getEstado, papeisPorExtenso, ramoDaModalidade, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "./workflow";
 import {
   MIN_JUSTIFICATIVA,
   impugnacaoTempestiva,
@@ -282,16 +282,16 @@ export function avaliarGates(p: ProcessoCompleto, feriados: Set<string>, hoje: s
     }
     if (gate.tipo === "campo") {
       const ok = Boolean((p.metadados as Record<string, unknown> | null)?.[gate.campo]);
-      return { gate, ok, motivo: ok ? "ok" : `Campo ${gate.campo} não preenchido` };
+      return { gate, ok, motivo: ok ? "ok" : gate.descricao ? `Falta preencher: ${gate.descricao}` : "Falta preencher um dado obrigatório desta etapa" };
     }
     const docs = p.documentos.filter((d) => d.tipo === gate.documentoTipo);
     if (docs.length === 0) return { gate, ok: false, motivo: "Documento não juntado" };
     const ultimo = docs[docs.length - 1];
     if (gate.assinadoPorQualquer?.length && !gate.assinadoPorQualquer.some((papel) => ultimo.assinaturas.some((a) => a.papel === papel))) {
-      return { gate, ok: false, motivo: `Falta assinatura de ${gate.assinadoPorQualquer.join(" ou ")}` };
+      return { gate, ok: false, motivo: `Falta a assinatura ${papeisPorExtenso(gate.assinadoPorQualquer, "ou")}` };
     }
     const faltam = (gate.assinadoPor ?? []).filter((papel) => !ultimo.assinaturas.some((a) => a.papel === papel));
-    return faltam.length ? { gate, ok: false, motivo: `Falta assinatura: ${faltam.join(", ")}` } : { gate, ok: true, motivo: "ok" };
+    return faltam.length ? { gate, ok: false, motivo: `Falta a assinatura ${papeisPorExtenso(faltam, "e")}` } : { gate, ok: true, motivo: "ok" };
   });
 }
 
@@ -531,7 +531,7 @@ export async function juntarDocumento(u: SessaoUsuario, processoId: string, tipo
 export async function assinarDocumento(u: SessaoUsuario, documentoId: string, papel: Papel) {
   const d = await db.query.documentos.findFirst({ where: eq(documentos.id, documentoId), with: { processo: true } });
   if (!d || d.processo.municipioId !== u.municipioId) throw new ErroFluxo("Documento não encontrado.");
-  if (!temPapel(u, papel)) throw new ErroFluxo(`Você não tem o papel ${papel}.`);
+  if (!temPapel(u, papel)) throw new ErroFluxo(`Você não pode assinar como ${PAPEL_NOME[papel] ?? papel}: seu perfil não tem esse papel.`);
   const carimbo = new Date().toISOString();
   const hashAssinado = sha256(`${d.hash}|${u.cpf}|${papel}|${carimbo}`);
   return db.transaction(async (tx) => {
@@ -764,7 +764,7 @@ async function gravarMeta(tx: Tx, processoId: string, meta: Record<string, unkno
 function dataIso(v: unknown, rotulo: string): string {
   const s = typeof v === "string" ? v.trim() : "";
   const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + "T12:00:00Z") : null;
-  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw new ErroFluxo(`${rotulo}: informe uma data válida no formato AAAA-MM-DD.`);
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw new ErroFluxo(`${rotulo}: informe uma data válida (dd/mm/aaaa).`);
   return s;
 }
 

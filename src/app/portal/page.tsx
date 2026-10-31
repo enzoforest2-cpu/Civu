@@ -53,7 +53,7 @@ export default async function PortalInicio() {
       <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {atalhos.map((a) => (
           <Link key={a.href} href={a.href} className="panel group flex items-start gap-3 p-5 transition-colors hover:border-brand">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-2">
               <a.Icone size={19} />
             </span>
             <span className="min-w-0">
@@ -69,7 +69,7 @@ export default async function PortalInicio() {
       <section className="panel mt-8 p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-[17px] font-semibold text-ink">Pedidos em andamento</h2>
-          <Link href="/portal/pedidos" className="text-[13.5px] font-semibold text-brand hover:underline">
+          <Link href="/portal/pedidos" className="text-[13.5px] font-semibold text-brand-2 hover:underline">
             Ver todos
           </Link>
         </div>
@@ -83,7 +83,7 @@ export default async function PortalInicio() {
               const etapa = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
               return (
                 <li key={p.id}>
-                  <Link href={`/portal/pedidos/${p.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:text-brand">
+                  <Link href={`/portal/pedidos/${p.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:text-brand-2">
                     <span className="min-w-0">
                       <span className="tnum text-[13px] text-ink-3">{p.numero}</span>
                       <span className="block font-medium text-ink">{p.assunto}</span>

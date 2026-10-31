@@ -44,7 +44,7 @@ export default async function ArtigoPage({ params }: { params: Promise<{ slug: s
           <ul className="space-y-2">
             {relacionados.map((x) => (
               <li key={x.slug}>
-                <Link href={`/ajuda/${x.slug}`} className="font-semibold text-brand hover:underline">
+                <Link href={`/ajuda/${x.slug}`} className="font-semibold text-brand-2 hover:underline">
                   {x.titulo}
                 </Link>
                 <span className="text-[13.5px] text-ink-3"> — {x.resumo}</span>

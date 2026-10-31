@@ -83,7 +83,7 @@ export default async function IndicesPage() {
                 </div>
               </dl>
               <details className="mt-3 text-[13px] text-ink-2">
-                <summary className="font-semibold text-brand">Como é calculado</summary>
+                <summary className="font-semibold text-brand-2">Como é calculado</summary>
                 <p className="mt-2">{i.base}</p>
                 <p className="mt-1">
                   <strong className="text-ink">Projeção (estimativa):</strong> {i.comoProjetado}

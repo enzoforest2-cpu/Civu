@@ -57,7 +57,7 @@ export default async function EmitirGuia() {
               <ul className="divide-y divide-line">
                 {guias.map((g) => (
                   <li key={g.id}>
-                    <Link href={`/portal/guias/${g.id}`} className="block py-2.5 hover:text-brand">
+                    <Link href={`/portal/guias/${g.id}`} className="block py-2.5 hover:text-brand-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="tnum text-[13px] font-semibold text-ink">{g.numero}</span>
                         <Chip tone={g.situacao === "PAGA" ? "ok" : "brand"}>{g.situacao === "PAGA" ? "Paga" : `Vence ${fmtData(g.vencimento + "T12:00:00")}`}</Chip>

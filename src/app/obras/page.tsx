@@ -67,7 +67,7 @@ export default async function ObrasPublicasPage({ searchParams }: { searchParams
                         <MapPin size={13} /> {c.obraLocal}
                       </span>
                     </div>
-                    <h2 className="mt-2 text-[18px] leading-snug font-semibold text-ink group-hover:text-brand">{c.objeto}</h2>
+                    <h2 className="mt-2 text-[18px] leading-snug font-semibold text-ink group-hover:text-brand-2">{c.objeto}</h2>
                     <div className="mt-4 grid gap-4 text-[13.5px] sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
                       <div>
                         <div className="flex items-baseline justify-between">
@@ -97,7 +97,7 @@ export default async function ObrasPublicasPage({ searchParams }: { searchParams
                         <strong className="font-semibold">Por que atrasou:</strong> {c.obraMotivo}
                       </p>
                     )}
-                    <span className="mt-4 inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand">
+                    <span className="mt-4 inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand-2">
                       Ver cronograma e medições <ArrowRight size={14} />
                     </span>
                   </Link>

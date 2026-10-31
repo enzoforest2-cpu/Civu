@@ -76,7 +76,7 @@ export default async function Guia({ params, searchParams }: { params: Promise<{
             </div>
             <div>
               <div className="text-[12.5px] text-ink-3">PIX copia e cola (fictício)</div>
-              <div className="mt-1 rounded-lg bg-sunken px-3 py-2 font-mono text-[11.5px] leading-relaxed break-all text-ink-2">{g.pixCopiaCola}</div>
+              <div className="mt-1 rounded-lg bg-sunken px-3 py-2 font-mono text-[12px] leading-relaxed break-all text-ink-2">{g.pixCopiaCola}</div>
             </div>
           </div>
           <div className="flex flex-col items-center gap-1">

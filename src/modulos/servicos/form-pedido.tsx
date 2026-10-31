@@ -43,7 +43,7 @@ export function FormPedido({
           {endereco?.logradouro && (
             <button
               type="button"
-              className="text-[13px] font-semibold text-brand hover:underline"
+              className="text-[13px] font-semibold text-brand-2 hover:underline"
               onClick={() => setEnd({ logradouro: endereco.logradouro ?? "", numero: endereco.numero ?? "", bairro: endereco.bairro ?? "" })}
             >
               Usar meu endereço

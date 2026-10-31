@@ -9,6 +9,7 @@ import { finCreditos, finEmpenhos, finLiquidacoes, finPagamentos, finProcessoEmp
 import { requireUser, temPapel, type SessaoUsuario } from "@/lib/auth";
 import { ErroFluxo, juntarDocumento } from "@/lib/engine";
 import { fmtMoeda } from "@/lib/dates";
+import { papeisPorExtenso } from "@/lib/workflow";
 import { cnpjValido } from "@/lib/pagamentos";
 import type { ActionState } from "@/app/actions";
 import { anoCorrente, caixa, execucao, hojeIso } from "./dados";
@@ -27,7 +28,7 @@ const dataDe = (fd: FormData, k: string, padrao?: string) => {
   return v;
 };
 function exigir(u: SessaoUsuario, ...papeis: Parameters<typeof temPapel>[1][]) {
-  if (!temPapel(u, ...papeis)) throw new ErroFin("Seu perfil não pode registrar esta etapa. Peça a quem tem o papel de " + papeis.join(" ou ").toLowerCase() + ".");
+  if (!temPapel(u, ...papeis)) throw new ErroFin("Seu perfil não pode registrar esta etapa: ela é " + papeisPorExtenso(papeis) + ".");
 }
 function trata(e: unknown): ActionState {
   if (e instanceof ErroFin || e instanceof ErroFluxo) return { erro: e.message };

@@ -29,7 +29,7 @@ export default async function NovaOrdem({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <Link href="/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand">
+      <Link href="/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand-2">
         <ArrowLeft size={16} /> Fila de ocorrências
       </Link>
       <div className="mt-3">
@@ -49,7 +49,7 @@ export default async function NovaOrdem({ searchParams }: { searchParams: Promis
               {validas.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-start justify-between gap-2 px-6 py-3.5">
                   <div className="min-w-0">
-                    <Link href={`/servicos/${o.id}`} className="tnum text-[13.5px] font-semibold text-brand hover:underline">
+                    <Link href={`/servicos/${o.id}`} className="tnum text-[13.5px] font-semibold text-brand-2 hover:underline">
                       {o.protocolo}
                     </Link>
                     <div className="font-medium text-ink">{o.servico.nome}</div>

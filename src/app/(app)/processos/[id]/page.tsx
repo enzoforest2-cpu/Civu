@@ -104,7 +104,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
       {/* Cabeçalho do processo */}
       <header className="mb-7">
         <div className="flex flex-wrap items-center gap-2.5 text-[14px]">
-          <span className="tnum font-semibold text-brand">Processo {p.numero}</span>
+          <span className="tnum font-semibold text-brand-2">Processo {p.numero}</span>
           <Chip tone="brand">{p.tipo.nome}</Chip>
           <UrgenciaChip u={p.urgencia} />
           {p.encerradoEm && <Chip tone="ok">Concluído em {fmtData(p.encerradoEm)}</Chip>}
@@ -201,7 +201,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                         <>
                           Há {posFila.aFrente.length === 1 ? "1 pagamento" : `${posFila.aFrente.length} pagamentos`} à frente ({posFila.aFrente.map((x) => x.numero).join(", ")}). Para pagar este
                           antes, escreva a justificativa na observação: ela fica pública na{" "}
-                          <Link href="/fila-de-pagamentos" className="font-semibold text-brand hover:underline">
+                          <Link href="/fila-de-pagamentos" className="font-semibold text-brand-2 hover:underline">
                             fila de pagamentos
                           </Link>{" "}
                           (Lei 14.133, art. 141, §1º).
@@ -324,7 +324,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <li key={d.id}>
                     <details className="group">
                       <summary className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f4f8f6]">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-2">
                           <FileText size={18} />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -349,7 +349,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       <div className="px-6 pb-5">
                         <div className="rounded-xl border border-line bg-sunken/60 p-5">
                           <div className="doc-texto">{d.conteudo}</div>
-                          <div className="mt-4 text-[11.5px] break-all text-ink-3">Impressão digital do documento (SHA-256): {d.hash}</div>
+                          <div className="mt-4 text-[12px] break-all text-ink-3">Impressão digital do documento (SHA-256): {d.hash}</div>
                         </div>
                         {!p.encerradoEm && u.papeis.some((x) => x !== "ADMIN") && (
                           <ActionForm action={assinarAction} className="mt-3">
@@ -387,7 +387,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
 
             {!p.encerradoEm && (
               <details id="juntar" className="border-t border-line" open={!!docSugerido}>
-                <summary className="flex items-center gap-2 px-6 py-4 text-[14.5px] font-semibold text-brand hover:text-brand-2">
+                <summary className="flex items-center gap-2 px-6 py-4 text-[14.5px] font-semibold text-brand-2 hover:text-brand-ink">
                   <Plus size={17} /> Juntar documento
                 </summary>
                 <ActionForm action={juntarDocumentoAction} className="px-6 pb-6">
@@ -464,7 +464,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <div className="font-semibold">{pessoaInteressada?.nome}</div>
                 )}
                 <div className="mt-1 text-[13px] text-ink-3">
-                  Pelo {p.canal === "WHATSAPP" ? "WhatsApp" : p.canal === "PORTAL" ? "portal" : p.canal.toLowerCase()}
+                  {p.canal === "WHATSAPP" ? "Pelo WhatsApp" : p.canal === "PORTAL" ? "Pelo portal" : p.canal === "BALCAO" ? "No balcão" : "Aberto pela prefeitura"}
                   {pessoaInteressada?.telefone ? ` · ${pessoaInteressada.telefone}` : ""}
                 </div>
               </div>
@@ -475,7 +475,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               ) : (
                 !p.encerradoEm && (
                   <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
-                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Pedir complemento ao interessado</summary>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Pedir complemento ao interessado</summary>
                     <ActionForm action={abrirExigenciaAction} className="space-y-3 px-4 pb-4">
                       <input type="hidden" name="processoId" value={p.id} />
                       <div>
@@ -510,21 +510,19 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
             <section id="contratacao" className="scroll-mt-24">
               <Panel title="Dados da contratação">
                 {contratacao ? (
-                  <dl className="space-y-3">
-                    <div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-3">
+                    <div className="col-span-2">
                       <dt className="text-[12.5px] text-ink-3">Fornecedor</dt>
                       <dd className="text-[14.5px] text-ink">{contratacao.fornecedor}</dd>
                       <dd className="tnum text-[13px] text-ink-2">CNPJ {fmtCnpj(contratacao.cnpj)}</dd>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <dt className="text-[12.5px] text-ink-3">Valor contratado</dt>
-                        <dd className="display tnum text-[18px] font-semibold text-ink">{fmtMoeda(contratacao.valor ?? null)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-[12.5px] text-ink-3">Fonte de recurso</dt>
-                        <dd className="text-[14px] text-ink">{nomeFonte(contratacao.fonte ?? "")}</dd>
-                      </div>
+                    <div>
+                      <dt className="text-[12.5px] text-ink-3">Valor contratado</dt>
+                      <dd className="display tnum text-[18px] font-semibold text-ink">{fmtMoeda(contratacao.valor ?? null)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[12.5px] text-ink-3">Fonte de recurso</dt>
+                      <dd className="text-[14px] text-ink">{nomeFonte(contratacao.fonte ?? "")}</dd>
                     </div>
                   </dl>
                 ) : (
@@ -532,7 +530,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                 )}
                 {podeContratacao && (
                   <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={contratacaoIncompleta}>
-                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand">{!contratacao ? "Informar dados" : contratacaoIncompleta ? "Completar dados" : "Corrigir dados"}</summary>
+                    <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">{!contratacao ? "Informar dados" : contratacaoIncompleta ? "Completar dados" : "Corrigir dados"}</summary>
                     <ActionForm action={contratacaoAction} className="space-y-3 px-4 pb-4" resetOnOk={false}>
                       <input type="hidden" name="processoId" value={p.id} />
                       <div>
@@ -615,7 +613,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       </ActionForm>
                     )}
                     {o.chave === "PNCP" && o.situacao !== "cumprida" && (
-                      <Link href="?doc=PUBLICACAO_PNCP#juntar" scroll={false} className="mt-2 inline-flex text-[13px] font-semibold text-brand hover:underline">
+                      <Link href="?doc=PUBLICACAO_PNCP#juntar" scroll={false} className="mt-2 inline-flex text-[13px] font-semibold text-brand-2 hover:underline">
                         Juntar comprovante do PNCP
                       </Link>
                     )}

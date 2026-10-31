@@ -45,7 +45,7 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
                 ) : (
                   pode && (
                     <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">
-                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand">Responder</summary>
+                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand-2">Responder</summary>
                       <ActionForm action={responderImpugnacaoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
                         <input type="hidden" name="impugnacaoId" value={i.id} />
@@ -55,10 +55,10 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
                           </label>
                           <textarea id={`resp-${i.id}`} name="resposta" className="input" rows={3} required />
                         </div>
-                        <label className="flex items-center gap-2 text-[14px] text-ink">
+                        <label className="flex min-h-[44px] items-center gap-2 text-[14px] text-ink">
                           <input type="checkbox" name="acolhida" className="h-4 w-4" /> Impugnação acolhida
                         </label>
-                        <label className="flex items-center gap-2 text-[14px] text-ink">
+                        <label className="flex min-h-[44px] items-center gap-2 text-[14px] text-ink">
                           <input type="checkbox" name="alteraPropostas" className="h-4 w-4" /> Altera as propostas (o edital volta a ser publicado com prazo novo)
                         </label>
                         <SubmitButton pendingText="Salvando…">Registrar resposta</SubmitButton>
@@ -74,7 +74,7 @@ export function PainelImpugnacoes({ p, pode }: PropsEtapa) {
 
       {pode ? (
         <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
-          <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar impugnação</summary>
+          <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar impugnação</summary>
           <ActionForm action={registrarImpugnacaoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">

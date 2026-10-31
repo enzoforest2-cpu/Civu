@@ -52,7 +52,7 @@ export default async function Empresas({ searchParams }: { searchParams: Promise
                 <li key={p.id} className="rounded-xl border border-line p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Link href={`/processos/${p.id}`} className="tnum text-[13px] font-semibold text-brand hover:underline">
+                      <Link href={`/processos/${p.id}`} className="tnum text-[13px] font-semibold text-brand-2 hover:underline">
                         Processo {p.numero}
                       </Link>
                       <div className="font-semibold text-ink">{p.assunto}</div>
@@ -109,7 +109,7 @@ export default async function Empresas({ searchParams }: { searchParams: Promise
           <Link
             key={f.chave}
             href={f.chave ? `?f=${f.chave}` : "?"}
-            className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${(sp.f ?? "") === f.chave ? "border-brand bg-brand text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}
+            className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${(sp.f ?? "") === f.chave ? "border-brand-2 bg-brand-2 text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}
           >
             {f.rotulo}
           </Link>
@@ -148,7 +148,7 @@ export default async function Empresas({ searchParams }: { searchParams: Promise
                     <td>{REGIME_NOME[i.regime]}</td>
                     <td>
                       {alv ? (
-                        <Link href={`/verificar/alvara/${alv.codigoVerificacao}`} className="tnum text-brand hover:underline">
+                        <Link href={`/verificar/alvara/${alv.codigoVerificacao}`} className="tnum text-brand-2 hover:underline">
                           {alv.numero}
                         </Link>
                       ) : (

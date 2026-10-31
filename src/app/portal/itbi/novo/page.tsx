@@ -135,7 +135,7 @@ export default async function NovoItbi({ searchParams }: { searchParams: Promise
             </ol>
           </Panel>
           <AvisoDemo>O envio de documentos (contrato, matrícula) ao cartório não faz parte desta demonstração.</AvisoDemo>
-          <Link href="/portal/itbi" className="block text-center text-[13.5px] font-semibold text-brand hover:underline">
+          <Link href="/portal/itbi" className="block text-center text-[13.5px] font-semibold text-brand-2 hover:underline">
             Ver minhas declarações
           </Link>
         </aside>

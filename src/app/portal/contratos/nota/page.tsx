@@ -22,7 +22,7 @@ export default async function EnviarNotaPage({ searchParams }: { searchParams: P
       <h1 className="display text-[30px] font-bold text-ink">Enviar nota fiscal</h1>
       <p className="mt-1 max-w-2xl text-[15px] text-ink-2">
         A nota vai direto para o fiscal do contrato, que confere a entrega e atesta em até 5 dias úteis. Depois do atesto, você acompanha a liquidação e a posição na fila de
-        pagamentos em <Link href="/portal/contratos/pagamentos" className="font-semibold text-brand hover:underline">Meus pagamentos</Link>.
+        pagamentos em <Link href="/portal/contratos/pagamentos" className="font-semibold text-brand-2 hover:underline">Meus pagamentos</Link>.
       </p>
       <div className="panel mt-6 max-w-2xl p-6">
         {ativos.length === 0 ? (

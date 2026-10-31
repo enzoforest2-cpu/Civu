@@ -85,7 +85,7 @@ export default async function FinancasPage() {
                     </span>
                     <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{a.texto}</span>
                   </span>
-                  <ArrowUpRight size={16} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand" />
+                  <ArrowUpRight size={16} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand-2" />
                 </Link>
               </li>
             ))}
@@ -94,7 +94,7 @@ export default async function FinancasPage() {
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr] [&>*]:min-w-0">
-        <Panel title="Execução por área" action={<Link href="/financas/orcamento" className="text-[13px] font-semibold text-brand hover:underline">Ver dotações</Link>}>
+        <Panel title="Execução por área" action={<Link href="/financas/orcamento" className="text-[13px] font-semibold text-brand-2 hover:underline">Ver dotações</Link>}>
           <ul className="space-y-3.5">
             {funcoes.map((f) => (
               <li key={f.funcao}>
@@ -134,7 +134,7 @@ export default async function FinancasPage() {
               ))}
             </ul>
           </Panel>
-          <Panel title="Caixa por fonte" action={<Link href="/financas/caixa" className="text-[13px] font-semibold text-brand hover:underline">Projeção</Link>}>
+          <Panel title="Caixa por fonte" action={<Link href="/financas/caixa" className="text-[13px] font-semibold text-brand-2 hover:underline">Projeção</Link>}>
             <ul className="divide-y divide-line">
               {cx.fontes.map((f) => (
                 <li key={f.grupo} className="flex items-center justify-between gap-3 py-2.5 text-[14px]">

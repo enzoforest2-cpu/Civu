@@ -55,7 +55,7 @@ export default async function ObrigacoesPage({ searchParams }: { searchParams: P
                 {lista.map((o) => (
                   <tr key={o.processoId + o.chave}>
                     <td className="min-w-[220px]">
-                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand-2 hover:underline">
                         {o.numero}
                       </Link>
                       <div className="text-[13px] text-ink-2">{o.assunto}</div>

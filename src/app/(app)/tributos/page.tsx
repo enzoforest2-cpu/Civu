@@ -56,7 +56,7 @@ export default async function TributosPainel() {
           sub={iptu ? `${fmtMoeda(iptu.aberto)} vencidos e não pagos em ${iptu.contribuintes} lançamentos` : undefined}
         />
         <Numero rotulo="Dívida ativa (atualizada)" valor={moedaCurta(estoqueValor)} sub={`${estoque.length} inscrições em aberto ou em cobrança judicial`} />
-        <Numero rotulo="ITBI esperando avaliação" valor={fila} tone={fila > 5 ? "warn" : undefined} sub={<Link href="/tributos/itbi" className="font-semibold text-brand hover:underline">Abrir a fila</Link>} />
+        <Numero rotulo="ITBI esperando avaliação" valor={fila} tone={fila > 5 ? "warn" : undefined} sub={<Link href="/tributos/itbi" className="font-semibold text-brand-2 hover:underline">Abrir a fila</Link>} />
         <Numero rotulo="Alvarás" valor={`${vencidos} vencidos`} tone={vencidos ? "bad" : undefined} sub={`${vencendo} vencem nos próximos 30 dias · ${inscricoes.length} inscrições`} />
       </div>
 
@@ -124,7 +124,7 @@ export default async function TributosPainel() {
         title="Maiores devedores"
         className="mt-6"
         action={
-          <Link href="/tributos/divida-ativa" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+          <Link href="/tributos/divida-ativa" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
             Dívida ativa <ArrowUpRight size={14} />
           </Link>
         }

@@ -23,7 +23,7 @@ export default async function OrdemPage({ params, searchParams }: { params: Prom
 
   return (
     <>
-      <Link href="/servicos/ordens" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand">
+      <Link href="/servicos/ordens" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand-2">
         <ArrowLeft size={16} /> Ordens de serviço
       </Link>
       {nova && (
@@ -35,7 +35,7 @@ export default async function OrdemPage({ params, searchParams }: { params: Prom
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="tnum text-[15px] font-semibold text-brand">{os.numero}</span>
+        <span className="tnum text-[15px] font-semibold text-brand-2">{os.numero}</span>
         <StatusOrdemChip status={os.status} />
       </div>
       <h1 className="display mt-2 text-[28px] leading-tight font-semibold text-ink sm:text-[32px]">
@@ -54,7 +54,7 @@ export default async function OrdemPage({ params, searchParams }: { params: Prom
               {os.ocorrencias.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-start justify-between gap-2 px-6 py-3.5">
                   <div className="min-w-0">
-                    <Link href={`/servicos/${o.id}`} className="tnum text-[13.5px] font-semibold text-brand hover:underline">
+                    <Link href={`/servicos/${o.id}`} className="tnum text-[13.5px] font-semibold text-brand-2 hover:underline">
                       {o.protocolo}
                     </Link>
                     {o.duplicadas.length > 0 && <span className="ml-2 text-[12.5px] text-ink-3">+{o.duplicadas.length} duplicada(s)</span>}

@@ -94,7 +94,7 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
                     {empenhos.map((e) => (
                       <tr key={e.id} className="linha">
                         <td className="tnum whitespace-nowrap">
-                          <Link href={`/financas/empenhos/${e.id}`} className="font-semibold text-brand hover:underline">
+                          <Link href={`/financas/empenhos/${e.id}`} className="font-semibold text-brand-2 hover:underline">
                             {e.numero}/{e.ano}
                           </Link>
                           <div className="text-[12.5px] text-ink-3">
@@ -132,7 +132,7 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
                         {fmtIso(r.data)} · {r.historico}
                       </div>
                       {r.processoId && (
-                        <Link href={`/processos/${r.processoId}`} className="text-[12.5px] font-semibold text-brand hover:underline">
+                        <Link href={`/processos/${r.processoId}`} className="text-[12.5px] font-semibold text-brand-2 hover:underline">
                           Ver processo
                         </Link>
                       )}

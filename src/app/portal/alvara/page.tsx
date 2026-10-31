@@ -105,13 +105,13 @@ export default async function AlvaraDaEmpresa({ searchParams }: { searchParams: 
                           <dt className="text-ink-3">Código</dt>
                           <dd className="tnum text-ink">{atual.codigoVerificacao}</dd>
                         </dl>
-                        <Link href={`/verificar/alvara/${atual.codigoVerificacao}`} className="mt-3 inline-block text-[13.5px] font-semibold text-brand hover:underline">
+                        <Link href={`/verificar/alvara/${atual.codigoVerificacao}`} className="mt-3 inline-block text-[13.5px] font-semibold text-brand-2 hover:underline">
                           Abrir o alvará para imprimir ou mostrar ao fiscal
                         </Link>
                       </div>
                       <div className="flex flex-col items-center gap-1">
                         <QrCodigo texto={url} tamanho={120} titulo="QR Code de verificação do alvará" />
-                        <span className="text-[11.5px] text-ink-3">Verificação pública</span>
+                        <span className="text-[12px] text-ink-3">Verificação pública</span>
                       </div>
                     </div>
                   ) : (
@@ -120,7 +120,7 @@ export default async function AlvaraDaEmpresa({ searchParams }: { searchParams: 
                   {aberto ? (
                     <p className="mt-4 text-[14px] text-ink-2">
                       Pedido{" "}
-                      <Link href={`/portal/pedidos/${aberto.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/portal/pedidos/${aberto.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                         {aberto.numero}
                       </Link>{" "}
                       em análise desde {fmtData(aberto.abertoEm)}.

@@ -108,7 +108,7 @@ export default async function FichaImovel({ params }: { params: Promise<{ id: st
             )}
             <p className="mt-3 text-[12.5px] text-ink-3">
               Preço de transação (ITBI quitado) não é anúncio nem avaliação individual. Veja o{" "}
-              <Link href="/tributos/observatorio" className="font-semibold text-brand hover:underline">
+              <Link href="/tributos/observatorio" className="font-semibold text-brand-2 hover:underline">
                 observatório imobiliário
               </Link>
               .
@@ -120,7 +120,7 @@ export default async function FichaImovel({ params }: { params: Promise<{ id: st
               <ul className="divide-y divide-line">
                 {im.itbis.map((i) => (
                   <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[14px]">
-                    <Link href={`/tributos/itbi/${i.id}`} className="tnum font-semibold text-brand hover:underline">
+                    <Link href={`/tributos/itbi/${i.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                       {i.numero}
                     </Link>
                     <span className="text-ink-2">

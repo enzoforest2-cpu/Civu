@@ -32,7 +32,7 @@ export default async function CatalogoServicos() {
               <li key={c.id} className="px-6 py-4">
                 <details className="group">
                   <summary className="flex flex-wrap items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-2">
                       <IconeServico categoria={c.categoria} size={17} />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -47,7 +47,7 @@ export default async function CatalogoServicos() {
                       </Chip>
                       {c.exigeFoto && <Chip>Pede foto</Chip>}
                       {!c.ativo && <Chip tone="warn">Fora do portal</Chip>}
-                      {editavel(c.setorId) && <span className="text-[13px] font-semibold text-brand group-open:hidden">Editar</span>}
+                      {editavel(c.setorId) && <span className="text-[13px] font-semibold text-brand-2 group-open:hidden">Editar</span>}
                     </span>
                   </summary>
                   {editavel(c.setorId) && (

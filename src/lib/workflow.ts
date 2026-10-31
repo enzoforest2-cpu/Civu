@@ -30,6 +30,27 @@ export const PAPEL_NOME: Record<Papel, string> = {
   ADMIN: "Administrador",
 };
 
+/** Papel com artigo, para frases como "Falta a assinatura do requisitante ou do secretário". */
+export const PAPEL_COM_ARTIGO: Record<Papel, string> = {
+  REQUISITANTE: "do requisitante",
+  SECRETARIO: "do secretário",
+  ORDENADOR: "do ordenador de despesa",
+  PROTOCOLO: "do protocolo",
+  COMPRAS: "do setor de compras",
+  CONTABILIDADE: "da contabilidade",
+  CONTROLE_INTERNO: "do controle interno",
+  JURIDICO: "da procuradoria",
+  TESOURARIA: "da tesouraria",
+  FISCAL: "do fiscal de contrato",
+  ADMIN: "do administrador",
+};
+
+/** Lista de papéis em linguagem de tela: ["REQUISITANTE", "SECRETARIO"] → "do requisitante ou do secretário". */
+export function papeisPorExtenso(papeis: readonly string[], conjuncao: "ou" | "e" = "ou"): string {
+  const nomes = papeis.map((p) => PAPEL_COM_ARTIGO[p as Papel] ?? `de ${p.toLowerCase().replace(/_/g, " ")}`);
+  return nomes.length <= 1 ? (nomes[0] ?? "") : `${nomes.slice(0, -1).join(", ")} ${conjuncao} ${nomes[nomes.length - 1]}`;
+}
+
 /** Tipos de documento que podem ser juntados ao processo. */
 export const DOCUMENTO_TIPOS: Record<string, string> = {
   DFD: "Documento de Formalização de Demanda (DFD)",

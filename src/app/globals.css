@@ -19,20 +19,23 @@
   --color-sunken: #eef3f1;
   --color-ink: #172d36;
   --color-ink-2: #4b5f68;
-  --color-ink-3: #82949b;
+  --color-ink-3: #5f7178;
   --color-line: #e1e8e5;
   --color-line-2: #c9d5d0;
+  /* borda de campos de formulário: 3,22:1 sobre branco (WCAG 1.4.11) */
+  --color-line-campo: #7f948c;
 
+  /* brand: identidade e preenchimentos sem texto; brand-2: texto da marca e fundo com texto branco (6,4:1) */
   --color-brand: #168779;
   --color-brand-2: #106b60;
   --color-brand-soft: #e5f3ee;
   --color-brand-ink: #0d564d;
 
-  --color-ok: #2e7d32;
+  --color-ok: #2a7330;
   --color-ok-soft: #e6f2e3;
-  --color-warn: #b86e00;
+  --color-warn: #8f5500;
   --color-warn-soft: #fff1d6;
-  --color-bad: #d22f3a;
+  --color-bad: #c0272f;
   --color-bad-soft: #fde6e8;
 }
 
@@ -60,7 +63,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-brand-2);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -75,7 +78,7 @@ body {
 /* Campos */
 .input {
   width: 100%;
-  border: 1px solid var(--color-line-2);
+  border: 1px solid var(--color-line-campo);
   border-radius: 10px;
   background: #fff;
   padding: 0.65rem 0.85rem;
@@ -131,16 +134,21 @@ textarea.input {
 .btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.btn:disabled {
-  opacity: 0.55;
+.btn:disabled,
+.btn-primary:disabled,
+.btn-quiet:disabled,
+.btn-danger:disabled {
+  background: var(--color-sunken);
+  border-color: var(--color-line-2);
+  color: var(--color-ink-2);
   cursor: not-allowed;
 }
 .btn-primary {
-  background: var(--color-brand);
+  background: var(--color-brand-2);
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-brand-2);
+  background: var(--color-brand-ink);
 }
 .btn-quiet {
   background: #fff;
@@ -171,7 +179,7 @@ textarea.input {
   gap: 0.35rem;
   border-radius: 999px;
   padding: 0.18rem 0.6rem;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.35;
@@ -237,5 +245,39 @@ details > summary::-webkit-details-marker {
 @media (prefers-reduced-motion: reduce) {
   .estacao-atual {
     animation: none;
+  }
+}
+
+/* "Pular para o conteúdo": fora da tela até receber foco */
+.pular-conteudo {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 10px;
+  background: var(--color-brand-2);
+  padding: 0.7rem 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+.pular-conteudo:focus {
+  transform: none;
+}
+main:focus {
+  outline: none;
+}
+
+/* Área de toque de pelo menos 44 px sem mudar o desenho: um pseudo-elemento invisível amplia o alvo */
+@utility alvo-toque {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
 }

@@ -43,7 +43,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
                 ) : (
                   pode && (
                     <details className="mt-3 rounded-xl border border-line open:bg-sunken/50">
-                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand">Decidir</summary>
+                      <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand-2">Decidir</summary>
                       <ActionForm action={decidirRecursoAction} className="space-y-3 px-4 pb-4">
                         <input type="hidden" name="processoId" value={p.id} />
                         <input type="hidden" name="recursoId" value={r.id} />
@@ -68,7 +68,7 @@ export function PainelRecursos({ p, pode }: PropsEtapa) {
       </div>
       {pode ? (
         <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
-          <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Registrar intenção de recurso</summary>
+          <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Registrar intenção de recurso</summary>
           <ActionForm action={registrarRecursoAction} className="space-y-3 px-4 pb-4">
             <input type="hidden" name="processoId" value={p.id} />
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">

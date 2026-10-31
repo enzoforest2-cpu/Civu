@@ -171,9 +171,9 @@ export default async function NovoEmpenhoPage({ searchParams }: { searchParams: 
           {proc ? (
             <Panel title="Preenchido a partir do processo">
               <div className="flex items-start gap-3">
-                <Link2 size={18} className="mt-0.5 shrink-0 text-brand" />
+                <Link2 size={18} className="mt-0.5 shrink-0 text-brand-2" />
                 <div className="min-w-0 text-[14px]">
-                  <Link href={`/processos/${proc.id}`} className="tnum font-semibold text-brand hover:underline">
+                  <Link href={`/processos/${proc.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                     {proc.numero}
                   </Link>{" "}
                   <span className="text-ink">{proc.assunto}</span>
@@ -193,7 +193,7 @@ export default async function NovoEmpenhoPage({ searchParams }: { searchParams: 
             <Panel title="Empenhar a partir de um processo">
               <p className="text-[14px] text-ink-2">
                 Para preencher credor, valor e dotação automaticamente, abra o processo de compra na lista{" "}
-                <Link href="/financas/empenhos#aguardando" className="font-semibold text-brand hover:underline">
+                <Link href="/financas/empenhos#aguardando" className="font-semibold text-brand-2 hover:underline">
                   aguardando empenho
                 </Link>
                 .

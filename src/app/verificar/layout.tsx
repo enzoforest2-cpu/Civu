@@ -12,7 +12,7 @@ export default function VerificarLayout({ children }: { children: React.ReactNod
             <MarcaCompleta altura={26} />
             <span className="border-l border-line pl-2.5 text-[12.5px] leading-tight text-ink-3">Verificação de documentos</span>
           </Link>
-          <Link href="/consulta" className="text-[14px] font-semibold text-brand hover:underline">
+          <Link href="/consulta" className="text-[14px] font-semibold text-brand-2 hover:underline">
             Consulta de processos
           </Link>
         </div>

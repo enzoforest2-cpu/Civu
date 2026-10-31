@@ -13,13 +13,13 @@ export default async function LoginPage() {
   if (u) redirect("/painel");
   return (
     <main className="flex min-h-screen bg-surface">
-      <aside className="relative hidden w-[52%] flex-col justify-between overflow-hidden bg-brand p-14 text-white lg:flex">
+      <aside className="relative hidden w-[52%] flex-col justify-between overflow-hidden bg-brand-2 p-14 text-white lg:flex">
         <div className="flex items-center gap-3">
           <MarcaCompleta altura={34} inversa />
         </div>
 
         <div>
-          <h1 className="display max-w-xl text-[46px] leading-[1.05] font-semibold">Cada pedido da prefeitura, do protocolo ao pagamento, com prazo e responsável.</h1>
+          <p className="display max-w-xl text-[46px] leading-[1.05] font-semibold">Cada pedido da prefeitura, do protocolo ao pagamento, com prazo e responsável.</p>
           {/* o trilho como ilustração */}
           <ol className="mt-14 flex items-start" aria-hidden>
             {PARADAS.map((p, i) => {
@@ -29,18 +29,18 @@ export default async function LoginPage() {
                 <li key={p} className="relative flex flex-1 flex-col items-start">
                   {i < PARADAS.length - 1 && <span className={`absolute top-[13px] left-0 h-[3px] w-full ${passou ? "bg-white" : "bg-white/25"}`} />}
                   <span
-                    className={`relative z-10 h-[29px] w-[29px] rounded-full ${atual ? "border-[3px] border-white bg-brand" : passou ? "bg-white" : "border-2 border-white/35 bg-brand"}`}
+                    className={`relative z-10 h-[29px] w-[29px] rounded-full ${atual ? "border-[3px] border-white bg-brand-2" : passou ? "bg-white" : "border-2 border-white/35 bg-brand-2"}`}
                   >
                     {atual && <span className="absolute inset-[6px] rounded-full bg-white" />}
                   </span>
-                  <span className={`mt-3 text-[13.5px] ${atual ? "font-semibold text-white" : passou ? "text-white/85" : "text-white/50"}`}>{p}</span>
+                  <span className={`mt-3 text-[13.5px] ${atual ? "font-semibold text-white" : passou ? "text-white/90" : "text-white/80"}`}>{p}</span>
                 </li>
               );
             })}
           </ol>
         </div>
 
-        <p className="max-w-md text-[13px] text-white/65">Segue a Lei 14.133, a Lei 4.320, a LRF e o Decreto 10.540. Toda movimentação fica registrada e não pode ser apagada.</p>
+        <p className="max-w-md text-[13px] text-white/85">Segue a Lei 14.133, a Lei 4.320, a LRF e o Decreto 10.540. Toda movimentação fica registrada e não pode ser apagada.</p>
       </aside>
 
       <section className="flex flex-1 items-center justify-center p-8">
@@ -48,7 +48,7 @@ export default async function LoginPage() {
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <MarcaCompleta altura={32} />
           </div>
-          <h2 className="display text-[30px] font-semibold text-ink">Entrar</h2>
+          <h1 className="display text-[30px] font-semibold text-ink">Entrar</h1>
           <p className="mt-1.5 text-[14.5px] text-ink-2">Use seu CPF e sua senha de servidor.</p>
           <ActionForm action={loginAction} className="mt-8 space-y-5" resetOnOk={false}>
             <div>

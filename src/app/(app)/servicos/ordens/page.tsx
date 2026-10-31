@@ -78,14 +78,14 @@ export default async function OrdensPage({ searchParams }: { searchParams: Promi
                   return (
                     <tr key={os.id} className="linha">
                       <td className="whitespace-nowrap">
-                        <Link href={`/servicos/ordens/${os.id}`} className="tnum font-semibold text-brand hover:underline">
+                        <Link href={`/servicos/ordens/${os.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                           {os.numero}
                         </Link>
                         {!setorSel && <div className="text-[12.5px] text-ink-3">{os.setor.sigla}</div>}
                       </td>
                       <td className="tnum whitespace-nowrap">
                         {fmtDia(os.programadaPara)}
-                        {os.programadaPara === hoje && <div className="text-[12.5px] font-semibold text-brand">hoje</div>}
+                        {os.programadaPara === hoje && <div className="text-[12.5px] font-semibold text-brand-2">hoje</div>}
                         {vencida && <div className="text-[12.5px] font-semibold text-bad">data passou</div>}
                       </td>
                       <td className="min-w-[180px] text-[14px]">{os.equipe?.nome ?? "—"}</td>

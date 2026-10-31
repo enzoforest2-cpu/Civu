@@ -84,7 +84,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
               )}
             </dl>
             <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-              <Link href={`/integracoes?conector=${i.chave}#chamadas`} className="text-[13px] font-semibold text-brand hover:underline">
+              <Link href={`/integracoes?conector=${i.chave}#chamadas`} className="text-[13px] font-semibold text-brand-2 hover:underline">
                 Ver chamadas
               </Link>
               {admin && (
@@ -115,7 +115,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
           pad={false}
           action={
             filtrado ? (
-              <Link href="/integracoes#chamadas" className="text-[13px] font-semibold text-brand hover:underline">
+              <Link href="/integracoes#chamadas" className="text-[13px] font-semibold text-brand-2 hover:underline">
                 Ver todas
               </Link>
             ) : undefined
@@ -157,7 +157,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
                       </td>
                       <td className="tnum text-[12.5px] whitespace-nowrap text-ink-2">
                         {c.idOperacao}
-                        {c.simulada && <div className="text-[11.5px] text-warn">simulada</div>}
+                        {c.simulada && <div className="text-[12px] text-warn">simulada</div>}
                       </td>
                     </tr>
                   ))}

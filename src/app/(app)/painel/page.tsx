@@ -97,7 +97,7 @@ export default async function PainelPage() {
         title="Onde os processos estão agora"
         action={
           <div className="hidden items-center gap-4 text-[12.5px] text-ink-3 sm:flex">
-            <Legenda cor="bg-brand" texto="No prazo" />
+            <Legenda cor="bg-brand-2" texto="No prazo" />
             <Legenda cor="bg-warn" texto="Não recebido" />
             <Legenda cor="bg-bad" texto="Atrasado" />
           </div>
@@ -111,16 +111,16 @@ export default async function PainelPage() {
             {fila.map((s) => (
               <li key={s.nome} className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2 py-3.5 md:grid-cols-[240px_1fr_auto]">
                 <span className="truncate font-medium text-ink">{s.nome}</span>
-                <div className="order-3 col-span-2 flex flex-wrap gap-1.5 md:order-none md:col-span-1">
+                <div className="order-3 col-span-2 flex flex-wrap gap-x-1.5 gap-y-[18px] md:order-none md:col-span-1">
                   {s.itens.map((p) => {
                     const atrasado = p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora;
-                    const cor = atrasado ? "bg-bad hover:bg-bad/80" : !p.recebidoEm ? "bg-warn hover:bg-warn/80" : "bg-brand hover:bg-brand-2";
+                    const cor = atrasado ? "bg-bad hover:bg-bad/80" : !p.recebidoEm ? "bg-warn hover:bg-warn/80" : "bg-brand-2 hover:bg-brand-ink";
                     return (
                       <Link
                         key={p.id}
                         href={`/processos/${p.id}`}
                         title={`${p.numero} — ${p.assunto}`}
-                        className={`tnum h-7 rounded-md px-2 text-[11.5px] leading-7 font-semibold text-white transition-colors ${cor}`}
+                        className={`alvo-toque tnum h-7 rounded-md px-2 text-[12px] leading-7 font-semibold text-white transition-colors ${cor}`}
                       >
                         {p.numero.slice(-4)}
                       </Link>
@@ -139,8 +139,8 @@ export default async function PainelPage() {
         <Panel
           title="Obrigações legais"
           action={
-            <Link href="/obrigacoes" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
-              Ver todas <ArrowUpRight size={14} />
+            <Link href="/obrigacoes" className="alvo-toque inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
+              Ver todas <ArrowUpRight size={14} aria-hidden />
             </Link>
           }
         >
@@ -154,7 +154,7 @@ export default async function PainelPage() {
             <ul className="mt-3 space-y-2">
               {obrigAbertas.slice(0, 4).map((o) => (
                 <li key={o.processoId + o.chave} className="text-[13.5px] leading-snug">
-                  <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand hover:underline">
+                  <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand-2 hover:underline">
                     {o.numero}
                   </Link>{" "}
                   <span className="text-ink">{o.chave === "PNCP" ? "PNCP" : "Tribunal de Contas"}</span>
@@ -201,8 +201,8 @@ export default async function PainelPage() {
         <Panel
           title="Fila de pagamentos"
           action={
-            <Link href="/fila-de-pagamentos" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
-              Página pública <ArrowUpRight size={14} />
+            <Link href="/fila-de-pagamentos" className="alvo-toque inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
+              Página pública <ArrowUpRight size={14} aria-hidden />
             </Link>
           }
         >
@@ -230,8 +230,8 @@ export default async function PainelPage() {
         <Panel
           title="Precisa de atenção"
           action={
-            <Link href="/processos?situacao=atrasados" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
-              Ver todos <ArrowUpRight size={14} />
+            <Link href="/processos?situacao=atrasados" className="alvo-toque inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
+              Ver todos <ArrowUpRight size={14} aria-hidden />
             </Link>
           }
         >
@@ -278,7 +278,7 @@ export default async function PainelPage() {
             ) : (
               <ul className="space-y-2.5">
                 {m.tempoPorEstado.slice(0, 8).map((t) => (
-                  <li key={t.nome} className="grid grid-cols-[150px_1fr_52px] items-center gap-3 text-[13.5px]">
+                  <li key={t.nome} className="grid grid-cols-[minmax(0,190px)_1fr_52px] items-center gap-3 text-[13.5px]">
                     <span className="truncate text-ink-2" title={nomeEtapa(t.nome)}>
                       {nomeEtapa(t.nome)}
                     </span>

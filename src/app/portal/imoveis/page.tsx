@@ -43,7 +43,7 @@ export default async function MeusImoveis() {
                         {im.fracao < 100 && ` · fração de ${im.fracao.toLocaleString("pt-BR")}%`}
                       </div>
                     </div>
-                    <ArrowRight size={17} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand" />
+                    <ArrowRight size={17} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand-2" />
                   </div>
                   <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line pt-3 text-[13.5px]">
                     <span>

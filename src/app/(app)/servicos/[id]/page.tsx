@@ -22,11 +22,11 @@ export default async function OcorrenciaGestao({ params }: { params: Promise<{ i
 
   return (
     <>
-      <Link href="/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand">
+      <Link href="/servicos" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand-2">
         <ArrowLeft size={16} /> Ocorrências urbanas
       </Link>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="tnum text-[15px] font-semibold text-brand">{o.protocolo}</span>
+        <span className="tnum text-[15px] font-semibold text-brand-2">{o.protocolo}</span>
         <StatusChip status={o.status} />
         <SlaChip o={o} />
       </div>
@@ -65,7 +65,7 @@ export default async function OcorrenciaGestao({ params }: { params: Promise<{ i
             {o.duplicadaDe && (
               <p className="mt-5 rounded-lg bg-sunken px-3 py-2 text-[14px] text-ink">
                 Duplicada de{" "}
-                <Link href={`/servicos/${o.duplicadaDe.id}`} className="tnum font-semibold text-brand hover:underline">
+                <Link href={`/servicos/${o.duplicadaDe.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                   {o.duplicadaDe.protocolo}
                 </Link>
                 . O solicitante acompanha pelo pedido principal e recebe a conclusão junto.
@@ -77,7 +77,7 @@ export default async function OcorrenciaGestao({ params }: { params: Promise<{ i
                 {o.duplicadas.map((d, i) => (
                   <span key={d.id}>
                     {i > 0 && ", "}
-                    <Link href={`/servicos/${d.id}`} className="tnum font-semibold text-brand hover:underline">
+                    <Link href={`/servicos/${d.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                       {d.protocolo}
                     </Link>
                   </span>
@@ -102,7 +102,7 @@ export default async function OcorrenciaGestao({ params }: { params: Promise<{ i
         <div className="space-y-6">
           {o.ordem && (
             <Panel title="Ordem de serviço">
-              <Link href={`/servicos/ordens/${o.ordem.id}`} className="tnum text-[16px] font-semibold text-brand hover:underline">
+              <Link href={`/servicos/ordens/${o.ordem.id}`} className="tnum text-[16px] font-semibold text-brand-2 hover:underline">
                 {o.ordem.numero}
               </Link>
               <div className="mt-2 flex flex-wrap gap-2">

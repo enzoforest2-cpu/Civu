@@ -94,7 +94,7 @@ export function DecisaoLote({ itens, podeDecidir }: { itens: ItemLote[]; podeDec
               <li key={r.processoId} className="flex items-start gap-2 text-[13.5px]">
                 {r.ok ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-ok" /> : <XCircle size={16} className="mt-0.5 shrink-0 text-bad" />}
                 <span>
-                  <Link href={`/processos/${r.processoId}`} className="tnum font-semibold text-brand hover:underline">
+                  <Link href={`/processos/${r.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">
                     {r.numero}
                   </Link>{" "}
                   <span className={r.ok ? "text-ink-2" : "text-bad"}>{r.mensagem}</span>
@@ -125,7 +125,7 @@ export function DecisaoLote({ itens, podeDecidir }: { itens: ItemLote[]; podeDec
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/processos/${i.id}`} className="tnum font-semibold text-brand hover:underline">
+                <Link href={`/processos/${i.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                   {i.numero}
                 </Link>
                 {i.urgencia === "URGENTE" && (

@@ -68,7 +68,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
         className="mb-6"
         action={
           alertas.length > 5 ? (
-            <Link href={mostrarTodos ? "/contratos" : "/contratos?alertas=todos"} className="text-[13.5px] font-semibold text-brand hover:underline">
+            <Link href={mostrarTodos ? "/contratos" : "/contratos?alertas=todos"} className="alvo-toque text-[13.5px] font-semibold text-brand-2 hover:underline">
               {mostrarTodos ? "Mostrar menos" : "Ver todos"}
             </Link>
           ) : undefined
@@ -87,10 +87,10 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
                       <Icone size={15} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-ink group-hover:text-brand">{a.titulo}</span>
+                      <span className="block font-medium text-ink group-hover:text-brand-2">{a.titulo}</span>
                       <span className="block text-[13px] text-ink-2">{a.detalhe}</span>
                     </span>
-                    <ArrowUpRight size={16} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand" />
+                    <ArrowUpRight size={16} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand-2" />
                   </Link>
                 </li>
               );
@@ -143,7 +143,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
                 {lista.map((c) => (
                   <tr key={c.id} className="linha">
                     <td className="min-w-[280px]">
-                      <Link href={`/contratos/${c.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/contratos/${c.id}`} className="alvo-toque tnum font-semibold text-brand-2 hover:underline">
                         {c.rotulo}
                       </Link>
                       <span className="ml-2 text-[12.5px] text-ink-3">{NATUREZAS_CONTRATO[c.natureza]?.nome}</span>

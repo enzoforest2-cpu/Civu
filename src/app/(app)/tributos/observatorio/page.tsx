@@ -52,7 +52,7 @@ export default async function Observatorio({ searchParams }: { searchParams: Pro
         acao={
           <nav className="flex gap-2" aria-label="Uso">
             {["RESIDENCIAL", "COMERCIAL"].map((k) => (
-              <Link key={k} href={`?uso=${k}`} className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${uso === k ? "border-brand bg-brand text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
+              <Link key={k} href={`?uso=${k}`} className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${uso === k ? "border-brand-2 bg-brand-2 text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
                 {k === "RESIDENCIAL" ? "Residencial" : "Comercial"}
               </Link>
             ))}

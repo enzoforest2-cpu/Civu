@@ -12,6 +12,9 @@ export default async function PortalLayout({ children }: { children: React.React
   const app = s.empresaAtiva ? "Civu Empresas" : "Civu Cidadão";
   return (
     <div className="min-h-screen bg-bg">
+      <a href="#conteudo" className="pular-conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/portal" className="flex items-center gap-3">
@@ -43,7 +46,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         </div>
         {s.empresaAtiva && (
-          <div className="bg-brand text-white">
+          <div className="bg-brand-2 text-white">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 px-4 py-1.5 text-[13px] sm:px-6">
               <Avatar nome={s.pessoa.nome} size={20} />
               <span>
@@ -53,7 +56,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </div>
         )}
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
+      <main id="conteudo" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
     </div>
   );
 }

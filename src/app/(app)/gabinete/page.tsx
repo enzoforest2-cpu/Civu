@@ -135,7 +135,7 @@ export default async function GabinetePage() {
                 {assinaturas.map((a) => (
                   <li key={a.id + a.documento} className="flex flex-wrap items-start justify-between gap-2 py-3">
                     <div className="min-w-0">
-                      <Link href={`/processos/${a.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/processos/${a.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                         {a.numero}
                       </Link>{" "}
                       <span className="text-[14px] text-ink">{a.assunto}</span>
@@ -180,7 +180,7 @@ export default async function GabinetePage() {
                               {a.responsavel && <> · {a.responsavel}</>}
                             </span>
                             {a.acao && (
-                              <Link href={a.acao.href} className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">
+                              <Link href={a.acao.href} className="inline-flex items-center gap-1 font-semibold text-brand-2 hover:underline">
                                 {a.acao.rotulo} <ArrowUpRight size={13} />
                               </Link>
                             )}
@@ -190,7 +190,7 @@ export default async function GabinetePage() {
                       {lista.length > 4 && (
                         <li className="text-[13px] text-ink-3">
                           e mais {lista.length - 4}.{" "}
-                          <Link href="/automacoes" className="font-semibold text-brand hover:underline">
+                          <Link href="/automacoes" className="font-semibold text-brand-2 hover:underline">
                             Ver todos
                           </Link>
                         </li>
@@ -225,7 +225,7 @@ export default async function GabinetePage() {
         <Panel
           title="Agenda de prazos legais"
           action={
-            <Link href="/obrigacoes" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+            <Link href="/obrigacoes" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
               Ver todas <ArrowUpRight size={14} />
             </Link>
           }
@@ -245,7 +245,7 @@ export default async function GabinetePage() {
                     </div>
                     <div className="text-[13.5px] text-ink">{o.titulo}</div>
                     <div className="text-[12.5px] text-ink-3">
-                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand-2 hover:underline">
                         {o.numero}
                       </Link>{" "}
                       · {o.assunto}
@@ -260,7 +260,7 @@ export default async function GabinetePage() {
         <Panel
           title="Pagamentos fora da ordem cronológica"
           action={
-            <Link href="/fila-de-pagamentos" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+            <Link href="/fila-de-pagamentos" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
               Fila pública <ArrowUpRight size={14} />
             </Link>
           }
@@ -276,7 +276,7 @@ export default async function GabinetePage() {
               {hist.quebras.map((q) => (
                 <li key={q.processoId} className="rounded-xl border border-line p-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <Link href={`/processos/${q.processoId}`} className="tnum font-semibold text-brand hover:underline">
+                    <Link href={`/processos/${q.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">
                       {q.numero}
                     </Link>
                     <span className="tnum text-[12.5px] text-ink-3">pago em {fmtData(q.pagoEm)}</span>

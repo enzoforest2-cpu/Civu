@@ -36,7 +36,7 @@ export default async function VerificarAlvara({ params }: { params: Promise<{ co
           </div>
           <div className="text-[12.5px] text-ink-3">Departamento de Tributação e Fiscalização</div>
           <h1 className="display mt-2 text-[24px] leading-tight font-semibold text-ink sm:text-[28px]">{LICENCA_NOME[l.tipo] ?? l.tipo}</h1>
-          <div className="tnum mt-1 text-[15px] font-semibold text-brand">{l.numero}</div>
+          <div className="tnum mt-1 text-[15px] font-semibold text-brand-2">{l.numero}</div>
         </header>
         <div className="grid gap-6 px-6 py-6 sm:grid-cols-[1fr_auto]">
           <dl className="grid min-w-0 gap-x-6 gap-y-3 text-[14.5px] sm:grid-cols-2">
@@ -85,7 +85,7 @@ export default async function VerificarAlvara({ params }: { params: Promise<{ co
           <div className="flex flex-col items-center gap-1.5">
             <QrCodigo texto={url} tamanho={148} titulo="QR Code para verificar este alvará" />
             <div className="tnum text-[13px] font-semibold text-ink">{l.codigoVerificacao}</div>
-            <div className="max-w-[160px] text-center text-[11.5px] leading-snug break-all text-ink-3">{url}</div>
+            <div className="max-w-[160px] text-center text-[12px] leading-snug break-all text-ink-3">{url}</div>
           </div>
         </div>
         <footer className="border-t border-line px-6 py-4 text-[12.5px] leading-snug text-ink-3">

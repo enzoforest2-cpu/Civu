@@ -11,7 +11,7 @@ export type Estacao = { chave: string; nome: string; setor?: string | null; opci
  * Etapas opcionais (ex.: crédito adicional) só aparecem se o processo passou por elas.
  */
 export function Trilho({ estacoes, atual, encerrado, visitadas }: { estacoes: Estacao[]; atual: string; encerrado: boolean; visitadas: string[] }) {
-  const ref = useRef<HTMLOListElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const visiveis = estacoes.filter((e) => !e.opcional || visitadas.includes(e.chave) || e.chave === atual);
   const idx = visiveis.findIndex((e) => e.chave === atual);
 
@@ -19,6 +19,7 @@ export function Trilho({ estacoes, atual, encerrado, visitadas }: { estacoes: Es
     const el = ref.current?.querySelector<HTMLElement>("[data-atual='1']");
     if (el && ref.current) {
       const box = ref.current;
+      // rola só o trilho (sem mexer na página) para deixar a etapa atual no centro
       box.scrollLeft = el.offsetLeft - box.clientWidth / 2 + el.clientWidth / 2;
     }
   }, [atual]);
@@ -31,13 +32,14 @@ export function Trilho({ estacoes, atual, encerrado, visitadas }: { estacoes: Es
         {encerrado ? `Todas as ${principais.length} etapas concluídas` : posPrincipal >= 0 ? `Etapa ${posPrincipal + 1} de ${principais.length}` : "Etapa extra, fora do caminho normal"}
       </div>
       <div aria-hidden className="pointer-events-none absolute top-8 right-0 bottom-2 z-20 w-16 bg-gradient-to-l from-white to-transparent" />
-      <ol ref={ref} className="flex snap-x overflow-x-auto scroll-smooth pr-12 pb-2 [scrollbar-width:thin]" aria-label="Caminho do processo">
+      <div ref={ref} tabIndex={0} role="region" aria-label="Etapas do processo" className="snap-x overflow-x-auto scroll-smooth rounded-lg pr-12 pb-2 [scrollbar-width:thin]">
+      <ol className="relative flex">
         {visiveis.map((e, i) => {
           const passou = encerrado || i < idx;
           const aqui = !encerrado && i === idx;
           const ultimo = i === visiveis.length - 1;
           return (
-            <li key={e.chave} data-atual={aqui ? "1" : undefined} className="relative flex w-[118px] shrink-0 snap-center flex-col items-center text-center">
+            <li key={e.chave} data-atual={aqui ? "1" : undefined} aria-current={aqui ? "step" : undefined} className="relative flex w-[118px] shrink-0 snap-center flex-col items-center text-center">
               {/* linha até a próxima estação */}
               {!ultimo && <span aria-hidden className={`absolute top-[15px] left-1/2 h-[3px] w-full ${passou ? "bg-brand" : "bg-line"}`} />}
               <span
@@ -53,12 +55,14 @@ export function Trilho({ estacoes, atual, encerrado, visitadas }: { estacoes: Es
                 {aqui && <span className="h-[13px] w-[13px] rounded-full bg-brand" />}
               </span>
               <span className={`mt-2.5 px-1.5 text-[12.5px] leading-snug ${aqui ? "font-semibold text-ink" : passou ? "text-ink-2" : "text-ink-3"}`}>{e.nome}</span>
-              {aqui && <span className="mt-1 text-[11.5px] font-semibold text-brand">Está aqui</span>}
-              {e.setor && !aqui && <span className="mt-0.5 text-[11px] text-ink-3">{e.setor}</span>}
+              {passou && <span className="sr-only">, concluída</span>}
+              {aqui && <span className="mt-1 text-[12px] font-semibold text-brand-2">Está aqui</span>}
+              {e.setor && !aqui && <span className="mt-0.5 text-[12px] text-ink-3">{e.setor}</span>}
             </li>
           );
         })}
       </ol>
+      </div>
     </div>
   );
 }
@@ -67,7 +71,7 @@ export function Trilho({ estacoes, atual, encerrado, visitadas }: { estacoes: Es
 export function TrilhoMini({ total, posicao, encerrado, atrasado }: { total: number; posicao: number; encerrado: boolean; atrasado?: boolean }) {
   const feitos = encerrado ? total : posicao;
   return (
-    <div className="flex items-center gap-2" aria-label={encerrado ? "Concluído" : `Etapa ${posicao + 1} de ${total}`}>
+    <div className="flex items-center gap-2" role="img" aria-label={encerrado ? "Concluído" : `Etapa ${posicao + 1} de ${total}`}>
       <div className="flex gap-[3px]">
         {Array.from({ length: total }, (_, i) => (
           <span

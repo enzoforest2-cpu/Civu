@@ -124,7 +124,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
           {sp.saldo === "baixo" ? (
             <Chip tone="warn">Mostrando dotações com menos de 3% de saldo</Chip>
           ) : (
-            <Link href="/financas/orcamento?saldo=baixo" className="font-semibold text-brand hover:underline">
+            <Link href="/financas/orcamento?saldo=baixo" className="font-semibold text-brand-2 hover:underline">
               Ver dotações quase esgotadas
             </Link>
           )}
@@ -166,7 +166,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
                       {ds.map((d) => (
                         <tr key={d.id} className="linha">
                           <td className="min-w-[280px]">
-                            <Link href={`/financas/orcamento/${d.id}`} className="font-medium text-ink hover:text-brand hover:underline">
+                            <Link href={`/financas/orcamento/${d.id}`} className="font-medium text-ink hover:text-brand-2 hover:underline">
                               {d.acaoNome}
                             </Link>
                             <div className="text-[12.5px] text-ink-2">
@@ -232,7 +232,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
                       <Chip tone={c.valor < 0 ? "neutral" : "brand"}>{TIPOS_CREDITO[c.tipo] ?? c.tipo}</Chip>
                     </td>
                     <td className="min-w-[260px]">
-                      <Link href={`/financas/orcamento/${c.d.id}`} className="font-medium text-ink hover:text-brand hover:underline">
+                      <Link href={`/financas/orcamento/${c.d.id}`} className="font-medium text-ink hover:text-brand-2 hover:underline">
                         {c.d.acaoNome} · {c.d.natureza} · {c.d.fonte}
                       </Link>
                       {c.justificativa && <div className="text-[12.5px] text-ink-2">{c.justificativa}</div>}
@@ -250,7 +250,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
       </Panel>
       <p className="mt-4 max-w-3xl text-[13px] text-ink-3">
         Disponível = atualizado − empenhado − reservado. Saldo de orçamento não é dinheiro em caixa: para saber se há recurso para pagar, veja{" "}
-        <Link href="/financas/caixa" className="font-semibold text-brand hover:underline">
+        <Link href="/financas/caixa" className="font-semibold text-brand-2 hover:underline">
           Caixa e projeção
         </Link>
         .

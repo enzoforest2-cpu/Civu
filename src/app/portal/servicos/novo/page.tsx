@@ -29,11 +29,11 @@ export default async function PedirServico({ searchParams }: { searchParams: Pro
     } | null;
     return (
       <div className="mx-auto max-w-2xl">
-        <Link href="/portal/servicos/novo" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand">
+        <Link href="/portal/servicos/novo" className="inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 hover:text-brand-2">
           <ArrowLeft size={16} /> Escolher outro serviço
         </Link>
         <div className="mt-4 flex items-start gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-2">
             <IconeServico categoria={escolhido.categoria} size={22} />
           </span>
           <div>
@@ -81,7 +81,7 @@ export default async function PedirServico({ searchParams }: { searchParams: Pro
               href={`/portal/servicos/novo?servico=${c.chave}`}
               className="panel group flex items-center gap-3 p-4 transition-colors hover:border-brand"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-2">
                 <IconeServico categoria={c.categoria} size={19} />
               </span>
               <span className="min-w-0 flex-1">
@@ -89,7 +89,7 @@ export default async function PedirServico({ searchParams }: { searchParams: Pro
                 <span className="block font-semibold text-ink">{c.nome}</span>
                 <span className="mt-0.5 block text-[13px] leading-snug text-ink-2">{c.descricao}</span>
               </span>
-              <ChevronRight size={18} className="shrink-0 text-ink-3 group-hover:text-brand" />
+              <ChevronRight size={18} className="shrink-0 text-ink-3 group-hover:text-brand-2" />
             </Link>
           ))}
         </div>

@@ -65,7 +65,7 @@ export default async function GovernancaPage({ searchParams }: { searchParams: P
 
 function Marca({ sim }: { sim: boolean }) {
   return sim ? (
-    <span className="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-soft text-brand" title="Permitido">
+    <span className="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-soft text-brand-2" title="Permitido">
       <Check size={14} strokeWidth={3} />
       <span className="sr-only">Permitido</span>
     </span>
@@ -89,7 +89,7 @@ async function Matriz({ municipioId }: { municipioId: string }) {
               <tr>
                 <th className="min-w-[260px]">Ação</th>
                 {PAPEIS.map((p) => (
-                  <th key={p} className="text-center !text-[11.5px] leading-tight whitespace-normal" style={{ minWidth: 78 }}>
+                  <th key={p} className="text-center !text-[12px] leading-tight whitespace-normal" style={{ minWidth: 78 }}>
                     {PAPEL_NOME[p]}
                   </th>
                 ))}
@@ -130,7 +130,7 @@ async function Matriz({ municipioId }: { municipioId: string }) {
                     <th className="min-w-[220px]">Etapa</th>
                     <th>Setor</th>
                     {PAPEIS_VISIVEIS.map((p) => (
-                      <th key={p} className="text-center !text-[11.5px] leading-tight whitespace-normal" style={{ minWidth: 74 }}>
+                      <th key={p} className="text-center !text-[12px] leading-tight whitespace-normal" style={{ minWidth: 74 }}>
                         {PAPEL_NOME[p]}
                       </th>
                     ))}
@@ -203,7 +203,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
               </div>
               {editavel && (
                 <details className="mt-3 ml-0 sm:ml-12">
-                  <summary className="cursor-pointer text-[13.5px] font-semibold text-brand">Alterar setor e papéis</summary>
+                  <summary className="cursor-pointer text-[13.5px] font-semibold text-brand-2">Alterar setor e papéis</summary>
                   <ActionForm action={atualizarAcessoAction} resetOnOk={false} className="mt-3 space-y-3 rounded-xl bg-sunken p-4">
                     <input type="hidden" name="usuarioId" value={x.id} />
                     <div>
@@ -313,11 +313,11 @@ async function Trilha({ municipioId, sp }: { municipioId: string; sp: SP }) {
                     <td className="whitespace-nowrap">{i.autor}</td>
                     <td className="whitespace-nowrap">
                       <div className="text-ink">{i.acao}</div>
-                      <div className="text-[11.5px] text-ink-3">{i.fonte === "PROCESSO" ? "Processo" : "Administrativa"}</div>
+                      <div className="text-[12px] text-ink-3">{i.fonte === "PROCESSO" ? "Processo" : "Administrativa"}</div>
                     </td>
                     <td className="min-w-[220px]">
                       {i.href ? (
-                        <Link href={i.href} className="text-brand hover:underline">
+                        <Link href={i.href} className="text-brand-2 hover:underline">
                           {i.objeto}
                         </Link>
                       ) : (
@@ -326,7 +326,7 @@ async function Trilha({ municipioId, sp }: { municipioId: string; sp: SP }) {
                     </td>
                     <td className="min-w-[220px] text-[13px] text-ink-2">
                       {i.detalhe ?? "—"}
-                      {i.hash && <div className="tnum text-[11px] text-ink-3" title={i.hash}>hash {i.hash.slice(0, 12)}…</div>}
+                      {i.hash && <div className="tnum text-[12px] text-ink-3" title={i.hash}>hash {i.hash.slice(0, 12)}…</div>}
                     </td>
                   </tr>
                 ))}
@@ -396,7 +396,7 @@ async function Integridade({ municipioId, podeVerificar }: { municipioId: string
               <ul className="mt-4 space-y-1 text-[13.5px]">
                 {ult.falhas.map((f) => (
                   <li key={f.processoId}>
-                    <Link href={`/processos/${f.processoId}`} className="tnum font-semibold text-brand hover:underline">
+                    <Link href={`/processos/${f.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">
                       {f.numero}
                     </Link>{" "}
                     <span className="text-bad">não confere a partir do evento {f.seq}</span>

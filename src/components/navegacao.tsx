@@ -21,9 +21,9 @@ export function Navegacao({ grupos }: { grupos: GrupoNav[] }) {
         const contem = g.itens.some((i) => ativo(path, i.href));
         return (
           <details key={g.chave} open={contem || g.chave === "visao" || g.chave === "atendimento"} className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-[12px] font-semibold tracking-wide text-ink-3 uppercase hover:text-ink-2 [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-[13px] font-semibold text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
               {g.rotulo}
-              <ChevronRight size={14} className="transition-transform group-open:rotate-90" />
+              <ChevronRight size={14} aria-hidden className="shrink-0 transition-transform group-open:rotate-90" />
             </summary>
             <div className="space-y-0.5 pb-2">
               {g.itens.map((i) => {
@@ -35,7 +35,7 @@ export function Navegacao({ grupos }: { grupos: GrupoNav[] }) {
                     href={i.href}
                     aria-current={a ? "page" : undefined}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[14.5px] transition-colors ${
-                      a ? "bg-brand-soft font-semibold text-brand-ink [&_svg]:text-brand" : "text-ink-2 hover:bg-sunken hover:text-ink [&_svg]:text-ink-3"
+                      a ? "bg-brand-soft font-semibold text-brand-ink [&_svg]:text-brand-2" : "text-ink-2 hover:bg-sunken hover:text-ink [&_svg]:text-ink-3"
                     }`}
                   >
                     {i.icone}

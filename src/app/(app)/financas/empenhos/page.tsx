@@ -72,7 +72,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
             {aguardando.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5">
                 <div className="min-w-0">
-                  <Link href={`/processos/${p.id}`} className="tnum font-semibold text-brand hover:underline">
+                  <Link href={`/processos/${p.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                     {p.numero}
                   </Link>{" "}
                   <span className="font-medium text-ink">{p.assunto}</span>
@@ -151,7 +151,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
                 {mostrar.map((e) => (
                   <tr key={e.id} className="linha">
                     <td className="tnum align-top whitespace-nowrap">
-                      <Link href={`/financas/empenhos/${e.id}`} className="font-semibold text-brand hover:underline">
+                      <Link href={`/financas/empenhos/${e.id}`} className="font-semibold text-brand-2 hover:underline">
                         {e.numero}/{e.ano}
                       </Link>
                       <div className="text-[12.5px] text-ink-3">{fmtIso(e.data)}</div>
@@ -188,7 +188,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
             {lista.length > mostrar.length && (
               <div className="border-t border-line px-6 py-3 text-[13.5px] text-ink-2">
                 Mostrando os {mostrar.length} mais recentes de {lista.length}.{" "}
-                <Link href={`/financas/empenhos${qs({ todos: "1" })}`} className="font-semibold text-brand hover:underline">
+                <Link href={`/financas/empenhos${qs({ todos: "1" })}`} className="font-semibold text-brand-2 hover:underline">
                   Mostrar todos
                 </Link>
               </div>

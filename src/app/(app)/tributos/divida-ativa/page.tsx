@@ -95,7 +95,7 @@ export default async function DividaAtiva({ searchParams }: { searchParams: Prom
                         <td className="max-w-[220px]">
                           <div className="text-[13px]">{TRIBUTO_NOME[d.lancamento.tributo]} {d.lancamento.exercicio}</div>
                           {d.lancamento.imovelId ? (
-                            <Link href={`/tributos/imoveis/${d.lancamento.imovelId}`} className="block truncate text-[12.5px] text-brand hover:underline">
+                            <Link href={`/tributos/imoveis/${d.lancamento.imovelId}`} className="block truncate text-[12.5px] text-brand-2 hover:underline">
                               {d.lancamento.descricao.split(" — ")[1]}
                             </Link>
                           ) : (

@@ -62,7 +62,7 @@ export function CartaoIndicador({ i }: { i: Indicador }) {
       </div>
       {i.nota && <p className="mt-2 text-[12.5px] leading-snug text-ink-3">{i.nota}</p>}
       <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-3 text-[12px] text-ink-3">
-        <Link href={i.origem.href} className="font-semibold text-brand hover:underline">
+        <Link href={i.origem.href} className="font-semibold text-brand-2 hover:underline">
           {i.origem.rotulo}
         </Link>
         <span title={`Atualizado em ${fmtDataHora(i.atualizadoEm)}`}>{i.responsavel}</span>

@@ -126,7 +126,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
                       </div>
                       {l.aPagar > 0 && tesouraria && (
                         <details className="mt-3 rounded-xl border border-line bg-sunken/40">
-                          <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand">Registrar pagamento</summary>
+                          <summary className="px-4 py-2.5 text-[14px] font-semibold text-brand-2">Registrar pagamento</summary>
                           <ActionForm action={pagarAction} className="space-y-3 px-4 pb-4">
                             <input type="hidden" name="liquidacaoId" value={l.id} />
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -224,7 +224,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
             <div className="mt-2 text-[13px] text-ink-3">Emitido em {fmtIso(e.data)}</div>
           </Panel>
           <Panel title="Dotação">
-            <Link href={`/financas/orcamento/${d.id}`} className="font-semibold text-ink hover:text-brand hover:underline">
+            <Link href={`/financas/orcamento/${d.id}`} className="font-semibold text-ink hover:text-brand-2 hover:underline">
               {d.acaoNome}
             </Link>
             <div className="text-[13.5px] text-ink-2">
@@ -245,7 +245,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
                   const estado = t ? getEstado(t.definicao as WorkflowDef, p.estadoAtual)?.nome : p.estadoAtual;
                   return (
                     <li key={p.id}>
-                      <Link href={`/processos/${p.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/processos/${p.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                         {p.numero}
                       </Link>{" "}
                       <span className="text-ink">{p.assunto}</span>

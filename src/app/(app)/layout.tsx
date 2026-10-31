@@ -26,7 +26,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const mobile = ITENS_GESTAO.filter((i) => i.grupo !== "publico").slice(0, 8);
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
+      <a href="#conteudo" className="pular-conteudo">
+        Pular para o conteúdo
+      </a>
+      <aside aria-label="Menu lateral" className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
         <div className="px-5 pt-6 pb-5">
           <Link href="/painel" className="flex items-center gap-2.5">
             <MarcaCompleta />
@@ -53,8 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <div className="min-w-0 flex-1">
-        <nav className="flex items-center gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2 lg:hidden" aria-label="Menu">
-          <Link href="/painel" className="mr-2 shrink-0">
+        <nav className="flex items-center gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-1 lg:hidden" aria-label="Menu">
+          <Link href="/painel" className="mr-1 flex h-11 w-11 shrink-0 items-center justify-center" aria-label="Civu, ir para o painel">
             <Marca size={26} />
           </Link>
           {mobile.map(({ href: h, rotulo: r }) => (
@@ -65,8 +68,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </nav>
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-bg/85 px-4 py-3 backdrop-blur sm:px-10">
           <form action="/processos" className="relative w-full max-w-md">
-            <Search size={17} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-3" />
-            <input name="q" className="input !rounded-full !bg-white !py-2.5 !pl-10" placeholder="Buscar processo por número ou assunto" />
+            <Search size={17} aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-3" />
+            <input name="q" className="input !rounded-full !bg-white !py-2.5 !pl-10" placeholder="Buscar processo por número ou assunto" aria-label="Buscar processo por número ou assunto" />
             <input type="hidden" name="situacao" value="todos" />
           </form>
           <div className="flex shrink-0 items-center gap-1">
@@ -76,7 +79,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </Link>
           </div>
         </header>
-        <main className="mx-auto max-w-[1280px] px-4 py-7 sm:px-10 sm:py-9">{children}</main>
+        <main id="conteudo" tabIndex={-1} className="mx-auto max-w-[1280px] px-4 py-7 sm:px-10 sm:py-9">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ export default async function FilaItbi({ searchParams }: { searchParams: Promise
           const n = todos.filter((i) => a.situacoes.includes(i.situacao)).length;
           const ativo = a.chave === aba.chave;
           return (
-            <Link key={a.chave} href={`?aba=${a.chave}`} className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${ativo ? "border-brand bg-brand text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
+            <Link key={a.chave} href={`?aba=${a.chave}`} className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${ativo ? "border-brand-2 bg-brand-2 text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
               {a.rotulo} <span className="tnum opacity-80">{n}</span>
             </Link>
           );
@@ -55,7 +55,7 @@ export default async function FilaItbi({ searchParams }: { searchParams: Promise
                 {lista.map((i) => (
                   <tr key={i.id} className="linha">
                     <td>
-                      <Link href={`/tributos/itbi/${i.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/tributos/itbi/${i.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                         {i.numero}
                       </Link>
                       <div className="text-[12.5px] text-ink-3">

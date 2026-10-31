@@ -98,7 +98,7 @@ export function Cabecalho({ titulo, sub, acao }: { titulo: string; sub?: ReactNo
 
 export function NumeroProcesso({ id, numero, className = "" }: { id: string; numero: string; className?: string }) {
   return (
-    <Link href={`/processos/${id}`} className={`tnum font-semibold text-brand hover:text-brand-2 hover:underline ${className}`}>
+    <Link href={`/processos/${id}`} className={`alvo-toque tnum font-semibold text-brand-2 hover:text-brand-ink hover:underline ${className}`}>
       {numero}
     </Link>
   );

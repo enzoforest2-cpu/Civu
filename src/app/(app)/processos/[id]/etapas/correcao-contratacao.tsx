@@ -29,7 +29,7 @@ export function CorrecaoContratacao({
   const v: Record<string, string | undefined> = state?.valores ?? {};
   return (
     <details className="mt-4 rounded-xl border border-line open:bg-sunken/50" open={!!state}>
-      <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Corrigir fonte ou valor</summary>
+      <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Corrigir fonte ou valor</summary>
       <form key={JSON.stringify(state ?? {})} action={formAction} className="space-y-3 px-4 pb-4">
         <input type="hidden" name="processoId" value={processoId} />
         <p className="hint">Fornecedor e CNPJ não mudam. Na fila de pagamento, a posição continua pela data da liquidação; com outra fonte, o pagamento passa à fila dela.</p>

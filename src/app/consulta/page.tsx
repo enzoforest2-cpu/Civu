@@ -51,7 +51,7 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
               <div className="text-[12.5px] text-ink-3">Consulta pública de processos</div>
             </div>
           </div>
-          <Link href="/login" className="text-[14px] font-semibold text-brand hover:underline">
+          <Link href="/login" className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
             Sou servidor
           </Link>
         </div>
@@ -95,7 +95,7 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
           <article className="mt-8 space-y-6">
             <div className="panel p-6">
               <div className="flex flex-wrap items-center gap-2 text-[14px]">
-                <span className="tnum font-semibold text-brand">Processo {p.numero}</span>
+                <span className="tnum font-semibold text-brand-2">Processo {p.numero}</span>
                 <Chip tone="brand">{p.tipo.nome}</Chip>
                 {p.encerradoEm ? <Chip tone="ok">Concluído em {fmtData(p.encerradoEm)}</Chip> : <Chip>Em andamento</Chip>}
               </div>

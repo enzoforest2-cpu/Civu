@@ -93,7 +93,7 @@ export default async function ReceitaPage({ searchParams }: { searchParams: Prom
                   {g.itens.map((c) => (
                     <tr key={c.categoria} className="linha">
                       <td className="min-w-[220px]">
-                        <a href={`?cat=${c.categoria}`} className="font-medium text-ink hover:text-brand hover:underline">
+                        <a href={`?cat=${c.categoria}`} className="font-medium text-ink hover:text-brand-2 hover:underline">
                           {c.nome}
                         </a>
                         <div className="text-[12.5px] text-ink-3">

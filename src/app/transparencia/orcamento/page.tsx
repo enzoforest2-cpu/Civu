@@ -32,10 +32,10 @@ export default async function OrcamentoAbertoPage({ searchParams }: { searchPara
             </div>
           </div>
           <nav className="flex items-center gap-4 text-[14px] font-semibold">
-            <Link href={`/fila-de-pagamentos${mun ? `?m=${mun.slug}` : ""}`} className="hidden text-ink-2 hover:text-ink sm:inline">
+            <Link href={`/fila-de-pagamentos${mun ? `?m=${mun.slug}` : ""}`} className="alvo-toque hidden text-ink-2 hover:text-ink sm:inline">
               Fila de pagamentos
             </Link>
-            <Link href="/login" className="text-brand hover:underline">
+            <Link href="/login" className="alvo-toque text-brand-2 hover:underline">
               Sou servidor
             </Link>
           </nav>
@@ -144,7 +144,7 @@ export default async function OrcamentoAbertoPage({ searchParams }: { searchPara
               </p>
               <p className="mt-2">
                 Os pagamentos a fornecedores seguem uma fila por ordem de entrega, que você pode acompanhar na{" "}
-                <Link href={`/fila-de-pagamentos${mun ? `?m=${mun.slug}` : ""}`} className="font-semibold text-brand hover:underline">
+                <Link href={`/fila-de-pagamentos${mun ? `?m=${mun.slug}` : ""}`} className="font-semibold text-brand-2 hover:underline">
                   fila de pagamentos
                 </Link>
                 .

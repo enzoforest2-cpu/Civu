@@ -128,7 +128,7 @@ function CartaoOs({ os, hoje, resumida }: { os: OsCampo; hoje: string; resumida?
     <article className="panel overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
-          <Link href={`/servicos/ordens/${os.id}`} className="tnum font-semibold text-brand hover:underline">
+          <Link href={`/servicos/ordens/${os.id}`} className="tnum font-semibold text-brand-2 hover:underline">
             {os.numero}
           </Link>
           <div className="text-[13px] text-ink-2">
@@ -145,7 +145,7 @@ function CartaoOs({ os, hoje, resumida }: { os: OsCampo; hoje: string; resumida?
             </span>
             <div className="min-w-0">
               <div className="flex items-start gap-1.5 text-[15.5px] font-semibold text-ink">
-                <MapPin size={16} className="mt-1 shrink-0 text-brand" />
+                <MapPin size={16} className="mt-1 shrink-0 text-brand-2" />
                 <span>
                   {o.logradouro}
                   {o.numero ? `, ${o.numero}` : ""} · {o.bairro}

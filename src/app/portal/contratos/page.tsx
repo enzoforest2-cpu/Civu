@@ -68,7 +68,7 @@ function Cartao({ c }: { c: Awaited<ReturnType<typeof contratosDaEmpresa>>[numbe
           <ChipContrato s={c.fin.situacao} />
           {c.obra && <ChipObra s={c.obra.situacao} />}
         </div>
-        <h3 className="mt-2 leading-snug font-semibold text-ink group-hover:text-brand">{c.objeto}</h3>
+        <h3 className="mt-2 leading-snug font-semibold text-ink group-hover:text-brand-2">{c.objeto}</h3>
         <div className="mt-4 grid grid-cols-2 gap-3 text-[13.5px]">
           <div>
             <div className="text-ink-3">Saldo</div>
@@ -86,7 +86,7 @@ function Cartao({ c }: { c: Awaited<ReturnType<typeof contratosDaEmpresa>>[numbe
         <div className="mt-3">
           <BarraSaldo fin={c.fin} compacta />
         </div>
-        <span className="mt-4 inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand">
+        <span className="mt-4 inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand-2">
           Ver notas e aditivos <ArrowRight size={14} />
         </span>
       </Link>

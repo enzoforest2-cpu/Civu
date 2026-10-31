@@ -71,7 +71,7 @@ export default async function AtestosPage({ searchParams }: { searchParams: Prom
                       </Chip>
                     </div>
                     <div className="mt-1 text-[13.5px] text-ink-2">
-                      <Link href={`/contratos/${n.contrato.id}#notas`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/contratos/${n.contrato.id}#notas`} className="tnum font-semibold text-brand-2 hover:underline">
                         Contrato {numeroContrato(n.contrato)}
                       </Link>{" "}
                       · {n.contrato.empresa.nomeFantasia ?? n.contrato.empresa.razaoSocial} · competência {rotuloMes(n.competencia)} · recebida em {fmtData(n.criadoEm)}

@@ -37,7 +37,7 @@ export function FormGuia({ debitos, agrupar = true }: { debitos: Debito[]; agrup
                       {d.vencida && <Chip tone="bad">Vencida</Chip>}
                       <span className="tnum w-28 text-right text-[14px] font-semibold text-ink">
                         {fmtMoeda(d.total)}
-                        {d.acrescimos > 0 && <span className="block text-[11.5px] font-normal text-bad">+{fmtMoeda(d.acrescimos)} de acréscimos</span>}
+                        {d.acrescimos > 0 && <span className="block text-[12px] font-normal text-bad">+{fmtMoeda(d.acrescimos)} de acréscimos</span>}
                       </span>
                     </label>
                   </li>

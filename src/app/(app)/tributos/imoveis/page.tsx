@@ -64,7 +64,7 @@ export default async function Imoveis({ searchParams }: { searchParams: Promise<
                 {r.lista.map((im) => (
                   <tr key={im.id} className="linha">
                     <td>
-                      <Link href={`/tributos/imoveis/${im.id}`} className="tnum font-semibold text-brand hover:underline">
+                      <Link href={`/tributos/imoveis/${im.id}`} className="tnum font-semibold text-brand-2 hover:underline">
                         {im.inscricao}
                       </Link>
                     </td>

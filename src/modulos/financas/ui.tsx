@@ -43,7 +43,8 @@ export const podeVerFinancas = (u: SessaoUsuario) => u.papeis.some((p) => (PAPEI
 
 export function SemAcesso() {
   return (
-    <div className="mx-auto max-w-xl py-16">
+    <div className="mx-auto max-w-xl py-10">
+      <h1 className="display mb-6 text-[28px] leading-[1.1] font-semibold text-ink sm:text-[34px]">Finanças</h1>
       <Vazio>
         As telas de finanças são para gestão, contabilidade, tesouraria, controle interno e secretários. Se precisar destes dados, peça à
         contabilidade.
@@ -213,12 +214,12 @@ export function ReguaIndice({
         {realizado != null && <div className="absolute inset-y-0 left-0 rounded-full bg-brand" style={{ width: p(realizado) }} />}
         {projetado != null && (
           <div className="absolute -top-1.5 h-6 w-0.5 bg-ink" style={{ left: p(projetado) }} title={`Projetado: ${fmtPct(projetado)}`}>
-            <span className="tnum absolute -top-5 -translate-x-1/2 text-[11.5px] font-semibold whitespace-nowrap text-ink">proj. {fmtPct(projetado)}</span>
+            <span className="tnum absolute -top-5 -translate-x-1/2 text-[12px] font-semibold whitespace-nowrap text-ink">proj. {fmtPct(projetado)}</span>
           </div>
         )}
         {marcas.map((m) => (
           <div key={m.v} className="absolute top-3 h-2 w-px bg-ink-3" style={{ left: p(m.v) }}>
-            <span className="tnum absolute top-2 -translate-x-1/2 text-[11px] whitespace-nowrap text-ink-3">
+            <span className="tnum absolute top-2 -translate-x-1/2 text-[12px] whitespace-nowrap text-ink-3">
               {tipo === "maximo" ? fmtPct(m.v) : `${m.rotulo} ${fmtPct(m.v)}`}
             </span>
           </div>

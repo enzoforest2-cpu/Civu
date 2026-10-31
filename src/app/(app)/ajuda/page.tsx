@@ -28,7 +28,7 @@ export default async function AjudaPage({ searchParams }: { searchParams: Promis
       {lista.length === 0 ? (
         <Vazio>
           Nenhum artigo encontrado para &quot;{q}&quot;.{" "}
-          <Link href="/ajuda" className="font-semibold text-brand hover:underline">
+          <Link href="/ajuda" className="font-semibold text-brand-2 hover:underline">
             Ver todos
           </Link>
         </Vazio>
@@ -43,7 +43,7 @@ export default async function AjudaPage({ searchParams }: { searchParams: Promis
                   .map((a) => (
                     <Link key={a.slug} href={`/ajuda/${a.slug}`} className="group">
                       <Panel className="h-full transition-colors group-hover:border-brand/40">
-                        <div className="text-[15.5px] font-semibold text-ink group-hover:text-brand">{a.titulo}</div>
+                        <div className="text-[15.5px] font-semibold text-ink group-hover:text-brand-2">{a.titulo}</div>
                         <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{a.resumo}</p>
                       </Panel>
                     </Link>

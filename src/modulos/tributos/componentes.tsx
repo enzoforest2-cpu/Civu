@@ -8,7 +8,7 @@ import { qrSvgPath } from "./qr";
 
 export function Voltar({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-ink-2 hover:text-brand">
+    <Link href={href} className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-ink-2 hover:text-brand-2">
       <ArrowLeft size={15} /> {children}
     </Link>
   );

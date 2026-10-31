@@ -47,7 +47,7 @@ export default async function MeusPagamentosPage() {
       <h1 className="display text-[30px] font-bold text-ink">Meus pagamentos</h1>
       <p className="mt-1 max-w-2xl text-[15px] text-ink-2">
         Onde está cada nota de {a.empresa.razaoSocial}: atesto do fiscal, liquidação, fila cronológica e pagamento. As posições na fila são as mesmas da{" "}
-        <Link href="/fila-de-pagamentos" className="font-semibold text-brand hover:underline">
+        <Link href="/fila-de-pagamentos" className="font-semibold text-brand-2 hover:underline">
           fila pública
         </Link>
         .
@@ -78,7 +78,7 @@ export default async function MeusPagamentosPage() {
             return (
               <div key={n.id} className="rounded-2xl border-2 border-brand bg-brand-soft/50 px-5 py-4">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="display tnum text-[34px] leading-none font-semibold text-brand">{s.fila!.posicao}º</span>
+                  <span className="display tnum text-[34px] leading-none font-semibold text-brand-2">{s.fila!.posicao}º</span>
                   <span className="text-[15px] text-ink">
                     de {s.fila!.total} na fila de <strong className="font-semibold">{s.fila!.fonteNome}</strong> — {c.municipio.nome}
                   </span>
@@ -102,7 +102,7 @@ export default async function MeusPagamentosPage() {
           <div className="p-3">
             <Vazio>
               Nenhuma nota em andamento.{" "}
-              <Link href="/portal/contratos/nota" className="font-semibold text-brand hover:underline">
+              <Link href="/portal/contratos/nota" className="font-semibold text-brand-2 hover:underline">
                 Enviar nota fiscal
               </Link>
             </Vazio>
@@ -116,7 +116,7 @@ export default async function MeusPagamentosPage() {
                     <span className="font-semibold text-ink">NF {n.numero}</span>
                     <span className="text-[13px] text-ink-3">
                       · {rotuloMes(n.competencia)} ·{" "}
-                      <Link href={`/portal/contratos/${c.id}`} className="hover:text-brand hover:underline">
+                      <Link href={`/portal/contratos/${c.id}`} className="hover:text-brand-2 hover:underline">
                         contrato {c.rotulo}
                       </Link>
                     </span>
@@ -148,7 +148,7 @@ export default async function MeusPagamentosPage() {
       {outros.length > 0 && (
         <section className="panel mt-6 p-6">
           <h2 className="flex items-center gap-2 text-[16px] font-semibold text-ink">
-            <ListOrdered size={17} className="text-brand" /> Outros pagamentos da empresa na fila
+            <ListOrdered size={17} className="text-brand-2" /> Outros pagamentos da empresa na fila
           </h2>
           <p className="mt-1 text-[13.5px] text-ink-2">Compras e serviços contratados sem contrato acompanhado aqui (por exemplo, dispensas pagas em parcela única).</p>
           <ul className="mt-3 divide-y divide-line">
@@ -173,7 +173,7 @@ export default async function MeusPagamentosPage() {
       <p className="mt-6 max-w-3xl text-[13px] text-ink-3">
         “Pago” significa que a tesouraria registrou o pagamento com comprovante. Nesta demonstração o retorno bancário é simulado; na operação real, o estado só muda
         com a confirmação do banco.{" "}
-        <Link href="/portal/contratos" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">
+        <Link href="/portal/contratos" className="inline-flex items-center gap-1 font-semibold text-brand-2 hover:underline">
           Meus contratos <ArrowRight size={13} />
         </Link>
       </p>

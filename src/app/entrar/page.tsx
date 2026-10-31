@@ -17,7 +17,7 @@ export default async function EntrarPage() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <MarcaCompleta altura={26} />
-          <Link href="/login" className="text-[14px] font-semibold text-brand hover:underline">
+          <Link href="/login" className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
             Sou servidor
           </Link>
         </div>
@@ -31,7 +31,7 @@ export default async function EntrarPage() {
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <section className="panel p-6">
             <div className="flex items-center gap-2 text-[16px] font-semibold text-ink">
-              <ShieldCheck size={19} className="text-brand" /> Entrar com gov.br
+              <ShieldCheck size={19} className="text-brand-2" /> Entrar com gov.br
             </div>
             <p className="mt-1 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-ink">
               <strong className="font-semibold">Ambiente de demonstração.</strong> A entrada gov.br é simulada: escolha uma pessoa fictícia. A integração real depende
@@ -43,7 +43,7 @@ export default async function EntrarPage() {
                   <form action={entrarGovbrAction}>
                     <input type="hidden" name="pessoaId" value={p.id} />
                     <button className="flex w-full items-start gap-3 rounded-xl border border-line px-4 py-3 text-left transition-colors hover:border-brand hover:bg-brand-soft/40">
-                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-2">
                         {p.representacoes.length ? <Building2 size={17} /> : <UserRound size={17} />}
                       </span>
                       <span className="min-w-0">

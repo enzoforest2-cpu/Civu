@@ -22,7 +22,7 @@ export default async function Certidao() {
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Panel>
           <div className={`flex items-start gap-3 rounded-xl px-4 py-4 ${neg ? "bg-ok-soft" : efeito ? "bg-brand-soft" : "bg-bad-soft"}`}>
-            {neg || efeito ? <CircleCheck size={22} className={neg ? "text-ok" : "text-brand"} /> : <TriangleAlert size={22} className="text-bad" />}
+            {neg || efeito ? <CircleCheck size={22} className={neg ? "text-ok" : "text-brand-2"} /> : <TriangleAlert size={22} className="text-bad" />}
             <div>
               <div className={`text-[16px] font-semibold ${neg ? "text-ok" : efeito ? "text-brand-ink" : "text-bad"}`}>A certidão sairá como: {CERTIDAO_NOME[sit.tipo].replace("Certidão ", "")}</div>
               <p className="mt-0.5 text-[14px] text-ink-2">
@@ -75,7 +75,7 @@ export default async function Certidao() {
               <ul className="divide-y divide-line">
                 {emitidas.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/verificar/certidao/${c.codigoVerificacao}`} className="block py-2.5 hover:text-brand">
+                    <Link href={`/verificar/certidao/${c.codigoVerificacao}`} className="block py-2.5 hover:text-brand-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="tnum text-[13px] font-semibold text-ink">{c.numero}</span>
                         <Chip tone={c.tipo === "POSITIVA" ? "bad" : c.tipo === "NEGATIVA" ? "ok" : "brand"}>{c.tipo === "POSITIVA" ? "Positiva" : c.tipo === "NEGATIVA" ? "Negativa" : "Efeito de negativa"}</Chip>

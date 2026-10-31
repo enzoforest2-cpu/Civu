@@ -128,7 +128,7 @@ export default async function AutomacoesPage() {
                     {a.detalhe && <p className="text-[13px] leading-snug text-ink-2">{a.detalhe}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {a.processoId && (
-                        <Link href={`/processos/${a.processoId}`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline">
+                        <Link href={`/processos/${a.processoId}`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
                           Abrir processo <ArrowRight size={13} />
                         </Link>
                       )}
@@ -197,7 +197,7 @@ export default async function AutomacoesPage() {
                           <span className="text-ink-3">Nada a fazer.</span>
                         ) : (
                           <details>
-                            <summary className="cursor-pointer text-[13.5px] text-brand">
+                            <summary className="cursor-pointer text-[13.5px] text-brand-2">
                               {Object.entries(
                                 itens.reduce<Record<string, number>>((acc, i) => ({ ...acc, [i.resultado]: (acc[i.resultado] ?? 0) + 1 }), {}),
                               )
@@ -207,7 +207,7 @@ export default async function AutomacoesPage() {
                             <ul className="mt-2 space-y-1.5">
                               {itens.map((i) => (
                                 <li key={i.processoId} className="text-[13px] leading-snug">
-                                  <Link href={`/processos/${i.processoId}`} className="tnum font-semibold text-brand hover:underline">
+                                  <Link href={`/processos/${i.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">
                                     {i.numero}
                                   </Link>{" "}
                                   <span className={i.resultado === "FALHA" ? "text-bad" : "text-ink-2"}>{RESULTADO_ROTULO[i.resultado]}</span>

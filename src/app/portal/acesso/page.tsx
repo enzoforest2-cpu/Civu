@@ -65,7 +65,7 @@ export default async function AcessoPage() {
             </ul>
             {souResponsavel && (
               <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
-                <summary className="px-4 py-3 text-[14px] font-semibold text-brand">Conceder representação</summary>
+                <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Conceder representação</summary>
                 <ActionForm action={concederRepresentacaoAction} className="grid gap-3 px-4 pb-4 md:grid-cols-2">
                   <input type="hidden" name="empresaId" value={minha.empresaId} />
                   <div>
