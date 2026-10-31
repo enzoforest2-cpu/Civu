@@ -4,13 +4,14 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { AlertTriangle, ArrowUpRight, Hourglass, Inbox, Undo2, ListOrdered } from "lucide-react";
 import { db } from "@/db";
 import { processos, unidadesGestoras } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireUser, temPapel } from "@/lib/auth";
 import { painel } from "@/lib/metricas";
 import { obrigacoes, usoDoLimite } from "@/lib/conformidade";
 import { filaDePagamentos } from "@/lib/pagamentos";
 import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtMoeda, relativo } from "@/lib/dates";
-import { Panel, Vazio, NumeroProcesso, Chip, UrgenciaChip } from "@/components/ui";
+import { Panel, Vazio, NumeroProcesso, Chip, UrgenciaChip, Prazo } from "@/components/ui";
+import { valorDoProcesso } from "@/components/tabela-processos";
 
 function saudacao() {
   const h = Number(new Date().toLocaleString("pt-BR", { timeZone: "America/Fortaleza", hour: "2-digit", hour12: false }));
@@ -53,44 +54,107 @@ export default async function PainelPage() {
   const fila = [...setoresMap.values()].sort((a, b) => b.itens.length - a.itens.length);
   const maxTempo = Math.max(1, ...m.tempoPorEstado.map((t) => t.mediaDias));
   const primeiroNome = u.nome.replace(/^(Dr|Dra)\.?\s+/i, "").split(" ")[0];
+  const nomeEtapaDe = (p: (typeof abertos)[number]) => {
+    const e = getEstado(p.tipo.definicao as WorkflowDef, p.estadoAtual);
+    return e ? nomeEtapa(e.nome) : p.estadoAtual;
+  };
+  // Gestão (gabinete, ordenador, secretário, controle interno) começa pela visão da prefeitura; os demais, pelo próprio trabalho
+  const visaoGestao = u.setor?.sigla === "GAB" || temPapel(u, "ORDENADOR", "SECRETARIO", "CONTROLE_INTERNO");
+  const peso = (p: (typeof abertos)[number]) => (p.prazoEtapaEm && p.prazoEtapaEm.getTime() < agora ? 0 : !p.recebidoEm ? 1 : 2);
+  const meus = u.setorId
+    ? abertos
+        .filter((p) => p.setorAtualId === u.setorId)
+        .sort((a, b) => peso(a) - peso(b) || (a.prazoEtapaEm?.getTime() ?? Infinity) - (b.prazoEtapaEm?.getTime() ?? Infinity))
+    : [];
+  const meusAtrasados = meus.filter((p) => peso(p) === 0).length;
+  const meusNaoRecebidos = meus.filter((p) => !p.recebidoEm).length;
+  const resumoPrefeitura =
+    abertos.length === 0 ? (
+      "Nenhum processo em andamento."
+    ) : (
+      <>
+        {plural(abertos.length, "processo em andamento", "processos em andamento")}
+        {atrasados.length > 0 ? <span className="text-bad">, {plural(atrasados.length, "com prazo estourado", "com prazo estourado")}</span> : ", todos dentro do prazo"}
+        {semReceber.length > 0 && <> e {plural(semReceber.length, "esperando alguém receber", "esperando alguém receber")}</>}.
+      </>
+    );
 
   return (
     <>
-      {/* Resumo em uma frase — a primeira coisa que o gestor lê */}
-      <section className="mb-10">
-        <p className="text-[15px] text-ink-2">
-          {saudacao()}, {primeiroNome}.
-        </p>
-        <h1 className="display mt-1 max-w-4xl text-[30px] leading-[1.1] sm:text-[40px] font-semibold text-ink">
-          {abertos.length === 0 ? (
-            "Nenhum processo em andamento."
-          ) : (
-            <>
-              {plural(abertos.length, "processo em andamento", "processos em andamento")}
-              {atrasados.length > 0 ? (
-                <span className="text-bad">, {plural(atrasados.length, "com prazo estourado", "com prazo estourado")}</span>
+      {visaoGestao ? (
+        /* Resumo em uma frase — a primeira coisa que o gestor lê */
+        <section className="mb-10">
+          <p className="text-[15px] text-ink-2">
+            {saudacao()}, {primeiroNome}.
+          </p>
+          <h1 className="display mt-1 max-w-4xl text-[30px] leading-[1.1] font-semibold text-ink sm:text-[40px]">{resumoPrefeitura}</h1>
+          <Totais m={m} />
+        </section>
+      ) : (
+        <>
+          {/* Seu trabalho: o que está com o setor da pessoa, atrasados e não recebidos primeiro */}
+          <section className="mb-10" aria-labelledby="seu-trabalho">
+            <p className="text-[15px] text-ink-2">
+              {saudacao()}, {primeiroNome}.
+            </p>
+            <h1 id="seu-trabalho" className="display mt-1 text-[30px] leading-[1.1] font-semibold text-ink sm:text-[40px]">
+              Seu trabalho
+            </h1>
+            <p className="mt-2 max-w-3xl text-[15px] text-ink-2">
+              {!u.setorId ? (
+                "Você ainda não está ligado a um setor. Peça ao administrador para ajustar seu cadastro."
+              ) : meus.length === 0 ? (
+                <>Nenhum processo com {u.setor?.nome} agora.</>
               ) : (
-                ", todos dentro do prazo"
+                <>
+                  {plural(meus.length, "processo está", "processos estão")} com <strong className="font-semibold text-ink">{u.setor?.nome}</strong>
+                  {meusAtrasados > 0 && <span className="font-semibold text-bad">, {plural(meusAtrasados, "atrasado", "atrasados")}</span>}
+                  {meusNaoRecebidos > 0 && <>, {plural(meusNaoRecebidos, "esperando o recebimento", "esperando o recebimento")}</>}.
+                </>
               )}
-              {semReceber.length > 0 && <> e {plural(semReceber.length, "esperando alguém receber", "esperando alguém receber")}</>}.
-            </>
-          )}
-        </h1>
-        <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-[14px] text-ink-2">
-          <div>
-            <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.abertos30d}</span> abertos nos últimos 30 dias
-          </div>
-          <div>
-            <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.encerrados30d}</span> concluídos nos últimos 30 dias
-          </div>
-          <div>
-            <span className="display tnum text-[22px] font-semibold text-ink">
-              {m.totais.tempoMedioEncerradosDias == null ? "—" : Math.round(m.totais.tempoMedioEncerradosDias)}
-            </span>{" "}
-            dias, em média, da abertura ao arquivamento
-          </div>
-        </div>
-      </section>
+            </p>
+            {meus.length > 0 && (
+              <div className="panel mt-5">
+                <ul className="divide-y divide-line">
+                  {meus.slice(0, 6).map((p) => {
+                    const valor = valorDoProcesso(p.metadados);
+                    return (
+                      <li key={p.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 py-4 sm:px-6">
+                        <div className="min-w-0 flex-1 basis-64">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <NumeroProcesso id={p.id} numero={p.numero} />
+                            <UrgenciaChip u={p.urgencia} />
+                            {!p.recebidoEm && <Chip tone="warn">Não recebido</Chip>}
+                          </div>
+                          <div className="mt-0.5 text-[15px] leading-snug text-ink">{p.assunto}</div>
+                          <div className="mt-0.5 text-[14px] text-ink-2">
+                            {nomeEtapaDe(p)}
+                            {valor != null && <span className="tnum"> · {fmtMoeda(valor)}</span>}
+                          </div>
+                        </div>
+                        <Prazo prazo={p.prazoEtapaEm} />
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="border-t border-line px-5 py-2 sm:px-6">
+                  <Link href="/caixa" className="inline-flex min-h-[44px] items-center gap-1 text-[14px] font-semibold text-brand-2 hover:underline">
+                    {meus.length > 6 ? `Ver os ${meus.length} na minha caixa` : "Abrir minha caixa"} <ArrowUpRight size={14} aria-hidden />
+                  </Link>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="mb-8" aria-labelledby="visao-prefeitura">
+            <h2 id="visao-prefeitura" className="text-[15px] font-semibold text-ink-2">
+              Visão geral da prefeitura
+            </h2>
+            <p className="display mt-1 max-w-4xl text-[24px] leading-[1.15] font-semibold text-ink sm:text-[28px]">{resumoPrefeitura}</p>
+            <Totais m={m} />
+          </section>
+        </>
+      )}
 
       {/* Onde os processos estão agora */}
       <Panel
@@ -119,7 +183,8 @@ export default async function PainelPage() {
                       <Link
                         key={p.id}
                         href={`/processos/${p.id}`}
-                        title={`${p.numero} — ${p.assunto}`}
+                        title={`${p.numero} — ${p.assunto} · ${nomeEtapaDe(p)}${atrasado ? " · atrasado" : !p.recebidoEm ? " · não recebido" : ""}`}
+                        aria-label={`Processo ${p.numero}: ${p.assunto}. Etapa: ${nomeEtapaDe(p)}. ${atrasado ? "Atrasado" : !p.recebidoEm ? "Não recebido" : "No prazo"}.`}
                         className={`alvo-toque tnum h-7 rounded-md px-2 text-[12px] leading-7 font-semibold text-white transition-colors ${cor}`}
                       >
                         {p.numero.slice(-4)}
@@ -149,18 +214,17 @@ export default async function PainelPage() {
             <span className="tnum font-semibold text-ink">{obrigAbertas.length}</span> em aberto
           </p>
           {obrigAbertas.length === 0 ? (
-            <p className="mt-3 text-[13.5px] text-ok">PNCP e Tribunal de Contas em dia.</p>
+            <p className="mt-3 text-[14px] text-ok">PNCP e Tribunal de Contas em dia.</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-1 divide-y divide-line">
               {obrigAbertas.slice(0, 4).map((o) => (
-                <li key={o.processoId + o.chave} className="text-[13.5px] leading-snug">
-                  <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand-2 hover:underline">
+                <li key={o.processoId + o.chave} className="py-2 text-[14px] leading-snug">
+                  <Link href={`/processos/${o.processoId}#contratacao`} className="alvo-toque tnum font-semibold text-brand-2 hover:underline">
                     {o.numero}
                   </Link>{" "}
                   <span className="text-ink">{o.chave === "PNCP" ? "PNCP" : "Tribunal de Contas"}</span>
-                  <span className={o.situacao === "vencida" ? "text-bad" : "text-ink-3"}>
-                    {" "}
-                    · {o.prazo ? (o.situacao === "vencida" ? `venceu ${relativo(o.prazo)}` : `até ${fmtData(o.prazo)}`) : "sem prazo"}
+                  <span className={`block text-[13px] ${o.situacao === "vencida" ? "text-bad" : "text-ink-3"}`}>
+                    {o.prazo ? (o.situacao === "vencida" ? `Venceu ${relativo(o.prazo)}` : `Até ${fmtData(o.prazo)}`) : "Sem prazo"}
                   </span>
                 </li>
               ))}
@@ -175,7 +239,7 @@ export default async function PainelPage() {
             <ul className="space-y-3">
               {limites.slice(0, 4).map((l) => (
                 <li key={l.ugId + l.natureza}>
-                  <div className="flex items-baseline justify-between gap-2 text-[13.5px]">
+                  <div className="flex items-baseline justify-between gap-2 text-[14px]">
                     <span className="truncate text-ink" title={`${l.naturezaNome} · ${nomeUg(l.ugId)}`}>
                       {l.naturezaNome}
                     </span>
@@ -211,7 +275,7 @@ export default async function PainelPage() {
           ) : (
             <ul className="space-y-2.5">
               {filas.map((f) => (
-                <li key={f.fonte} className="text-[13.5px]">
+                <li key={f.fonte} className="text-[14px]">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-ink">{f.fonteNome}</span>
                     <span className="tnum shrink-0 text-ink-2">{f.fila.length}</span>
@@ -278,7 +342,7 @@ export default async function PainelPage() {
             ) : (
               <ul className="space-y-2.5">
                 {m.tempoPorEstado.slice(0, 8).map((t) => (
-                  <li key={t.nome} className="grid grid-cols-[minmax(0,190px)_1fr_52px] items-center gap-3 text-[13.5px]">
+                  <li key={t.nome} className="grid grid-cols-[minmax(0,190px)_1fr_52px] items-center gap-3 text-[14px]">
                     <span className="truncate text-ink-2" title={nomeEtapa(t.nome)}>
                       {nomeEtapa(t.nome)}
                     </span>
@@ -317,5 +381,24 @@ function Legenda({ cor, texto }: { cor: string; texto: string }) {
       <span className={`h-2.5 w-2.5 rounded-sm ${cor}`} />
       {texto}
     </span>
+  );
+}
+
+function Totais({ m }: { m: Awaited<ReturnType<typeof painel>> }) {
+  return (
+    <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-[14px] text-ink-2">
+      <div>
+        <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.abertos30d}</span> abertos nos últimos 30 dias
+      </div>
+      <div>
+        <span className="display tnum text-[22px] font-semibold text-ink">{m.totais.encerrados30d}</span> concluídos nos últimos 30 dias
+      </div>
+      <div>
+        <span className="display tnum text-[22px] font-semibold text-ink">
+          {m.totais.tempoMedioEncerradosDias == null ? "—" : Math.round(m.totais.tempoMedioEncerradosDias)}
+        </span>{" "}
+        dias, em média, da abertura ao arquivamento
+      </div>
+    </div>
   );
 }
