@@ -272,7 +272,7 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
               </Panel>
             </>
           ) : (
-            <p className="text-[13px] text-ink-3">Reservas e créditos adicionais são registrados pela contabilidade.</p>
+            <p className="text-[14px] text-ink-3">Reservas e créditos adicionais são registrados pela contabilidade.</p>
           )}
         </div>
       </div>

@@ -150,7 +150,7 @@ export default async function MeusPagamentosPage() {
           <h2 className="flex items-center gap-2 text-[16px] font-semibold text-ink">
             <ListOrdered size={17} className="text-brand-2" /> Outros pagamentos da empresa na fila
           </h2>
-          <p className="mt-1 text-[13.5px] text-ink-2">Compras e serviços contratados sem contrato acompanhado aqui (por exemplo, dispensas pagas em parcela única).</p>
+          <p className="mt-1 text-[14px] text-ink-2">Compras e serviços contratados sem contrato acompanhado aqui (por exemplo, dispensas pagas em parcela única).</p>
           <ul className="mt-3 divide-y divide-line">
             {outros.map((o) => (
               <li key={o.numero} className="flex flex-wrap items-center justify-between gap-2 py-3">
@@ -170,7 +170,7 @@ export default async function MeusPagamentosPage() {
         </section>
       )}
 
-      <p className="mt-6 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-6 max-w-3xl text-[14px] text-ink-3">
         “Pago” significa que a tesouraria registrou o pagamento com comprovante. Nesta demonstração o retorno bancário é simulado; na operação real, o estado só muda
         com a confirmação do banco.{" "}
         <Link href="/portal/contratos" className="inline-flex items-center gap-1 font-semibold text-brand-2 hover:underline">

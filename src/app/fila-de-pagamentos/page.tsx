@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { municipios } from "@/db/schema";
 import { filaDePagamentos, historicoDePagamentos, enviadosAoBanco, mudancasDeFonteNaFila, fmtCnpj } from "@/lib/pagamentos";
 import { fmtData, fmtMoeda } from "@/lib/dates";
-import { Marca, MarcaCompleta } from "@/components/marca";
+import { MarcaCompleta } from "@/components/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -35,16 +35,17 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
         Pular para o conteúdo
       </a>
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex shrink-0 items-center gap-2.5">
             <MarcaCompleta altura={26} />
-            <div className="leading-tight border-l border-line pl-2.5">
+            <div className="hidden border-l border-line pl-2.5 leading-tight sm:block">
               <div className="text-[12.5px] text-ink-3">Transparência</div>
             </div>
           </div>
-          <nav className="flex items-center gap-4 text-[14px] font-semibold">
-            <Link href={`/consulta${mun ? `?m=${mun.slug}` : ""}`} className="alvo-toque text-ink-2 hover:text-ink">
-              Consultar processo
+          <nav className="flex items-center gap-4 text-[14px] font-semibold whitespace-nowrap" aria-label="Páginas públicas">
+            <Link href={`/consulta${mun ? `?m=${mun.slug}` : ""}`} className="alvo-toque text-ink-2 hover:text-ink" aria-label="Consultar processo">
+              <span className="sm:hidden">Consultar</span>
+              <span className="hidden sm:inline">Consultar processo</span>
             </Link>
             <Link href="/login" className="alvo-toque text-brand-2 hover:underline">
               Sou servidor
@@ -132,11 +133,40 @@ export default async function FilaPage({ searchParams }: { searchParams: Promise
                 <h2 className="flex items-center gap-2 text-[17px] font-semibold text-ink">
                   <ListOrdered size={18} className="text-brand-2" /> {f.fonteNome}
                 </h2>
-                <span className="tnum text-[13.5px] text-ink-2">
+                <span className="tnum text-[14px] text-ink-2">
                   {f.fila.length} {f.fila.length === 1 ? "pagamento" : "pagamentos"} · {fmtMoeda(f.total)}
                 </span>
               </header>
-              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`Fila de pagamentos: ${f.fonteNome}`}>
+              {/* Celular: um cartão por pagamento, na ordem da fila */}
+              <ol className="divide-y divide-line border-t border-line md:hidden" aria-label={`Fila de pagamentos: ${f.fonteNome}`}>
+                {f.fila.map((x) => (
+                  <li key={x.processoId} className={`flex gap-4 px-5 py-4 ${cnpj && x.cnpj === cnpj ? "bg-brand-soft/60" : ""}`}>
+                    <span className="display tnum w-10 shrink-0 text-[20px] leading-tight font-semibold text-ink">{x.posicao}º</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-ink">{x.fornecedor ?? "Não informado"}</div>
+                      {x.cnpj && <div className="tnum text-[12.5px] text-ink-3">{fmtCnpj(x.cnpj)}</div>}
+                      <div className="mt-1 text-[14px] text-ink-2">
+                        <span className="tnum font-semibold text-ink">{x.numero}</span> · {x.assunto}
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[14px]">
+                        <div>
+                          <dt className="text-[12px] text-ink-3">Valor</dt>
+                          <dd className="tnum font-semibold whitespace-nowrap text-ink">{fmtMoeda(x.valor)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[12px] text-ink-3">Liquidado em</dt>
+                          <dd className="tnum text-ink">{fmtData(x.liquidadoEm)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[12px] text-ink-3">Dias na fila</dt>
+                          <dd className="tnum text-ink">{Math.max(0, Math.round((hoje - x.liquidadoEm.getTime()) / 86400_000))}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="hidden overflow-x-auto md:block" tabIndex={0} role="region" aria-label={`Fila de pagamentos: ${f.fonteNome}`}>
                 <table className="lista">
                   <thead>
                     <tr>
@@ -271,7 +301,7 @@ function Numero({ valor, rotulo }: { valor: string; rotulo: string }) {
   return (
     <div className="panel px-5 py-4">
       <div className="display tnum text-[26px] font-semibold text-ink">{valor}</div>
-      <div className="text-[13.5px] text-ink-2">{rotulo}</div>
+      <div className="text-[14px] text-ink-2">{rotulo}</div>
     </div>
   );
 }

@@ -93,7 +93,7 @@ export default async function IndicesPage() {
           );
         })}
       </div>
-      <p className="mt-6 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-6 max-w-3xl text-[14px] text-ink-3">
         Acompanhamento gerencial com base na despesa liquidada. Os demonstrativos oficiais (RREO, RGF, SIOPS e SIOPE) são gerados pelo sistema contábil e seguem as
         regras do Manual de Demonstrativos Fiscais da STN, inclusive restos a pagar e os últimos 12 meses no caso da despesa com pessoal.
       </p>

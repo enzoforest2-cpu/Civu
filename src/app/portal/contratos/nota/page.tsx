@@ -16,7 +16,7 @@ export default async function EnviarNotaPage({ searchParams }: { searchParams: P
   const iso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
   return (
     <>
-      <Link href="/portal/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink-2 hover:text-ink">
+      <Link href="/portal/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-2 hover:text-ink">
         <ArrowLeft size={15} /> Meus contratos
       </Link>
       <h1 className="display text-[30px] font-bold text-ink">Enviar nota fiscal</h1>

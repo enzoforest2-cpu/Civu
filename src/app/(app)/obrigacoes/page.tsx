@@ -55,7 +55,7 @@ export default async function ObrigacoesPage({ searchParams }: { searchParams: P
                 {lista.map((o) => (
                   <tr key={o.processoId + o.chave}>
                     <td className="min-w-[220px]">
-                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum font-semibold text-brand-2 hover:underline">
+                      <Link href={`/processos/${o.processoId}#contratacao`} className="tnum inline-flex min-h-[44px] items-center font-semibold text-brand-2 hover:underline">
                         {o.numero}
                       </Link>
                       <div className="text-[13px] text-ink-2">{o.assunto}</div>
@@ -86,7 +86,7 @@ export default async function ObrigacoesPage({ searchParams }: { searchParams: P
           </div>
         )}
       </Panel>
-      <p className="mt-4 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-4 max-w-3xl text-[14px] text-ink-3">
         O envio automático ao PNCP e ao sistema do Tribunal de Contas depende do credenciamento da prefeitura. Até lá, o sistema calcula os prazos, avisa
         antes de vencer e guarda o comprovante ou o recibo de cada envio no histórico do processo.
       </p>
@@ -99,7 +99,7 @@ function Aba({ href, ativa, rotulo, n, tone }: { href: string; ativa: boolean; r
     <Link
       href={href}
       aria-current={ativa ? "page" : undefined}
-      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[14px] font-medium transition-colors ${
+      className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 text-[14px] font-medium transition-colors ${
         ativa ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-line-2 hover:text-ink"
       }`}
     >

@@ -44,7 +44,7 @@ export default async function AjudaPage({ searchParams }: { searchParams: Promis
                     <Link key={a.slug} href={`/ajuda/${a.slug}`} className="group">
                       <Panel className="h-full transition-colors group-hover:border-brand/40">
                         <div className="text-[15.5px] font-semibold text-ink group-hover:text-brand-2">{a.titulo}</div>
-                        <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{a.resumo}</p>
+                        <p className="mt-1 text-[14px] leading-snug text-ink-2">{a.resumo}</p>
                       </Panel>
                     </Link>
                   ))}

@@ -33,14 +33,14 @@ export default async function LoginPage() {
                   >
                     {atual && <span className="absolute inset-[6px] rounded-full bg-white" />}
                   </span>
-                  <span className={`mt-3 text-[13.5px] ${atual ? "font-semibold text-white" : passou ? "text-white/90" : "text-white/80"}`}>{p}</span>
+                  <span className={`mt-3 text-[14px] ${atual ? "font-semibold text-white" : passou ? "text-white/90" : "text-white/80"}`}>{p}</span>
                 </li>
               );
             })}
           </ol>
         </div>
 
-        <p className="max-w-md text-[13px] text-white/85">Segue a Lei 14.133, a Lei 4.320, a LRF e o Decreto 10.540. Toda movimentação fica registrada e não pode ser apagada.</p>
+        <p className="max-w-md text-[14px] text-white/85">Segue a Lei 14.133, a Lei 4.320, a LRF e o Decreto 10.540. Toda movimentação fica registrada e não pode ser apagada.</p>
       </aside>
 
       <section className="flex flex-1 items-center justify-center p-8">
@@ -68,7 +68,7 @@ export default async function LoginPage() {
             </SubmitButton>
           </ActionForm>
 
-          <details className="mt-10 rounded-xl border border-line bg-sunken/60 text-[13.5px] text-ink-2">
+          <details className="mt-10 rounded-xl border border-line bg-sunken/60 text-[14px] text-ink-2">
             <summary className="px-4 py-3 font-semibold text-ink">Acessos de demonstração</summary>
             <div className="px-4 pb-4">
               <p className="mb-2">

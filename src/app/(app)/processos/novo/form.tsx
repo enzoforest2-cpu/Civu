@@ -162,7 +162,7 @@ export function NovoProcessoForm({ tipos, ugs, setor }: { tipos: Tipo[]; ugs: { 
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[13.5px] text-ink-3">O processo sai do seu setor ({setor}) com número próprio.</p>
+            <p className="text-[14px] text-ink-3">O processo sai do seu setor ({setor}) com número próprio.</p>
             <SubmitButton className="btn btn-primary btn-lg" pendingText="Protocolando…">
               Protocolar processo
             </SubmitButton>
@@ -194,7 +194,7 @@ function Secao({ numero, titulo, sub, children }: { numero: number; titulo: stri
         <span className="display tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-[14px] font-semibold text-white">{numero}</span>
         <div>
           <h2 className="text-[17px] font-semibold text-ink">{titulo}</h2>
-          {sub && <p className="text-[13.5px] text-ink-2">{sub}</p>}
+          {sub && <p className="text-[14px] text-ink-2">{sub}</p>}
         </div>
       </div>
       {children}

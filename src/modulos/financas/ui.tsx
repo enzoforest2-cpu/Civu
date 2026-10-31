@@ -27,7 +27,7 @@ export function AbasFinancas({ atual }: { atual: string }) {
               key={a.href}
               href={a.href}
               aria-current={ativo ? "page" : undefined}
-              className={`rounded-full px-3.5 py-1.5 text-[13.5px] font-medium whitespace-nowrap transition-colors ${ativo ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken hover:text-ink"}`}
+              className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap transition-colors ${ativo ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken hover:text-ink"}`}
             >
               {a.rotulo}
             </Link>
@@ -238,5 +238,5 @@ export function Classificacao({ d }: { d: { unidade: string; funcao: string; sub
 }
 
 export function Simulado({ children }: { children: ReactNode }) {
-  return <p className="mt-4 max-w-3xl text-[13px] text-ink-3">{children}</p>;
+  return <p className="mt-4 max-w-3xl text-[14px] text-ink-3">{children}</p>;
 }

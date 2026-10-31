@@ -53,7 +53,7 @@ export function NovaRegra({ setores }: { setores: { sigla: string; nome: string 
               Palavras-chave (separadas por vírgula)
             </label>
             <input id="r-palavras" name="palavras" className="input" placeholder="buraco, asfalto, pavimentação" />
-            <label className="inline-flex items-center gap-2 text-[13.5px] text-ink-2">
+            <label className="inline-flex items-center gap-2 text-[14px] text-ink-2">
               <input type="checkbox" name="somenteNovos" defaultChecked className="h-4 w-4 accent-[var(--color-brand)]" /> Só requerimentos ainda no protocolo
             </label>
           </div>

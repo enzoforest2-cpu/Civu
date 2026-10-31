@@ -169,7 +169,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
   const humanos = lista.filter((x) => x.cpf !== CPF_ATENDIMENTO_DIGITAL);
   return (
     <Panel title={`${humanos.length} usuários · ${humanos.filter((x) => x.ativo).length} ativos`}>
-      {!admin && <p className="mb-3 text-[13.5px] text-ink-3">Consulta. Só o administrador ativa, desativa ou troca setor e papéis.</p>}
+      {!admin && <p className="mb-3 text-[14px] text-ink-3">Consulta. Só o administrador ativa, desativa ou troca setor e papéis.</p>}
       <ul className="divide-y divide-line">
         {humanos.map((x) => {
           const editavel = admin && x.id !== euId;
@@ -203,7 +203,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
               </div>
               {editavel && (
                 <details className="mt-3 ml-0 sm:ml-12">
-                  <summary className="cursor-pointer text-[13.5px] font-semibold text-brand-2">Alterar setor e papéis</summary>
+                  <summary className="cursor-pointer text-[14px] font-semibold text-brand-2">Alterar setor e papéis</summary>
                   <ActionForm action={atualizarAcessoAction} resetOnOk={false} className="mt-3 space-y-3 rounded-xl bg-sunken p-4">
                     <input type="hidden" name="usuarioId" value={x.id} />
                     <div>
@@ -222,7 +222,7 @@ async function Usuarios({ municipioId, admin, euId }: { municipioId: string; adm
                       <legend className="label">Papéis</legend>
                       <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                         {PAPEIS.map((p) => (
-                          <label key={p} className="inline-flex items-center gap-2 text-[13.5px] text-ink-2">
+                          <label key={p} className="inline-flex items-center gap-2 text-[14px] text-ink-2">
                             <input type="checkbox" name="papeis" value={p} defaultChecked={x.papeis.includes(p)} className="h-4 w-4 accent-[var(--color-brand)]" />
                             {PAPEL_NOME[p]}
                           </label>
@@ -357,7 +357,7 @@ async function Integridade({ municipioId, podeVerificar }: { municipioId: string
             </SubmitButton>
           </ActionForm>
         ) : (
-          <p className="mt-4 text-[13px] text-ink-3">Somente o controle interno ou o administrador podem executar a verificação.</p>
+          <p className="mt-4 text-[14px] text-ink-3">Somente o controle interno ou o administrador podem executar a verificação.</p>
         )}
         <p className="mt-4 text-[12.5px] leading-snug text-ink-3">
           O encadeamento revela alterações, mas sozinho não impede que um administrador do banco de dados altere registros. Por isso a verificação deve ser feita com regularidade e
@@ -393,7 +393,7 @@ async function Integridade({ municipioId, podeVerificar }: { municipioId: string
               </div>
             </dl>
             {ult.falhas.length > 0 && (
-              <ul className="mt-4 space-y-1 text-[13.5px]">
+              <ul className="mt-4 space-y-1 text-[14px]">
                 {ult.falhas.map((f) => (
                   <li key={f.processoId}>
                     <Link href={`/processos/${f.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">

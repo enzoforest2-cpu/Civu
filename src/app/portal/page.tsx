@@ -60,7 +60,7 @@ export default async function PortalInicio() {
               <span className="flex items-center gap-1 font-semibold text-ink">
                 {a.rotulo} <ArrowRight size={15} className="opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
-              <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{a.descricao}</span>
+              <span className="mt-0.5 block text-[14px] leading-snug text-ink-2">{a.descricao}</span>
             </span>
           </Link>
         ))}
@@ -69,7 +69,7 @@ export default async function PortalInicio() {
       <section className="panel mt-8 p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-[17px] font-semibold text-ink">Pedidos em andamento</h2>
-          <Link href="/portal/pedidos" className="text-[13.5px] font-semibold text-brand-2 hover:underline">
+          <Link href="/portal/pedidos" className="text-[14px] font-semibold text-brand-2 hover:underline">
             Ver todos
           </Link>
         </div>

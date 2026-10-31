@@ -91,7 +91,7 @@ export function DecisaoLote({ itens, podeDecidir }: { itens: ItemLote[]; podeDec
           </div>
           <ul className="space-y-1.5">
             {resultado.map((r) => (
-              <li key={r.processoId} className="flex items-start gap-2 text-[13.5px]">
+              <li key={r.processoId} className="flex items-start gap-2 text-[14px]">
                 {r.ok ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-ok" /> : <XCircle size={16} className="mt-0.5 shrink-0 text-bad" />}
                 <span>
                   <Link href={`/processos/${r.processoId}`} className="tnum font-semibold text-brand-2 hover:underline">
@@ -178,7 +178,7 @@ export function DecisaoLote({ itens, podeDecidir }: { itens: ItemLote[]; podeDec
               ))}
             </ul>
             {modo === "AVANCAR" && selecionados.length > aptos.length && (
-              <p className="mb-3 text-[13px] text-warn">
+              <p className="mb-3 text-[14px] text-warn">
                 {selecionados.length - aptos.length} selecionado(s) com pendência ficarão de fora. Use &quot;Só despachar&quot; para registrar uma orientação neles.
               </p>
             )}

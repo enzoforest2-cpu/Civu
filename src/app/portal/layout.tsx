@@ -19,7 +19,7 @@ export default async function PortalLayout({ children }: { children: React.React
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/portal" className="flex items-center gap-3">
             <MarcaCompleta altura={24} />
-            <span className="border-l border-line pl-3 text-[13.5px] font-semibold text-ink-2">{app}</span>
+            <span className="border-l border-line pl-3 text-[14px] font-semibold text-ink-2">{app}</span>
           </Link>
           <div className="flex items-center gap-2">
             {s.representacoes.length > 0 && (
@@ -27,7 +27,7 @@ export default async function PortalLayout({ children }: { children: React.React
                 <label htmlFor="empresaId" className="hidden text-[13px] text-ink-3 sm:block">
                   Agindo como
                 </label>
-                <select id="empresaId" name="empresaId" defaultValue={s.empresaAtiva?.id ?? ""} className="input !w-auto !py-1.5 text-[13.5px]">
+                <select id="empresaId" name="empresaId" defaultValue={s.empresaAtiva?.id ?? ""} className="input min-h-[44px] !w-auto !py-1.5 text-[14px]">
                   <option value="">{s.pessoa.nome} (você)</option>
                   {s.representacoes.map((r) => (
                     <option key={r.id} value={r.empresaId}>
@@ -35,11 +35,11 @@ export default async function PortalLayout({ children }: { children: React.React
                     </option>
                   ))}
                 </select>
-                <button className="btn btn-quiet !px-3 !py-1.5 text-[13px]">Trocar</button>
+                <button className="btn btn-quiet min-h-[44px] !px-3 !py-1.5 text-[13px]">Trocar</button>
               </form>
             )}
             <form action={sairPortalAction}>
-              <button className="rounded-lg p-2 text-ink-3 hover:bg-sunken hover:text-ink" title="Sair" aria-label="Sair">
+              <button className="flex h-[44px] w-[44px] items-center justify-center rounded-lg text-ink-3 hover:bg-sunken hover:text-ink" title="Sair" aria-label="Sair">
                 <LogOut size={17} />
               </button>
             </form>

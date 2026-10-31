@@ -54,7 +54,7 @@ export default async function FluxosPage() {
                           {e.final && <Chip tone="ok">Fim</Chip>}
                         </div>
                         {e.descricao && <p className="mt-1 text-[14px] text-ink-2">{e.descricao}</p>}
-                        <dl className="mt-3 grid gap-3 text-[13.5px] md:grid-cols-3">
+                        <dl className="mt-3 grid gap-3 text-[14px] md:grid-cols-3">
                           <div className="flex gap-2">
                             <Users size={16} className="mt-0.5 shrink-0 text-ink-3" />
                             <div>

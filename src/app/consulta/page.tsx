@@ -6,7 +6,7 @@ import { municipios, processos, setores } from "@/db/schema";
 import { caminhoDoProcesso, caminhoPrincipal, getEstado, nomeEtapa, ramoDaModalidade, type WorkflowDef } from "@/lib/workflow";
 import { fmtData, fmtDataHora } from "@/lib/dates";
 import { Chip } from "@/components/ui";
-import { Marca, MarcaCompleta } from "@/components/marca";
+import { MarcaCompleta } from "@/components/marca";
 import { Trilho } from "@/components/trilho";
 
 export const dynamic = "force-dynamic";
@@ -44,21 +44,21 @@ export default async function ConsultaPage({ searchParams }: { searchParams: Pro
   return (
     <main className="min-h-screen bg-bg">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2.5">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 items-center gap-2.5">
             <MarcaCompleta altura={26} />
-            <div className="leading-tight border-l border-line pl-2.5">
+            <div className="hidden border-l border-line pl-2.5 leading-tight sm:block">
               <div className="text-[12.5px] text-ink-3">Consulta pública de processos</div>
             </div>
           </div>
-          <Link href="/login" className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
+          <Link href="/login" className="alvo-toque shrink-0 text-[14px] font-semibold whitespace-nowrap text-brand-2 hover:underline">
             Sou servidor
           </Link>
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="display text-[38px] leading-[1.1] font-semibold text-ink">Acompanhe um processo da prefeitura</h1>
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-12">
+        <h1 className="display text-[32px] leading-[1.1] font-semibold text-ink sm:text-[38px]">Acompanhe um processo da prefeitura</h1>
         <p className="mt-2 text-[15px] text-ink-2">Digite o número que você recebeu no protocolo para ver em que etapa ele está.</p>
 
         <form className="panel mt-7 flex flex-wrap items-end gap-3 p-5" method="get">

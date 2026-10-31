@@ -209,7 +209,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
                     <input id="venc" name="vencimento" type="date" className="input tnum" defaultValue={addDiasIso(hoje, 20)} required />
                   </div>
                 </div>
-                <p className="text-[13px] text-ink-3">Liquide só com a nota fiscal atestada pelo fiscal do contrato (Lei 4.320, art. 63).</p>
+                <p className="text-[14px] text-ink-3">Liquide só com a nota fiscal atestada pelo fiscal do contrato (Lei 4.320, art. 63).</p>
                 <SubmitButton>Registrar liquidação</SubmitButton>
               </ActionForm>
             </Panel>
@@ -219,7 +219,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
         <div className="space-y-6">
           <Panel title="Credor">
             <div className="font-semibold text-ink">{e.credorNome}</div>
-            {e.credorDocumento && <div className="tnum text-[13.5px] text-ink-2">CNPJ {fmtCnpj(e.credorDocumento)}</div>}
+            {e.credorDocumento && <div className="tnum text-[14px] text-ink-2">CNPJ {fmtCnpj(e.credorDocumento)}</div>}
             {!e.empresaId && !e.credorDocumento && <div className="text-[13px] text-ink-3">Credor sem CNPJ (folha ou previdência).</div>}
             <div className="mt-2 text-[13px] text-ink-3">Emitido em {fmtIso(e.data)}</div>
           </Panel>
@@ -227,7 +227,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
             <Link href={`/financas/orcamento/${d.id}`} className="font-semibold text-ink hover:text-brand-2 hover:underline">
               {d.acaoNome}
             </Link>
-            <div className="text-[13.5px] text-ink-2">
+            <div className="text-[14px] text-ink-2">
               {NATUREZAS_DESPESA[d.natureza]} · {FONTES_DETALHE[d.fonte]?.nome}
             </div>
             <div className="tnum text-[12.5px] text-ink-3">
@@ -267,7 +267,7 @@ export default async function EmpenhoPage({ params, searchParams }: { params: Pr
           </Panel>
           {(e.anulacoes?.length ?? 0) > 0 && (
             <Panel title="Anulações">
-              <ul className="space-y-2 text-[13.5px]">
+              <ul className="space-y-2 text-[14px]">
                 {e.anulacoes!.map((a, i) => (
                   <li key={i}>
                     <span className="tnum font-semibold">{fmtMoeda(a.valor)}</span> em {fmtIso(a.data)} por {a.autor}

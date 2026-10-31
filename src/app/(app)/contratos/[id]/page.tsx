@@ -43,13 +43,13 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
 
   return (
     <>
-      <Link href="/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink-2 hover:text-ink">
+      <Link href="/contratos" className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 text-[14px] font-medium text-ink-2 hover:text-ink">
         <ArrowLeft size={15} /> Contratos
       </Link>
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="tnum text-[13.5px] font-semibold text-ink-3">Contrato {c.rotulo}</span>
+            <span className="tnum text-[14px] font-semibold text-ink-3">Contrato {c.rotulo}</span>
             <ChipContrato s={fin.situacao} />
             {obra && <Chip tone={SITUACAO_OBRA[obra.situacao].tone}>Obra {SITUACAO_OBRA[obra.situacao].texto.toLowerCase()}</Chip>}
             {fin.acimaDoLimite && (
@@ -84,7 +84,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
               </Dado>
             </div>
             <BarraSaldo fin={fin} />
-            <p className="mt-4 text-[13px] text-ink-3">
+            <p className="mt-4 text-[14px] text-ink-3">
               Saldo = valor global + aditivos + reajustes − notas atestadas (inclusive as já em liquidação ou pagas). Acréscimos de valor somam{" "}
               <strong className={`tnum ${fin.acimaDoLimite ? "text-bad" : "text-ink-2"}`}>{pct(fin.acrescimoPct)}</strong> do valor inicial atualizado; o limite do art. 125 da
               Lei 14.133 para {NATUREZAS_CONTRATO[c.natureza]?.nome.toLowerCase()} é {fin.limite}%.
@@ -94,7 +94,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
           {/* Notas */}
           <section id="notas" className="scroll-mt-24">
             <Panel title="Notas fiscais e pagamentos" pad={false}>
-              <p className="px-6 pt-1 pb-3 text-[13px] text-ink-3">
+              <p className="px-6 pt-1 pb-3 text-[14px] text-ink-3">
                 Cada nota atestada abre um processo de pagamento (liquidação, fila cronológica da fonte {nomeFonte(c.fonte)} e pagamento). O fornecedor acompanha o mesmo
                 andamento no Civu Empresas.
               </p>
@@ -115,7 +115,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                             <span className="text-[13px] text-ink-3">competência {rotuloMes(n.competencia)}</span>
                             {n.origem === "PORTAL" && <Chip tone="neutral">Enviada pelo portal</Chip>}
                           </div>
-                          {n.descricao && <p className="mt-0.5 text-[13.5px] text-ink-2">{n.descricao}</p>}
+                          {n.descricao && <p className="mt-0.5 text-[14px] text-ink-2">{n.descricao}</p>}
                           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
                             {s && <TrilhoNota s={s} />}
                             <span className={`text-[13px] ${s?.tone === "bad" ? "font-semibold text-bad" : "text-ink-2"}`}>
@@ -133,7 +133,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                             </span>
                           </div>
                           {s?.processo && (
-                            <Link href={`/processos/${s.processo.id}`} className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
+                            <Link href={`/processos/${s.processo.id}`} className="mt-0.5 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
                               Processo de pagamento <span className="tnum">{s.processo.numero}</span> <ExternalLink size={12} />
                             </Link>
                           )}
@@ -302,7 +302,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                         </label>
                         <input id="med-comp" name="competencia" type="month" className="input" required />
                       </div>
-                      <p className="text-[13px] text-ink-3">Percentual de cada etapa executado no mês (não acumulado). O valor é calculado pelo cronograma.</p>
+                      <p className="text-[14px] text-ink-3">Percentual de cada etapa executado no mês (não acumulado). O valor é calculado pelo cronograma.</p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {obra.porEtapa.map((e) => (
                           <div key={e.id}>
@@ -404,12 +404,12 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                       )}
                       <span className="text-[13px] text-ink-3">assinado em {dl(a.assinadoEm)}</span>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 text-[13.5px] text-ink-2">
+                    <div className="mt-1 flex flex-wrap gap-x-4 text-[14px] text-ink-2">
                       {num(a.valor) !== 0 && <span className="tnum">{num(a.valor) > 0 ? "+" : "−"}{fmtMoeda(Math.abs(num(a.valor)))}</span>}
                       {a.novaVigenciaFim && <span>Vigência até {dl(a.novaVigenciaFim)}</span>}
                       {a.acrescimoAcumulado && a.tipo !== "PRAZO" && a.tipo !== "RENOVACAO" && <span>Acréscimo acumulado: {pct(num(a.acrescimoAcumulado))}</span>}
                     </div>
-                    <p className="mt-1 text-[13.5px] text-ink-2">{a.justificativa}</p>
+                    <p className="mt-1 text-[14px] text-ink-2">{a.justificativa}</p>
                   </li>
                 ))}
                 {c.apostilamentos.map((a) => (
@@ -419,7 +419,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                       <Chip tone="neutral">{TIPOS_APOSTILAMENTO[a.tipo] ?? a.tipo}</Chip>
                       <span className="text-[13px] text-ink-3">{dl(a.data)}</span>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 text-[13.5px] text-ink-2">
+                    <div className="mt-1 flex flex-wrap gap-x-4 text-[14px] text-ink-2">
                       {a.indice && (
                         <span>
                           {a.indice} {pct(num(a.percentual), 2)}
@@ -427,7 +427,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                       )}
                       {num(a.valor) > 0 && <span className="tnum">+{fmtMoeda(a.valor)}</span>}
                     </div>
-                    <p className="mt-1 text-[13.5px] text-ink-2">{a.descricao}</p>
+                    <p className="mt-1 text-[14px] text-ink-2">{a.descricao}</p>
                   </li>
                 ))}
               </ul>
@@ -558,7 +558,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   <label className="label" htmlFor="ob-motivo">
                     Motivo do atraso ou da paralisação (público)
                   </label>
-                  <textarea id="ob-motivo" name="motivo" rows={3} className="input text-[13.5px]" defaultValue={c.obraMotivo ?? ""} />
+                  <textarea id="ob-motivo" name="motivo" rows={3} className="input text-[14px]" defaultValue={c.obraMotivo ?? ""} />
                 </div>
                 <SubmitButton className="btn btn-quiet" pendingText="Salvando…">
                   Atualizar
@@ -577,7 +577,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                   <option value="RESCINDIDO">Rescisão (extinção antecipada)</option>
                 </select>
                 <input name="data" type="date" className="input" required aria-label="Data" />
-                <textarea name="motivo" rows={3} className="input text-[13.5px]" placeholder="Motivo e fundamento" required minLength={15} aria-label="Motivo" />
+                <textarea name="motivo" rows={3} className="input text-[14px]" placeholder="Motivo e fundamento" required minLength={15} aria-label="Motivo" />
                 <SubmitButton className="btn btn-danger" pendingText="Registrando…">
                   Registrar
                 </SubmitButton>

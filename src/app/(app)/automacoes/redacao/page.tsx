@@ -35,7 +35,7 @@ export default async function RedacaoPage({ searchParams }: { searchParams: Prom
         titulo="Assistente de redação"
         sub="Despachos, ofícios e respostas ao cidadão a partir de modelos aprovados, preenchidos com os dados do processo. Revise sempre antes de usar."
       />
-      <div className="mb-6 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13.5px] text-ink">
+      <div className="mb-6 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[14px] text-ink">
         <span className="font-semibold">Versão por modelos.</span> O texto sai de modelos com variáveis, sem inteligência artificial. A versão com IA, que propõe o rascunho a partir do
         histórico do processo e mostra as fontes usadas, virá depois e continuará exigindo revisão de quem assina.
       </div>

@@ -20,6 +20,8 @@
   --color-ink: #172d36;
   --color-ink-2: #4b5f68;
   --color-ink-3: #5f7178;
+  /* texto secundário sobre fundos "soft" (brand/ok/warn/bad-soft): ≥ 4,83:1 em todos; ink-3 ali fica entre 4,29 e 4,46 */
+  --color-ink-3-soft: #57696f;
   --color-line: #e1e8e5;
   --color-line-2: #c9d5d0;
   /* borda de campos de formulário: 3,22:1 sobre branco (WCAG 1.4.11) */
@@ -78,6 +80,7 @@ body {
 /* Campos */
 .input {
   width: 100%;
+  min-height: 44px; /* área de toque (WCAG 2.5.5); o html tem 15 px, então min-h-11 daria 41 px */
   border: 1px solid var(--color-line-campo);
   border-radius: 10px;
   background: #fff;
@@ -115,6 +118,7 @@ textarea.input {
 /* Botões */
 .btn {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
@@ -268,6 +272,11 @@ main:focus {
   outline: none;
 }
 
+/* Rede de segurança: texto secundário (ink-3) dentro de um fundo soft usa o tom que mantém 4,5:1 */
+:where([class*="bg-brand-soft"], [class*="bg-ok-soft"], [class*="bg-warn-soft"], [class*="bg-bad-soft"]) .text-ink-3:not(:hover) {
+  color: var(--color-ink-3-soft);
+}
+
 /* Área de toque de pelo menos 44 px sem mudar o desenho: um pseudo-elemento invisível amplia o alvo */
 @utility alvo-toque {
   position: relative;
@@ -280,4 +289,9 @@ main:focus {
     height: max(100%, 44px);
     transform: translate(-50%, -50%);
   }
+}
+
+/* Âncoras e links de pendência: o alvo não fica escondido sob o cabeçalho fixo */
+main [id] {
+  scroll-margin-top: 5.5rem;
 }

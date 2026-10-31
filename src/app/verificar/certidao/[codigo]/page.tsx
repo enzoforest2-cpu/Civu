@@ -56,14 +56,14 @@ export default async function VerificarCertidao({ params }: { params: Promise<{ 
             {pend.length > 0 && (
               <ul className="divide-y divide-line rounded-xl border border-line">
                 {pend.map((p, i) => (
-                  <li key={i} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-[13.5px]">
+                  <li key={i} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-[14px]">
                     <span className="min-w-0 flex-1">{p.descricao}</span>
                     <span className="tnum font-semibold">{fmtMoeda(p.valor)}</span>
                   </li>
                 ))}
               </ul>
             )}
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-[13.5px]">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-[14px]">
               <dt className="text-ink-3">Emitida em</dt>
               <dd className="tnum">{fmtDataHora(c.emitidaEm)}</dd>
               <dt className="text-ink-3">Válida até</dt>

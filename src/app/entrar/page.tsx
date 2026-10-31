@@ -17,7 +17,7 @@ export default async function EntrarPage() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <MarcaCompleta altura={26} />
-          <Link href="/login" className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
+          <Link href="/login" className="alvo-toque shrink-0 text-[14px] font-semibold whitespace-nowrap text-brand-2 hover:underline">
             Sou servidor
           </Link>
         </div>
@@ -33,7 +33,7 @@ export default async function EntrarPage() {
             <div className="flex items-center gap-2 text-[16px] font-semibold text-ink">
               <ShieldCheck size={19} className="text-brand-2" /> Entrar com gov.br
             </div>
-            <p className="mt-1 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-ink">
+            <p className="mt-1 rounded-lg bg-warn-soft px-3 py-2 text-[14px] text-ink">
               <strong className="font-semibold">Ambiente de demonstração.</strong> A entrada gov.br é simulada: escolha uma pessoa fictícia. A integração real depende
               da adesão do município à Rede gov.br.
             </p>
@@ -64,7 +64,7 @@ export default async function EntrarPage() {
 
           <section className="panel p-6">
             <div className="text-[16px] font-semibold text-ink">CPF e senha</div>
-            <p className="mt-1 text-[13.5px] text-ink-2">Para serviços que não exigem identidade validada pelo gov.br.</p>
+            <p className="mt-1 text-[14px] text-ink-2">Para serviços que não exigem identidade validada pelo gov.br.</p>
             <ActionForm action={entrarSenhaAction} className="mt-4 space-y-3" resetOnOk={false}>
               <div>
                 <label className="label" htmlFor="cpf">

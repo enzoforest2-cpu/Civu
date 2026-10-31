@@ -10,10 +10,11 @@ export function LinkAjuda() {
   return (
     <Link
       href={`/ajuda?pagina=${encodeURIComponent(path)}`}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-medium text-ink-2 hover:bg-sunken hover:text-ink"
+      className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-medium text-ink-2 hover:bg-sunken hover:text-ink"
       title="Ajuda sobre esta página"
+      aria-label="Ajuda sobre esta página"
     >
-      <CircleHelp size={17} />
+      <CircleHelp size={17} aria-hidden />
       <span className="hidden sm:inline">Ajuda</span>
     </Link>
   );

@@ -36,7 +36,7 @@ export function AcoesNota({
             <label className="label !mb-1 !text-[12.5px]" htmlFor={`motivo-${notaId}`}>
               O que o fornecedor precisa corrigir
             </label>
-            <textarea id={`motivo-${notaId}`} name="motivo" rows={2} className="input text-[13.5px]" required minLength={15} />
+            <textarea id={`motivo-${notaId}`} name="motivo" rows={2} className="input text-[14px]" required minLength={15} />
             <SubmitButton className="btn btn-danger !px-3 !py-1.5 text-[13px]" pendingText="Glosando…">
               Glosar nota
             </SubmitButton>

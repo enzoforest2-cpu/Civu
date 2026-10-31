@@ -81,7 +81,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
             </tbody>
           </table>
         </div>
-        <p className="px-6 py-3 text-[13px] text-ink-3">
+        <p className="px-6 py-3 text-[14px] text-ink-3">
           Dinheiro vinculado (saúde, educação, assistência e convênios) só paga despesas da própria fonte. Disponibilidade líquida negativa significa que os compromissos
           dependem de receita que ainda vai entrar: veja a projeção abaixo.
         </p>
@@ -101,7 +101,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
                 key={c}
                 href={`/financas/caixa?cenario=${c}#projecao`}
                 aria-current={c === cenario ? "page" : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-[13.5px] font-medium ${c === cenario ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken"}`}
+                className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium ${c === cenario ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken"}`}
               >
                 {CENARIOS[c].nome}
               </Link>
@@ -186,7 +186,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
                       {c.banco} · ag. {c.agencia} · c/c {c.numero}
                     </div>
                   </td>
-                  <td className="text-[13.5px] whitespace-nowrap text-ink-2">{nomeGrupo(c.grupoFonte)}</td>
+                  <td className="text-[14px] whitespace-nowrap text-ink-2">{nomeGrupo(c.grupoFonte)}</td>
                   <td className="tnum text-right whitespace-nowrap">
                     {fmtMoeda(c.saldoExtrato)}
                     <div className="text-[12px] text-ink-3">{fmtIso(c.extratoEm)}</div>
@@ -199,7 +199,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
       </Panel>
-      <p className="mt-4 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-4 max-w-3xl text-[14px] text-ink-3">
         Demonstração: os extratos são simulados. Em produção, os saldos chegam pelo arquivo de extrato do banco (CNAB/OFX) ou por API bancária, com conciliação
         diária; nenhum pagamento é executado sem a confirmação do banco.
       </p>

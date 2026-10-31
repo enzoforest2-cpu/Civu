@@ -229,7 +229,7 @@ export function FormContrato({
         <section className="panel space-y-4 p-6">
           <div>
             <h2 className="text-[15px] font-semibold text-ink">Obra: local e cronograma físico-financeiro</h2>
-            <p className="mt-1 text-[13.5px] text-ink-2">
+            <p className="mt-1 text-[14px] text-ink-2">
               Para cada etapa, informe o valor e o percentual previsto em cada mês a partir do início, separados por ponto e vírgula. Ex.: <span className="tnum">20; 30; 30; 20</span>{" "}
               (quatro meses, somando 100).
             </p>
@@ -283,7 +283,7 @@ export function FormContrato({
               <button type="button" className="btn btn-quiet" onClick={() => setEtapas((a) => [...a, { nome: "", valor: "", previsto: "" }])} disabled={etapas.length >= 12}>
                 <Plus size={15} /> Etapa
               </button>
-              <span className={`tnum text-[13.5px] ${global && Math.abs(somaEtapas - global) > 0.05 ? "font-semibold text-bad" : "text-ink-2"}`}>
+              <span className={`tnum text-[14px] ${global && Math.abs(somaEtapas - global) > 0.05 ? "font-semibold text-bad" : "text-ink-2"}`}>
                 Etapas somam {moeda(somaEtapas)} {global ? `de ${moeda(global)}` : ""}
               </span>
             </div>

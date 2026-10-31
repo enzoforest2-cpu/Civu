@@ -4,6 +4,7 @@ import { LogOut, Search } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/app/actions";
 import { Navegacao, type GrupoNav } from "@/components/navegacao";
+import { MenuCelular } from "@/components/menu-celular";
 import { GRUPOS, ITENS_GESTAO } from "@/lib/modulos";
 import { Avatar } from "@/components/ui";
 import { Marca, MarcaCompleta } from "@/components/marca";
@@ -23,7 +24,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       icone: <i.icone size={18} strokeWidth={2} />,
     })),
   })).filter((g) => g.itens.length > 0);
-  const mobile = ITENS_GESTAO.filter((i) => i.grupo !== "publico").slice(0, 8);
   return (
     <div className="flex min-h-screen">
       <a href="#conteudo" className="pular-conteudo">
@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </a>
       <aside aria-label="Menu lateral" className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
         <div className="px-5 pt-6 pb-5">
-          <Link href="/painel" className="flex items-center gap-2.5">
+          <Link href="/painel" className="flex min-h-[44px] items-center gap-2.5">
             <MarcaCompleta />
           </Link>
           <div className="mt-3 rounded-lg bg-sunken px-3 py-2 text-[13px] leading-tight text-ink-2">
@@ -48,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="truncate text-ink-3">{u.cargo ?? u.setor?.nome}</div>
             </div>
             <form action={logoutAction}>
-              <button className="rounded-lg p-2 text-ink-3 hover:bg-sunken hover:text-ink" title="Sair" aria-label="Sair">
+              <button className="flex h-[44px] w-[44px] items-center justify-center rounded-lg text-ink-3 hover:bg-sunken hover:text-ink" title="Sair" aria-label="Sair">
                 <LogOut size={17} />
               </button>
             </form>
@@ -56,15 +56,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <div className="min-w-0 flex-1">
-        <nav className="flex items-center gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-1 lg:hidden" aria-label="Menu">
-          <Link href="/painel" className="mr-1 flex h-11 w-11 shrink-0 items-center justify-center" aria-label="Civu, ir para o painel">
+        <nav aria-label="Menu do celular" className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1 lg:hidden">
+          <Link href="/painel" className="flex h-[44px] min-w-[44px] items-center gap-2.5" aria-label={`Civu, ${u.municipio.nome}: ir para o painel`}>
             <Marca size={26} />
+            <span className="text-[13px] leading-tight text-ink-2">{u.municipio.nome}</span>
           </Link>
-          {mobile.map(({ href: h, rotulo: r }) => (
-            <Link key={h} href={h} className="shrink-0 rounded-lg px-3 py-1.5 text-[14px] font-medium text-ink-2 hover:bg-sunken">
-              {r}
-            </Link>
-          ))}
+          <MenuCelular
+            grupos={grupos}
+            topo={<span className="min-w-0 truncate text-[14px] font-semibold text-ink">{u.nome}</span>}
+            rodape={
+              <form action={logoutAction}>
+                <button className="btn btn-quiet min-h-[44px] w-full">
+                  <LogOut size={17} aria-hidden /> Sair
+                </button>
+              </form>
+            }
+          />
         </nav>
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-bg/85 px-4 py-3 backdrop-blur sm:px-10">
           <form action="/processos" className="relative w-full max-w-md">

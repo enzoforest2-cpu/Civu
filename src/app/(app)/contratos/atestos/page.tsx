@@ -70,7 +70,7 @@ export default async function AtestosPage({ searchParams }: { searchParams: Prom
                         {n.situacao === "ATESTADA" ? "Atestada: falta enviar à liquidação" : `Aguardando atesto · ${s?.detalhe?.toLowerCase()}`}
                       </Chip>
                     </div>
-                    <div className="mt-1 text-[13.5px] text-ink-2">
+                    <div className="mt-1 text-[14px] text-ink-2">
                       <Link href={`/contratos/${n.contrato.id}#notas`} className="tnum font-semibold text-brand-2 hover:underline">
                         Contrato {numeroContrato(n.contrato)}
                       </Link>{" "}

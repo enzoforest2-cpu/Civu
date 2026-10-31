@@ -100,7 +100,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
             key={s.chave}
             href={`/financas/empenhos${qs({ situacao: s.chave })}`}
             aria-current={situacao === s.chave ? "page" : undefined}
-            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13.5px] font-medium ${
+            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[14px] font-medium ${
               situacao === s.chave ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:text-ink"
             }`}
           >
@@ -186,7 +186,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
             {lista.length > mostrar.length && (
-              <div className="border-t border-line px-6 py-3 text-[13.5px] text-ink-2">
+              <div className="border-t border-line px-6 py-3 text-[14px] text-ink-2">
                 Mostrando os {mostrar.length} mais recentes de {lista.length}.{" "}
                 <Link href={`/financas/empenhos${qs({ todos: "1" })}`} className="font-semibold text-brand-2 hover:underline">
                   Mostrar todos

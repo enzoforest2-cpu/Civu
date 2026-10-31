@@ -248,7 +248,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </Panel>
-      <p className="mt-4 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-4 max-w-3xl text-[14px] text-ink-3">
         Disponível = atualizado − empenhado − reservado. Saldo de orçamento não é dinheiro em caixa: para saber se há recurso para pagar, veja{" "}
         <Link href="/financas/caixa" className="font-semibold text-brand-2 hover:underline">
           Caixa e projeção

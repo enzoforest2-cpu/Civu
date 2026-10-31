@@ -3,11 +3,11 @@ import { ArrowDownToLine } from "lucide-react";
 import { db } from "@/db";
 import { processos } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { Cabecalho, Panel, Vazio, NumeroProcesso, UrgenciaChip } from "@/components/ui";
-import { TabelaProcessos } from "@/components/tabela-processos";
+import { Cabecalho, Panel, Vazio, NumeroProcesso, UrgenciaChip, Prazo } from "@/components/ui";
+import { TabelaProcessos, valorDoProcesso } from "@/components/tabela-processos";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { receberAction } from "@/app/actions";
-import { fmtDataHora } from "@/lib/dates";
+import { fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { getEstado, nomeEtapa, type WorkflowDef } from "@/lib/workflow";
 
 export default async function CaixaPage() {
@@ -64,8 +64,24 @@ export default async function CaixaPage() {
                       <UrgenciaChip u={p.urgencia} />
                     </div>
                     <div className="mt-1 text-[15.5px] font-medium text-ink">{p.assunto}</div>
-                    <div className="mt-1 text-[13px] text-ink-3">
-                      {etapa ? nomeEtapa(etapa.nome) : p.estadoAtual} · enviado por {ult?.deSetor?.nome ?? "—"} em {fmtDataHora(ult?.criadoEm)}
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                      <div>
+                        <dt className="text-[12px] text-ink-3">Etapa</dt>
+                        <dd className="text-[14px] font-medium text-ink">{etapa ? nomeEtapa(etapa.nome) : p.estadoAtual}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[12px] text-ink-3">Valor</dt>
+                        <dd className="tnum text-[14px] text-ink">{fmtMoeda(valorDoProcesso(p.metadados))}</dd>
+                      </div>
+                      <div className="col-span-2">
+                        <dt className="text-[12px] text-ink-3">Prazo da etapa</dt>
+                        <dd className="mt-0.5">
+                          <Prazo prazo={p.prazoEtapaEm} encerrado={p.encerradoEm} />
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-2 text-[13px] text-ink-3">
+                      Enviado por {ult?.deSetor?.nome ?? "—"} em {fmtDataHora(ult?.criadoEm)}
                     </div>
                   </div>
                   <ActionForm action={receberAction}>

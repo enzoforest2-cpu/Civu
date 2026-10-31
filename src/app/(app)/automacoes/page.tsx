@@ -53,7 +53,7 @@ export default async function AutomacoesPage() {
         }
       />
 
-      <div className="mb-6 rounded-xl border border-line bg-white px-4 py-3 text-[13.5px] text-ink-2">
+      <div className="mb-6 rounded-xl border border-line bg-white px-4 py-3 text-[14px] text-ink-2">
         As regras rodam quando alguém aciona &quot;Rodar agora&quot;; o agendamento automático virá com a fila de tarefas. Encaminhamentos com nível &quot;Executar&quot; passam pelo
         fluxo do processo, em nome de quem acionou, e nunca decidem atos reservados (pagamento, licitação, lançamento).
       </div>
@@ -125,7 +125,7 @@ export default async function AutomacoesPage() {
                       <span className="text-[12px] text-ink-3">{fmtDataHora(a.criadoEm)}</span>
                     </div>
                     <div className="mt-1 text-[14px] font-semibold text-ink">{a.titulo}</div>
-                    {a.detalhe && <p className="text-[13px] leading-snug text-ink-2">{a.detalhe}</p>}
+                    {a.detalhe && <p className="text-[14px] leading-snug text-ink-2">{a.detalhe}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {a.processoId && (
                         <Link href={`/processos/${a.processoId}`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
@@ -197,7 +197,7 @@ export default async function AutomacoesPage() {
                           <span className="text-ink-3">Nada a fazer.</span>
                         ) : (
                           <details>
-                            <summary className="cursor-pointer text-[13.5px] text-brand-2">
+                            <summary className="cursor-pointer text-[14px] text-brand-2">
                               {Object.entries(
                                 itens.reduce<Record<string, number>>((acc, i) => ({ ...acc, [i.resultado]: (acc[i.resultado] ?? 0) + 1 }), {}),
                               )

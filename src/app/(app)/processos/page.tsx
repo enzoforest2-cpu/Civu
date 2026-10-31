@@ -71,7 +71,7 @@ export default async function ProcessosPage({ searchParams }: { searchParams: Pr
                 key={s.v}
                 href={href(s.v)}
                 aria-current={ativo ? "page" : undefined}
-                className={`alvo-toque rounded-lg px-3.5 py-1.5 text-[13.5px] font-semibold transition-colors ${ativo ? "bg-white text-ink shadow-[0_1px_2px_rgb(13_21_48/0.08)]" : "text-ink-2 hover:text-ink"}`}
+                className={`alvo-toque rounded-lg px-3.5 py-1.5 text-[14px] font-semibold transition-colors ${ativo ? "bg-white text-ink shadow-[0_1px_2px_rgb(13_21_48/0.08)]" : "text-ink-2 hover:text-ink"}`}
               >
                 {s.r}{" "}
                 <span className={`tnum ml-0.5 ${s.v === "atrasados" && n > 0 ? "text-bad" : "text-ink-3"}`}>{n}</span>

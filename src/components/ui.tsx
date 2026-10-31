@@ -10,7 +10,9 @@ export function Panel({
   title,
   action,
   pad = true,
+  id,
 }: {
+  id?: string;
   children: ReactNode;
   className?: string;
   title?: ReactNode;
@@ -18,7 +20,7 @@ export function Panel({
   pad?: boolean;
 }) {
   return (
-    <section className={`panel ${className}`}>
+    <section id={id} className={`panel ${className}`}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-3 px-6 pt-5 pb-1">
           <h2 className="text-[15px] font-semibold text-ink">{title}</h2>

@@ -104,7 +104,7 @@ export function Assistente({ processos, fixos, processoInicial }: { processos: P
             </span>
           )}
         </div>
-        <textarea id="a-texto" className="input min-h-[320px] font-mono !text-[13.5px] leading-relaxed" value={final} onChange={(e) => setTexto(e.target.value)} />
+        <textarea id="a-texto" className="input min-h-[320px] font-mono !text-[14px] leading-relaxed" value={final} onChange={(e) => setTexto(e.target.value)} />
         <p className="hint">Você pode ajustar o texto livremente. Ele só é usado depois que você copiar ou juntar ao processo.</p>
         <div className="mt-3 flex flex-wrap items-start gap-2">
           <button type="button" className="btn btn-quiet" onClick={copiar}>

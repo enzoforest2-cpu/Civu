@@ -83,7 +83,7 @@ export default async function FinancasPage() {
                       {a.titulo}
                       <Chip tone={a.nivel === "risco" ? "bad" : "warn"}>{a.nivel === "risco" ? "Risco" : "Atenção"}</Chip>
                     </span>
-                    <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{a.texto}</span>
+                    <span className="mt-0.5 block text-[14px] leading-snug text-ink-2">{a.texto}</span>
                   </span>
                   <ArrowUpRight size={16} className="mt-1 shrink-0 text-ink-3 group-hover:text-brand-2" />
                 </Link>
@@ -98,7 +98,7 @@ export default async function FinancasPage() {
           <ul className="space-y-3.5">
             {funcoes.map((f) => (
               <li key={f.funcao}>
-                <div className="mb-1 flex items-baseline justify-between gap-3 text-[13.5px]">
+                <div className="mb-1 flex items-baseline justify-between gap-3 text-[14px]">
                   <span className="truncate font-medium text-ink">{f.nome}</span>
                   <span className="tnum shrink-0 text-ink-2">
                     {fmtCompacto(f.pago)} <span className="text-ink-3">de {fmtCompacto(f.atualizado)}</span>
@@ -149,7 +149,7 @@ export default async function FinancasPage() {
           </Panel>
         </div>
       </div>
-      <p className="mt-6 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-6 max-w-3xl text-[14px] text-ink-3">
         Demonstração: saldos bancários e lançamentos são simulados. Em produção, os registros contábeis oficiais continuam no sistema contábil (SIAFIC) e chegam aqui por
         integração, com conciliação.
       </p>

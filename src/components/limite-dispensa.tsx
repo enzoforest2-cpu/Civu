@@ -30,7 +30,7 @@ export function LimiteDispensa({ a, ug, compacto = false }: { a: AnaliseFraciona
           <div className={`absolute inset-y-0 left-0 ${cores.barra}`} style={{ width: `${pctComprometido}%` }} />
         </div>
       </div>
-      <p className="mt-2.5 text-[13.5px] leading-snug text-ink">
+      <p className="mt-2.5 text-[14px] leading-snug text-ink">
         {a.naturezaNome}
         {ug ? ` em ${ug}` : ""}: <strong className="tnum font-semibold">{fmtMoeda(a.comprometido)}</strong> já em dispensas neste ano
         {a.valorNovo > 0 && (
@@ -41,7 +41,7 @@ export function LimiteDispensa({ a, ug, compacto = false }: { a: AnaliseFraciona
         = <strong className="tnum font-semibold">{fmtMoeda(a.total)}</strong> de <span className="tnum">{fmtMoeda(a.limite)}</span> ({Math.round(a.pct * 100)}%).
       </p>
       {!compacto && a.situacao === "excede" && (
-        <p className="mt-1.5 text-[13px] text-ink-2">
+        <p className="mt-1.5 text-[14px] text-ink-2">
           A lei soma as despesas de mesma natureza no exercício (Lei 14.133, art. 75, §1º). Acima do limite, a contratação precisa ser por licitação ou
           por outra hipótese com justificativa. O processo pode ser aberto, mas o alerta fica registrado no histórico.
         </p>

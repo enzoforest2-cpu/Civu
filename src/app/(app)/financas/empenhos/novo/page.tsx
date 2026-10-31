@@ -177,13 +177,13 @@ export default async function NovoEmpenhoPage({ searchParams }: { searchParams: 
                     {proc.numero}
                   </Link>{" "}
                   <span className="text-ink">{proc.assunto}</span>
-                  <ul className="mt-3 space-y-1.5 text-[13.5px] text-ink-2">
+                  <ul className="mt-3 space-y-1.5 text-[14px] text-ink-2">
                     <li>Credor: {ct?.fornecedor ? `${ct.fornecedor} (dados da contratação)` : "não informado"}</li>
                     <li>Valor: {ct?.valor ? `${fmtMoeda(Number(ct.valor))} contratado` : meta.valorEstimado ? `${fmtMoeda(meta.valorEstimado)} estimado (ainda sem contrato)` : "não informado"}</li>
                     <li>Dotação: {dotSugerida ? comoDot || "escolhida" : "escolha manual"}</li>
                     <li>Reserva: {reservaDoProc ? `nº ${reservaDoProc.numero}/${reservaDoProc.ano}, saldo ${fmtMoeda(reservaDoProc.saldo)}` : "nenhuma com saldo"}</li>
                   </ul>
-                  <p className="mt-3 text-[13px] text-ink-3">
+                  <p className="mt-3 text-[14px] text-ink-3">
                     Ao emitir, o empenho fica vinculado ao processo e a nota de empenho é juntada a ele para as assinaturas do contador e do ordenador. Confira tudo antes.
                   </p>
                 </div>
@@ -201,7 +201,7 @@ export default async function NovoEmpenhoPage({ searchParams }: { searchParams: 
             </Panel>
           )}
           {avisos.length > 0 && (
-            <div className="rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13.5px] text-warn">
+            <div className="rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[14px] text-warn">
               <ul className="list-disc space-y-1 pl-4">
                 {avisos.map((a) => (
                   <li key={a}>{a}</li>

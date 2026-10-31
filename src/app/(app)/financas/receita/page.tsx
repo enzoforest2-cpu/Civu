@@ -136,12 +136,12 @@ export default async function ReceitaPage({ searchParams }: { searchParams: Prom
             <dd className="tnum font-semibold">{fmtMoeda(t.rcl)}</dd>
           </div>
         </dl>
-        <p className="mt-3 text-[13px] text-ink-3">
+        <p className="mt-3 text-[14px] text-ink-3">
           Cálculo simplificado para acompanhamento. A RCL oficial (LRF, art. 2º) considera os últimos 12 meses e outras deduções, e é publicada no RREO pelo sistema
           contábil.
         </p>
       </Panel>
-      <p className="mt-4 max-w-3xl text-[13px] text-ink-3">
+      <p className="mt-4 max-w-3xl text-[14px] text-ink-3">
         Demonstração: a arrecadação é simulada. Em produção, os valores chegam diariamente do sistema de tributos e dos extratos das transferências (Tesouro Nacional e
         Estado).
       </p>

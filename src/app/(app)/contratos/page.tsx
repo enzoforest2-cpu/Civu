@@ -52,7 +52,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Numero valor={ativos.length} rotulo={`contratos em vigor, somando ${fmtMoeda(ativos.reduce((s, c) => s + c.fin.valorAtual, 0))}`} />
         <Numero valor={fmtMoeda(ativos.reduce((s, c) => s + c.fin.saldo, 0))} rotulo="de saldo a executar nos contratos em vigor" />
         <Numero
@@ -68,7 +68,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
         className="mb-6"
         action={
           alertas.length > 5 ? (
-            <Link href={mostrarTodos ? "/contratos" : "/contratos?alertas=todos"} className="alvo-toque text-[13.5px] font-semibold text-brand-2 hover:underline">
+            <Link href={mostrarTodos ? "/contratos" : "/contratos?alertas=todos"} className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
               {mostrarTodos ? "Mostrar menos" : "Ver todos"}
             </Link>
           ) : undefined
@@ -106,7 +106,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
               key={a.chave}
               href={`/contratos?aba=${a.chave}${q ? `&q=${encodeURIComponent(sp.q ?? "")}` : ""}`}
               aria-current={aba === a.chave ? "page" : undefined}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[14px] font-medium transition-colors ${
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 text-[14px] font-medium transition-colors ${
                 aba === a.chave ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-line-2 hover:text-ink"
               }`}
             >
@@ -128,7 +128,50 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
             <Vazio>{q ? `Nenhum contrato encontrado para "${sp.q}".` : "Nenhum contrato nesta situação."}</Vazio>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Celular: um cartão por contrato */}
+          <ul className="divide-y divide-line md:hidden">
+            {lista.map((c) => (
+              <li key={c.id} className="px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <Link href={`/contratos/${c.id}`} className="alvo-toque tnum font-semibold text-brand-2 hover:underline">
+                    {c.rotulo}
+                  </Link>
+                  <ChipContrato s={c.fin.situacao} />
+                </div>
+                <div className="mt-1 text-[14px] leading-snug text-ink">{c.objeto}</div>
+                <div className="mt-0.5 text-[13px] text-ink-2">
+                  {c.empresa.nomeFantasia ?? c.empresa.razaoSocial} · {NATUREZAS_CONTRATO[c.natureza]?.nome}
+                </div>
+                <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div>
+                    <dt className="text-[12px] text-ink-3">Valor atualizado</dt>
+                    <dd className="tnum text-[14px] font-semibold text-ink">{fmtMoeda(c.fin.valorAtual)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[12px] text-ink-3">Vigência</dt>
+                    <dd className="tnum text-[14px] text-ink">até {fmtData(dataLocal(c.fin.vigenciaFimAtual))}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-[12px] text-ink-3">Execução</dt>
+                    <dd className="mt-1">
+                      <BarraSaldo fin={c.fin} compacta />
+                    </dd>
+                    <dd className="tnum mt-1 text-[12.5px] text-ink-3">
+                      {pct(c.fin.pctExecutado, 0)} executado · saldo{" "}
+                      <span className={c.fin.ativo && c.fin.pctSaldo < 10 ? "font-semibold text-bad" : ""}>{pct(c.fin.pctSaldo, 0)}</span>
+                    </dd>
+                    {c.obra && (
+                      <dd className="mt-1.5">
+                        <ChipObra s={c.obra.situacao} />
+                      </dd>
+                    )}
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="lista">
               <thead>
                 <tr>
@@ -147,7 +190,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
                         {c.rotulo}
                       </Link>
                       <span className="ml-2 text-[12.5px] text-ink-3">{NATUREZAS_CONTRATO[c.natureza]?.nome}</span>
-                      <div className="text-[13.5px] leading-snug text-ink-2">{c.objeto}</div>
+                      <div className="text-[14px] leading-snug text-ink-2">{c.objeto}</div>
                     </td>
                     <td className="min-w-[180px] text-[14px]">{c.empresa.nomeFantasia ?? c.empresa.razaoSocial}</td>
                     <td className="tnum text-right whitespace-nowrap">{fmtMoeda(c.fin.valorAtual)}</td>
@@ -172,6 +215,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Panel>
     </>

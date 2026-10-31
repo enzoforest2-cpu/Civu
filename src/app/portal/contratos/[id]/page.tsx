@@ -36,11 +36,11 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <Link href="/portal/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink-2 hover:text-ink">
+      <Link href="/portal/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-2 hover:text-ink">
         <ArrowLeft size={15} /> Meus contratos
       </Link>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="tnum text-[13.5px] font-semibold text-ink-3">
+        <span className="tnum text-[14px] font-semibold text-ink-3">
           Contrato {c.rotulo} · Prefeitura de {c.municipio.nome}
         </span>
         <ChipContrato s={fin.situacao} />
@@ -105,7 +105,7 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
                         </span>
                       </div>
                       {n.situacao === "GLOSADA" && n.glosaMotivo && (
-                        <p className="mt-2 rounded-lg bg-bad-soft px-3 py-2 text-[13.5px] text-ink">
+                        <p className="mt-2 rounded-lg bg-bad-soft px-3 py-2 text-[14px] text-ink">
                           <strong className="font-semibold">O que corrigir:</strong> {n.glosaMotivo}{" "}
                           {fin.ativo && (
                             <Link href={`/portal/contratos/nota?contrato=${c.id}`} className="font-semibold text-brand-2 hover:underline">
@@ -150,7 +150,7 @@ export default async function MeuContratoPage({ params }: { params: Promise<{ id
             {c.aditivos.length === 0 && c.apostilamentos.length === 0 ? (
               <p className="text-[14px] text-ink-3">Nenhum.</p>
             ) : (
-              <ul className="space-y-3 text-[13.5px]">
+              <ul className="space-y-3 text-[14px]">
                 {c.aditivos.map((x) => (
                   <li key={x.id}>
                     <div className="font-semibold text-ink">{x.numero}º aditivo</div>

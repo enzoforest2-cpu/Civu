@@ -28,7 +28,7 @@ export default async function NovoContratoPage() {
   ]);
   return (
     <>
-      <Link href="/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink-2 hover:text-ink">
+      <Link href="/contratos" className="mb-4 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink-2 hover:text-ink">
         <ArrowLeft size={15} /> Contratos
       </Link>
       <Cabecalho titulo="Novo contrato" sub="Registre o contrato assinado. Vigência, saldo e alertas passam a ser acompanhados a partir daqui." />
