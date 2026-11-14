@@ -49,7 +49,7 @@ export const WORKFLOW_PAGAMENTO_CONTRATO: WorkflowDef = {
       chave: "ARQUIVADO",
       nome: "4. Arquivado",
       setor: "CONTAB",
-      papeis: ["CONTABILIDADE", "TESOURARIA", "ADMIN"],
+      papeis: ["CONTABILIDADE", "TESOURARIA"],
       slaDiasUteis: 0,
       gates: [],
       avancos: [],

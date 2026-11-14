@@ -1,6 +1,7 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, ClipboardCheck, Plus, Search, TrendingDown, Wallet } from "lucide-react";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Panel, Vazio } from "@/components/ui";
 import { alertasContratos, listarContratos } from "@/modulos/contratos/dados";
@@ -18,7 +19,7 @@ const ABAS = [
 const ICONE = { VIGENCIA: AlertTriangle, SALDO: Wallet, ATESTO: ClipboardCheck, OBRA: TrendingDown, ADITIVO: AlertTriangle };
 
 export default async function ContratosPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string; alertas?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/contratos");
   const sp = await searchParams;
   const todos = await listarContratos(u.municipioId);
   const alertas = await alertasContratos(u.municipioId, todos);

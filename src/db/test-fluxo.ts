@@ -27,7 +27,7 @@ async function main() {
     if (!u) throw new Error("usuário não encontrado " + cpf);
     return {
       id: u.id, nome: u.nome, cpf: u.cpf, email: u.email, cargo: u.cargo, papeis: u.papeis as never, setorId: u.setorId,
-      setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
+      setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome, area: u.setor.area } : null,
       municipioId: u.municipioId, municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
     };
   }
@@ -572,6 +572,28 @@ async function main() {
   await esperaErro("tramitar etapa antiga sem ser administrador", () => engine.tramitar(compras, velho.id, compras.setorId!, "tentativa"));
   await engine.tramitar(prefeita, velho.id, compras.setorId!, "Administrador reencaminha a etapa antiga.");
   ok("etapa antiga só é tramitada pelo administrador");
+
+  // ---- o administrador administra, mas não age em processo (Comando da prefeitura, Parte 1)
+  const admin = { ...prefeita, papeis: ["ADMIN"] as never };
+  const pa = await engine.abrirProcesso(requisitante, { tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: assunto("administrador não age"), metadados: dadosCompra });
+  let ca = await carregar(pa.id);
+  if (!engine.podeAgir(requisitante, ca)) falha("o requisitante deveria agir na etapa inicial");
+  if (engine.podeAgir(admin, ca)) falha("ADMIN não pode passar em podeAgir só por ser administrador");
+  if (engine.podeAgir(prefeita, ca)) falha("a prefeita (ordenadora e administradora) não age na etapa do requisitante");
+  const docAdm = await engine.juntarDocumento(requisitante, pa.id, "DFD", "DFD", "Demanda de teste do administrador.");
+  await esperaErro("administrador assina como administrador", () => engine.assinarDocumento(admin, docAdm.id, "ADMIN"));
+  await esperaErro("administrador assina como requisitante", () => engine.assinarDocumento(admin, docAdm.id, "REQUISITANTE"));
+  await esperaErro("administrador avança a etapa do requisitante", () => engine.avancar(admin, pa.id, ca.estado.avancos[0].para), "Você não tem papel para agir nesta etapa.");
+  await esperaErro("administrador registra a contratação", () => engine.registrarContratacao(admin, pa.id, { fornecedor: "Móveis Ltda", cnpj: CNPJ, valor: "9000", fonte: "ORDINARIOS" }));
+  await esperaErro("administrador registra a remessa ao TCE", () => engine.registrarRemessaTce(admin, pa.id, "TCE-123"));
+  // processo enviado a outro setor: o administrador não recebe nem tramita em nome do setor
+  await db.update(processos).set({ setorAtualId: secretario.setorId, recebidoEm: null }).where(eq(processos.id, pa.id));
+  await esperaErro("administrador recebe processo de outro setor", () => engine.receber(admin, pa.id), "O processo não está no seu setor.");
+  await esperaErro("administrador tramita processo de outro setor", () => engine.tramitar(admin, pa.id, admin.setorId!, "puxar"));
+  await engine.receber(secretario, pa.id);
+  ca = await carregar(pa.id);
+  if (!ca.recebidoEm) falha("o setor de destino deveria receber normalmente");
+  ok("ADMIN não age em processo: não avança, não assina, não recebe nem registra contratação ou remessa");
 
   console.log("\nTodos os testes passaram.");
   process.exit(0);

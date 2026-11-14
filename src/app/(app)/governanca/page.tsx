@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { Check, Minus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { db } from "@/db";
 import { setores as tSetores, tiposProcesso, usuarios as tUsuarios } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { CPF_ATENDIMENTO_DIGITAL } from "@/lib/engine";
 import { fmtDataHora } from "@/lib/dates";
 import { PAPEIS, PAPEL_NOME, nomeEtapa, type Papel, type WorkflowDef } from "@/lib/workflow";
@@ -30,8 +29,7 @@ const cpfMascara = (c: string) => (c.length === 11 ? `***.${c.slice(3, 6)}.${c.s
 type SP = { aba?: string; q?: string; fonte?: string; de?: string; ate?: string };
 
 export default async function GovernancaPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const u = await requireUser();
-  if (!pode.verGovernanca(u)) redirect("/painel");
+  const u = await exigirRota("/governanca", pode.verGovernanca);
   const sp = await searchParams;
   const aba: Aba = (ABAS.find((a) => a.chave === sp.aba)?.chave ?? "matriz") as Aba;
 
@@ -105,7 +103,7 @@ async function Matriz({ municipioId }: { municipioId: string }) {
                   </td>
                   {PAPEIS.map((p) => (
                     <td key={p} className="text-center">
-                      <Marca sim={a.papeis === "TODOS" || a.papeis.includes(p) || p === "ADMIN"} />
+                      <Marca sim={a.papeis === "TODOS" || a.papeis.includes(p)} />
                     </td>
                   ))}
                 </tr>
@@ -114,8 +112,8 @@ async function Matriz({ municipioId }: { municipioId: string }) {
           </table>
         </div>
         <p className="px-6 pt-3 pb-5 text-[12.5px] leading-snug text-ink-3">
-          Atenção: nesta versão o papel de administrador passa em todas as checagens do servidor, inclusive nas etapas dos fluxos. O documento de produto pede que o administrador
-          configure acessos sem acessar tudo por padrão; separar essas competências é uma pendência registrada para a próxima versão. Ninguém, nem o administrador, apaga trilhas.
+          O administrador configura cadastros, usuários, fluxos, automações e integrações e vê todas as áreas, mas não age nos processos por ser administrador: avança,
+          assina, empenha e paga só quem tem o papel da etapa. Ninguém, nem o administrador, apaga trilhas.
         </p>
       </Panel>
 

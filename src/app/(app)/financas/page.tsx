@@ -1,16 +1,15 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, Info } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 import { alertas, anoCorrente, caixa, execucao, fmtIso, indices, porFuncao, receita } from "@/modulos/financas/dados";
-import { AbasFinancas, BarraExecucao, Kpi, LegendaExecucao, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas, BarraExecucao, Kpi, LegendaExecucao } from "@/modulos/financas/ui";
 import { MESES_LONGOS, fmtCompacto, fmtPct, nomeGrupoCurto } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinancasPage() {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas");
   const ano = anoCorrente();
   const [ex, rec, cx, idx, funcoes, avisos] = await Promise.all([
     execucao(u.municipioId, ano),
@@ -45,7 +44,7 @@ export default async function FinancasPage() {
           </>
         }
       />
-      <AbasFinancas atual="/financas" />
+      <AbasFinancas atual="/financas" u={u} />
 
       <section className="mb-8">
         <p className="display max-w-4xl text-[22px] leading-snug font-semibold text-ink sm:text-[26px]">

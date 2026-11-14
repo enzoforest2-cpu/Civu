@@ -1,10 +1,10 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 import { anoCorrente, execucao, fmtIso } from "@/modulos/financas/dados";
-import { AbasFinancas, BarraExecucao, Classificacao, LegendaExecucao, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas, BarraExecucao, Classificacao, LegendaExecucao } from "@/modulos/financas/ui";
 import { FONTES_DETALHE, FUNCOES, NATUREZAS_DESPESA, TIPOS_CREDITO, fmtCompacto, fmtPct } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 type SP = { ug?: string; funcao?: string; fonte?: string; q?: string; saldo?: string };
 
 export default async function OrcamentoPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/orcamento");
   const sp = await searchParams;
   const ano = anoCorrente();
   const ex = await execucao(u.municipioId, ano);
@@ -41,7 +40,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
         titulo="Orçamento"
         sub={`Lei Orçamentária Anual de ${ano} por dotação: quanto foi autorizado, quanto já foi comprometido (empenhado), entregue (liquidado) e pago.`}
       />
-      <AbasFinancas atual="/financas/orcamento" />
+      <AbasFinancas atual="/financas/orcamento" u={u} />
 
       <form method="get" className="panel mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
         <div className="relative">

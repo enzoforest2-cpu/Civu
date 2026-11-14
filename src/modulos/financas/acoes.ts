@@ -1,6 +1,7 @@
 "use server";
 // Ações do módulo de finanças. Cada etapa da despesa é uma ação separada, com papel próprio
 // (contabilidade reserva, empenha e liquida; tesouraria paga), e é validada contra os saldos no servidor.
+import { exigirAreaNaAcao } from "@/lib/acesso";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, max } from "drizzle-orm";
@@ -28,6 +29,7 @@ const dataDe = (fd: FormData, k: string, padrao?: string) => {
   return v;
 };
 function exigir(u: SessaoUsuario, ...papeis: Parameters<typeof temPapel>[1][]) {
+  exigirAreaNaAcao(u, ["FAZENDA"], ErroFin);
   if (!temPapel(u, ...papeis)) throw new ErroFin("Seu perfil não pode registrar esta etapa: ela é " + papeisPorExtenso(papeis) + ".");
 }
 function trata(e: unknown): ActionState {
@@ -284,7 +286,7 @@ export async function pagarAction(_: ActionState, fd: FormData): Promise<ActionS
     const l = ex.liquidacoesCalc.find((x) => x.id === str(fd, "liquidacaoId"));
     if (!l) throw new ErroFin("Liquidação não encontrada.");
     const e = ex.empenhos.find((x) => x.id === l.empenhoId)!;
-    if (l.criadoPorId === u.id && !temPapel(u, "ADMIN")) throw new ErroFin("Quem liquidou não pode pagar a mesma despesa (segregação de funções).");
+    if (l.criadoPorId === u.id) throw new ErroFin("Quem liquidou não pode pagar a mesma despesa (segregação de funções).");
     const valor = valorDe(fd);
     if (valor > l.aPagar) throw new ErroFin(`O valor passa do saldo a pagar desta liquidação (${fmtMoeda(l.aPagar)}).`);
     const conta = cx.contas.find((c) => c.id === str(fd, "contaId"));

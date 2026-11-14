@@ -1,10 +1,11 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { FilePlus2, Search } from "lucide-react";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 import { anoCorrente, execucao, fmtIso, hojeIso, processosParaEmpenho } from "@/modulos/financas/dados";
-import { AbasFinancas, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas } from "@/modulos/financas/ui";
 import { GRUPOS_FONTE, TIPOS_EMPENHO, nomeGrupo } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,7 @@ const SITUACOES = [
 ] as const;
 
 export default async function EmpenhosPage({ searchParams }: { searchParams: Promise<{ situacao?: string; q?: string; fonte?: string; todos?: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/empenhos");
   const sp = await searchParams;
   const ano = anoCorrente();
   const [ex, procs] = await Promise.all([execucao(u.municipioId, ano), processosParaEmpenho(u.municipioId, ano)]);
@@ -63,7 +63,7 @@ export default async function EmpenhosPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
       />
-      <AbasFinancas atual="/financas/empenhos" />
+      <AbasFinancas atual="/financas/empenhos" u={u} />
 
       {aguardando.length > 0 && (
         <Panel title="Processos de compra aguardando empenho" className="mb-6" pad={false}>

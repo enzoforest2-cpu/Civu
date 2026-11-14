@@ -1,7 +1,7 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { carregarOrdem, equipes as listarEquipes, podeAtuar } from "@/modulos/servicos/dados";
 import { ordemAction } from "@/modulos/servicos/acoes";
 import { StatusChip, StatusOrdemChip } from "@/modulos/servicos/componentes";
@@ -12,7 +12,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Panel } from "@/components/ui";
 
 export default async function OrdemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nova?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos/ordens");
   const { id } = await params;
   const { nova } = await searchParams;
   const os = await carregarOrdem(u.municipioId, id);

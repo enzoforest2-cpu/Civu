@@ -43,7 +43,7 @@ function cumprivelPeloOrdenador(g: Gate) {
 export function analisarItem(p: ProcessoCompleto, feriados: Set<string>): { acao: AcaoPrincipal | null; bloqueio: string | null } {
   const av = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null)[0];
   if (!av) return { acao: null, bloqueio: "Etapa sem avanço disponível." };
-  if (!p.estado.papeis.includes("ORDENADOR") && !p.estado.papeis.includes("ADMIN")) return { acao: null, bloqueio: "Etapa não é de decisão do ordenador." };
+  if (!p.estado.papeis.includes("ORDENADOR")) return { acao: null, bloqueio: "Etapa não é de decisão do ordenador." };
   const gerar: AcaoPrincipal["gerar"] = [];
   for (const r of avaliarGates(p, feriados)) {
     if (r.ok) continue;

@@ -1,4 +1,5 @@
-import { requireUser, temPapel } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
+import { temPapel } from "@/lib/auth";
 import { catalogo, equipes as listarEquipes, todosSetores } from "@/modulos/servicos/dados";
 import { criarEquipeAction, salvarServicoAction } from "@/modulos/servicos/acoes";
 import { CATEGORIAS } from "@/modulos/servicos/constantes";
@@ -9,7 +10,7 @@ import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 type Setor = { id: string; nome: string };
 
 export default async function CatalogoServicos() {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos/catalogo");
   const [cat, eqs, setores] = await Promise.all([catalogo(u.municipioId, false), listarEquipes(u.municipioId), todosSetores(u.municipioId)]);
   const configura = temPapel(u, "ADMIN", "SECRETARIO");
   const editavel = (setorId: string) => configura && (temPapel(u, "ADMIN") || u.setorId === setorId);
@@ -68,14 +69,14 @@ export default async function CatalogoServicos() {
         </Panel>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel title="Equipes de campo" pad={false}>
           {eqs.length === 0 ? (
             <div className="p-6">
               <Vazio>Nenhuma equipe cadastrada.</Vazio>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Equipes de campo (tabela que rola para o lado)">
               <table className="lista">
                 <thead>
                   <tr>

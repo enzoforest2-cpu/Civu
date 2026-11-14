@@ -1,15 +1,14 @@
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel } from "@/components/ui";
 import { anoCorrente, indices } from "@/modulos/financas/dados";
-import { AbasFinancas, ReguaIndice, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas, ReguaIndice } from "@/modulos/financas/ui";
 import { MESES_LONGOS, fmtPct } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function IndicesPage() {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/indices");
   const ano = anoCorrente();
   const idx = await indices(u.municipioId, ano);
   const mes = MESES_LONGOS[idx.meses - 1];
@@ -20,7 +19,7 @@ export default async function IndicesPage() {
         titulo="Índices legais"
         sub={`Mínimos constitucionais de saúde e educação, FUNDEB e limite de despesa com pessoal: o realizado de janeiro a ${mes} e a projeção para 31/12.`}
       />
-      <AbasFinancas atual="/financas/indices" />
+      <AbasFinancas atual="/financas/indices" u={u} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {idx.lista.map((i) => {

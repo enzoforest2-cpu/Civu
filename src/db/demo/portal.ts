@@ -21,7 +21,7 @@ export const portalDemo: ModuloDemo = {
     if (prot) {
       const u = {
         id: prot.id, nome: prot.nome, cpf: prot.cpf, email: prot.email, cargo: prot.cargo, papeis: prot.papeis as never, setorId: prot.setorId,
-        setor: prot.setor ? { id: prot.setor.id, sigla: prot.setor.sigla, nome: prot.setor.nome } : null,
+        setor: prot.setor ? { id: prot.setor.id, sigla: prot.setor.sigla, nome: prot.setor.nome, area: prot.setor.area } : null,
         municipioId: prot.municipioId, municipio: { id: prot.municipio.id, nome: prot.municipio.nome, uf: prot.municipio.uf, slug: prot.municipio.slug },
       };
       await engine.abrirExigencia(u, p1.id, "Envie a ART ou o alvará da obra e informe a empresa que fornece a caçamba.", 5);

@@ -102,7 +102,7 @@ export function LinhaDoTempo({ eventos, modo }: { eventos: Ev[]; modo: "gestao" 
 
 export function Estrelas({ nota, tamanho = 15 }: { nota: number; tamanho?: number }) {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`Nota ${nota.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} de 5`}>
+    <span className="inline-flex items-center gap-0.5" role="img" aria-label={`Nota ${nota.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} de 5`}>
       {[1, 2, 3, 4, 5].map((n) => (
         <Star key={n} size={tamanho} strokeWidth={2} className={n <= Math.round(nota) ? "fill-warn text-warn" : "text-line-2"} aria-hidden />
       ))}

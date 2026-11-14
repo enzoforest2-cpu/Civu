@@ -1,9 +1,10 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { ArrowLeft, Link2 } from "lucide-react";
 import { db } from "@/db";
 import { processos } from "@/db/schema";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { fmtCnpj } from "@/lib/pagamentos";
 import { NATUREZAS } from "@/lib/workflow";
@@ -11,7 +12,6 @@ import { Cabecalho, Panel, Vazio } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { anoCorrente, execucao } from "@/modulos/financas/dados";
 import { empenhoAction } from "@/modulos/financas/acoes";
-import { SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
 import { ELEMENTO_DO_OBJETO, TIPOS_EMPENHO, nomeGrupo } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,7 @@ export const dynamic = "force-dynamic";
 type Ct = { fornecedor?: string; cnpj?: string; valor?: string; fonte?: string };
 
 export default async function NovoEmpenhoPage({ searchParams }: { searchParams: Promise<{ processo?: string; dotacao?: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/empenhos");
   if (!temPapel(u, "CONTABILIDADE"))
     return (
       <>

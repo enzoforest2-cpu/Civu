@@ -57,7 +57,7 @@ async function contratoDo(municipioId: string, id: string) {
 }
 
 export const podeGerir = (u: SessaoUsuario, c: { gestorId: string | null }) => temPapel(u, "COMPRAS") || u.id === c.gestorId;
-export const ehFiscalDo = (u: SessaoUsuario, c: { fiscalId: string | null }) => temPapel(u, "ADMIN") || u.id === c.fiscalId;
+export const ehFiscalDo = (u: SessaoUsuario, c: { fiscalId: string | null }) => u.id === c.fiscalId;
 export const podeEnviarLiquidacao = (u: SessaoUsuario, c: { fiscalId: string | null; gestorId: string | null }) =>
   ehFiscalDo(u, c) || u.id === c.gestorId || temPapel(u, "CONTABILIDADE");
 

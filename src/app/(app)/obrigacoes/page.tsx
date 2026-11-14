@@ -1,6 +1,5 @@
-/* eslint-disable react-hooks/purity -- prazos dependem da hora atual; renderizado a cada requisição */
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
 import { obrigacoes, type SituacaoObrigacao } from "@/lib/conformidade";
 import { fmtData, relativo } from "@/lib/dates";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
@@ -14,7 +13,7 @@ const SIT: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; 
 const ORDEM: SituacaoObrigacao[] = ["vencida", "vence", "pendente", "cumprida"];
 
 export default async function ObrigacoesPage({ searchParams }: { searchParams: Promise<{ situacao?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/obrigacoes");
   const { situacao } = await searchParams;
   const todas = await obrigacoes(u.municipioId);
   const filtro = ORDEM.includes(situacao as SituacaoObrigacao) ? (situacao as SituacaoObrigacao) : null;

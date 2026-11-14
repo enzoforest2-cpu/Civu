@@ -1,27 +1,8 @@
-// Escopo do produto publicado: o sistema de protocolo e o fluxo da contratação, do pedido ao pagamento.
-// Os módulos da visão completa da Civu (serviços urbanos, tributos, obras públicas, painel do prefeito,
-// receita e índices fiscais, integrações) continuam no código e no ramo `civu-completo`, mas ficam fora
-// do menu e das rotas. Para religar um módulo, tire o prefixo desta lista.
-export const FORA_DO_ESCOPO = [
-  "/servicos",
-  "/campo",
-  "/tributos",
-  "/verificar",
-  "/obras",
-  "/contratos/obras",
-  "/gabinete",
-  "/integracoes",
-  "/financas/receita",
-  "/financas/indices",
-  "/transparencia",
-  "/portal/servicos",
-  "/portal/imoveis",
-  "/portal/guias",
-  "/portal/itbi",
-  "/portal/certidao",
-  "/portal/alvara",
-  "/portal/parcelamento",
-] as const;
+// Módulos desligados do produto publicado. Desde 13/11/2026 (decisão do Enzo: a Civu volta a ser o sistema único
+// do município) a lista está vazia: serviços urbanos, tributos, obras, sala do prefeito, receita e índices,
+// integrações, transparência e o portal do cidadão completo estão religados. O mecanismo continua: um prefixo
+// nesta lista tira o item do menu e dos atalhos do portal, e src/proxy.ts redireciona a rota.
+export const FORA_DO_ESCOPO: readonly string[] = [];
 
 export function foraDoEscopo(caminho: string): boolean {
   return FORA_DO_ESCOPO.some((p) => caminho === p || caminho.startsWith(p + "/") || caminho.startsWith(p + "?"));

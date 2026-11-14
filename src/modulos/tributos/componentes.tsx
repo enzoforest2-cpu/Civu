@@ -83,7 +83,7 @@ export function ChipParcela({ situacao, vencimento }: { situacao: string; vencim
 
 export function TabelaParcelas({ parcelas }: { parcelas: { id: string; numero: number; vencimento: string; valor: number; desconto: number; situacao: string; pagoEm: Date | null; valorPago: number | null }[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Parcelas (tabela que rola para o lado)">
       <table className="lista min-w-[520px]">
         <thead>
           <tr>
@@ -127,11 +127,11 @@ export function QrCodigo({ texto, tamanho = 132, titulo }: { texto: string; tama
 }
 
 /** Barra horizontal de progresso (arrecadado sobre previsto). */
-export function Progresso({ valor, total, tone = "brand" }: { valor: number; total: number; tone?: "brand" | "warn" | "bad" | "ok" }) {
+export function Progresso({ valor, total, tone = "brand", rotulo }: { valor: number; total: number; tone?: "brand" | "warn" | "bad" | "ok"; rotulo?: string }) {
   const pct = total > 0 ? Math.min(100, (valor / total) * 100) : 0;
   const cor = { brand: "bg-brand", warn: "bg-warn", bad: "bg-bad", ok: "bg-ok" }[tone];
   return (
-    <div className="h-2.5 w-full rounded-full bg-sunken" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+    <div className="h-2.5 w-full rounded-full bg-sunken" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={rotulo ?? `${Math.round(pct)}% do previsto`}>
       <div className={`h-2.5 rounded-full ${cor}`} style={{ width: `${Math.max(pct, valor > 0 ? 2 : 0)}%` }} />
     </div>
   );

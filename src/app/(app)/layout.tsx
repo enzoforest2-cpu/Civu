@@ -5,7 +5,8 @@ import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/app/actions";
 import { Navegacao, type GrupoNav } from "@/components/navegacao";
 import { BotaoMenuCelular, GavetaMenuCelular } from "@/components/menu-celular";
-import { GRUPOS, ITENS_GESTAO } from "@/lib/modulos";
+import { GRUPOS, itensDoMenu } from "@/lib/modulos";
+import { paginaInicial } from "@/lib/areas";
 import { Avatar } from "@/components/ui";
 import { Marca, MarcaCompleta } from "@/components/marca";
 import { LinkAjuda } from "@/modulos/gestao/componentes/link-ajuda";
@@ -15,10 +16,12 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await getSessionUser();
   if (!u) redirect("/login");
+  const meus = itensDoMenu(u);
+  const inicio = paginaInicial(u);
   const grupos: GrupoNav[] = GRUPOS.map((g) => ({
     chave: g.chave,
     rotulo: g.rotulo,
-    itens: ITENS_GESTAO.filter((i) => i.grupo === g.chave && (!i.papeis || u.papeis.includes("ADMIN") || i.papeis.some((p) => u.papeis.includes(p)))).map((i) => ({
+    itens: meus.filter((i) => i.grupo === g.chave).map((i) => ({
       href: i.href,
       rotulo: i.rotulo,
       icone: <i.icone size={18} strokeWidth={2} />,
@@ -31,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </a>
       <aside aria-label="Menu lateral" className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-line bg-surface lg:flex">
         <div className="px-5 pt-6 pb-5">
-          <Link href="/painel" className="flex min-h-[44px] items-center gap-2.5">
+          <Link href={inicio} className="flex min-h-[44px] items-center gap-2.5">
             <MarcaCompleta />
           </Link>
           <div className="mt-3 rounded-lg bg-sunken px-3 py-2 text-[13px] leading-tight text-ink-2">
@@ -57,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <div className="min-w-0 flex-1">
         <nav aria-label="Menu do celular" className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1 lg:hidden">
-          <Link href="/painel" className="flex h-[44px] min-w-[44px] items-center gap-2.5" aria-label={`Civu, ${u.municipio.nome}: ir para o painel`}>
+          <Link href={inicio} className="flex h-[44px] min-w-[44px] items-center gap-2.5" aria-label={`Civu, ${u.municipio.nome}: ir para a página inicial`}>
             <Marca size={26} />
             <span className="text-[13px] leading-tight text-ink-2">{u.municipio.nome}</span>
           </Link>

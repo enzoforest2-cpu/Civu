@@ -91,7 +91,7 @@ export default async function OrcamentoAbertoPage({ searchParams }: { searchPara
                 <div key={r} className="panel p-5">
                   <dt className="text-[13px] font-semibold text-ink-3">{r}</dt>
                   <dd className="display tnum mt-1 text-[26px] font-semibold text-ink">{fmtCompacto(v)}</dd>
-                  <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{txt}</p>
+                  <dd className="mt-1 text-[13.5px] leading-snug text-ink-2">{txt}</dd>
                 </div>
               ))}
             </dl>

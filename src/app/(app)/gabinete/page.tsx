@@ -1,8 +1,7 @@
 /* eslint-disable react-hooks/purity -- painel depende da hora atual; renderizado a cada requisição */
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { AlertOctagon, AlertTriangle, ArrowUpRight, CalendarClock, Info, PenLine, Sparkles } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { obrigacoes } from "@/lib/conformidade";
 import { filaDePagamentos, historicoDePagamentos } from "@/lib/pagamentos";
 import { fmtData, fmtMoeda, relativo } from "@/lib/dates";
@@ -15,7 +14,7 @@ import { DecisaoLote, type ItemLote } from "@/modulos/gestao/componentes/decisao
 import { CartaoIndicador } from "@/modulos/gestao/componentes/tendencia";
 import type { Gravidade } from "@/modulos/gestao/avaliador";
 
-export const metadata = { title: "Painel do prefeito · Civu" };
+export const metadata = { title: "Sala do prefeito · Civu" };
 
 const GRAV: Record<Gravidade, { rotulo: string; tom: "bad" | "warn" | "neutral"; Icone: typeof AlertOctagon }> = {
   ALTA: { rotulo: "Gravidade alta", tom: "bad", Icone: AlertOctagon },
@@ -24,8 +23,7 @@ const GRAV: Record<Gravidade, { rotulo: string; tom: "bad" | "warn" | "neutral";
 };
 
 export default async function GabinetePage() {
-  const u = await requireUser();
-  if (!pode.verGabinete(u)) redirect("/painel");
+  const u = await exigirRota("/gabinete", pode.verGabinete);
 
   const [itens, assinaturas, painel, obs, filas, hist, semana] = await Promise.all([
     itensGabinete(u.municipioId),
@@ -95,7 +93,7 @@ export default async function GabinetePage() {
   return (
     <>
       <Cabecalho
-        titulo="Painel do prefeito"
+        titulo="Sala do prefeito"
         sub={`O que precisa da sua decisão, o que está atrasado e como a prefeitura de ${u.municipio.nome} andou na semana.`}
       />
 

@@ -10,7 +10,7 @@ import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Chip, Panel } from "@/components/ui";
 
 export default async function FichaImovel({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/imoveis");
   const { id } = await params;
   const im = await carregarImovel(u.municipioId, id);
   if (!im) notFound();
@@ -80,7 +80,7 @@ export default async function FichaImovel({ params }: { params: Promise<{ id: st
                   <span className="tnum font-semibold text-ink">{fmtMoeda((med ?? 0) * im.areaConstruida)}</span> — contra o valor venal de <span className="tnum">{fmtMoeda(im.valorVenal)}</span>.
                   {comps.length < 5 && <span className="text-warn"> Amostra pequena: confiança baixa.</span>}
                 </p>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Transações comparáveis (tabela que rola para o lado)">
                   <table className="lista min-w-[480px]">
                     <thead>
                       <tr>

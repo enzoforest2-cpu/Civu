@@ -13,7 +13,7 @@ const ABAS = [
 const TOM: Record<string, Tone> = { EM_AVALIACAO: "warn", AVALIADO: "brand", PAGO: "ok", CONTESTADO: "bad", CANCELADO: "neutral" };
 
 export default async function FilaItbi({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/itbi");
   const sp = await searchParams;
   const aba = ABAS.find((a) => a.chave === sp.aba) ?? ABAS[0];
   const todos = await filaItbi(u.municipioId);
@@ -27,8 +27,8 @@ export default async function FilaItbi({ searchParams }: { searchParams: Promise
           const n = todos.filter((i) => a.situacoes.includes(i.situacao)).length;
           const ativo = a.chave === aba.chave;
           return (
-            <Link key={a.chave} href={`?aba=${a.chave}`} className={`rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${ativo ? "border-brand-2 bg-brand-2 text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
-              {a.rotulo} <span className="tnum opacity-80">{n}</span>
+            <Link key={a.chave} href={`?aba=${a.chave}`} className={`alvo-toque rounded-full border px-4 py-1.5 text-[13.5px] font-semibold ${ativo ? "border-brand-2 bg-brand-2 text-white" : "border-line-2 bg-surface text-ink-2 hover:bg-sunken"}`}>
+              {a.rotulo} <span className="tnum">{n}</span>
             </Link>
           );
         })}
@@ -39,7 +39,7 @@ export default async function FilaItbi({ searchParams }: { searchParams: Promise
             <Vazio>{aba.chave === "fila" ? "Nenhuma declaração esperando avaliação." : "Nada por aqui."}</Vazio>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Declarações de ITBI (tabela que rola para o lado)">
             <table className="lista min-w-[820px]">
               <thead>
                 <tr>

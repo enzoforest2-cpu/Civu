@@ -1,7 +1,8 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ExternalLink, HardHat } from "lucide-react";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { fmtCnpj, nomeFonte } from "@/lib/pagamentos";
 import { Chip, Panel, Vazio } from "@/components/ui";
@@ -27,7 +28,7 @@ import { apostilamentoAction, diarioAction, encerrarAction, medicaoAction, notaI
 const dl = (d: string | null | undefined) => (d ? fmtData(dataLocal(d)) : "—");
 
 export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/contratos");
   const { id } = await params;
   const c = await carregarContrato(u.municipioId, id);
   if (!c) notFound();

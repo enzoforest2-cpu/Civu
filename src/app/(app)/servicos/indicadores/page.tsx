@@ -1,5 +1,5 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
 import { indicadores, setoresResponsaveis } from "@/modulos/servicos/dados";
 import { Aba, Barra, Estrelas } from "@/modulos/servicos/componentes";
 import { Cabecalho, Panel, Vazio } from "@/components/ui";
@@ -12,7 +12,7 @@ const fmt1 = (n: number) =>
   });
 
 export default async function IndicadoresServicos({ searchParams }: { searchParams: Promise<{ dias?: string; setor?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos/indicadores");
   const sp = await searchParams;
   const dias = PERIODOS.includes(Number(sp.dias)) ? Number(sp.dias) : 60;
   const setores = await setoresResponsaveis(u.municipioId);
@@ -90,14 +90,14 @@ export default async function IndicadoresServicos({ searchParams }: { searchPara
         />
       </section>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Panel title="Tempo médio de atendimento por serviço" pad={false}>
           {m.porServico.length === 0 ? (
             <div className="p-6">
               <Vazio>Nenhum pedido no período.</Vazio>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tempo médio por serviço (tabela que rola para o lado)">
               <table className="lista">
                 <thead>
                   <tr>
@@ -139,7 +139,7 @@ export default async function IndicadoresServicos({ searchParams }: { searchPara
               <Vazio>Nenhum pedido no período.</Vazio>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Pedidos por bairro (tabela que rola para o lado)">
               <table className="lista">
                 <thead>
                   <tr>

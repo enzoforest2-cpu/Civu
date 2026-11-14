@@ -85,7 +85,7 @@ export const tributosDemo: ModuloDemo = {
     const diasAtras = (n: number) => new Date(hoje.getTime() - n * 86400000);
 
     // ---- setor, servidor de tributação e fluxo do alvará ----
-    const [setor] = await db.insert(s.setores).values({ municipioId: mid, sigla: SIGLA_SETOR_TRIBUTOS, nome: "Departamento de Tributação e Fiscalização", slaPadraoDias: 5 }).returning();
+    const [setor] = await db.insert(s.setores).values({ municipioId: mid, sigla: SIGLA_SETOR_TRIBUTOS, nome: "Departamento de Tributação e Fiscalização", slaPadraoDias: 5, area: "FAZENDA" }).returning();
     const bcrypt = await import("bcryptjs");
     const senhaHash = await bcrypt.hash("123456", 10);
     const [fiscal] = await db

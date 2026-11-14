@@ -85,7 +85,7 @@ export const contratosDemo: ModuloDemo = {
         cargo: u.cargo,
         papeis: u.papeis as Papel[],
         setorId: u.setorId,
-        setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
+        setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome, area: u.setor.area } : null,
         municipioId: u.municipioId,
         municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
       };

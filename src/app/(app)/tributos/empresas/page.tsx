@@ -17,7 +17,7 @@ const FILTROS = [
 ];
 
 export default async function Empresas({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/empresas");
   const sp = await searchParams;
   const [inscricoes, pedidos] = await Promise.all([listarInscricoes(u.municipioId), pedidosAlvara(u.municipioId)]);
   const abertos = pedidos.filter((p) => !p.encerradoEm);
@@ -121,7 +121,7 @@ export default async function Empresas({ searchParams }: { searchParams: Promise
             <Vazio>Nenhuma inscrição neste filtro.</Vazio>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Inscrições municipais (tabela que rola para o lado)">
             <table className="lista min-w-[860px]">
               <thead>
                 <tr>

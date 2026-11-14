@@ -15,7 +15,7 @@ const CONF: Record<string, { rotulo: string; tone: Tone }> = {
 const reais = (v: number | null) => (v === null ? "—" : `R$\u00a0${Math.round(v).toLocaleString("pt-BR")}`);
 
 export default async function Observatorio({ searchParams }: { searchParams: Promise<{ uso?: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/observatorio");
   const sp = await searchParams;
   const uso = sp.uso === "COMERCIAL" ? "COMERCIAL" : "RESIDENCIAL";
   const { linhas, evolucao, total } = await observatorio(u.municipioId, uso);
@@ -112,7 +112,7 @@ export default async function Observatorio({ searchParams }: { searchParams: Pro
         {comDados.length === 0 ? (
           <p className="text-[14px] text-ink-3">Nenhuma transação quitada deste uso nos últimos 24 meses.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Gráfico por bairro (gráfico que rola para o lado)">
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[560px]" role="img" aria-label="Mediana do m² de transação e m² da planta por bairro">
               {ticks.map((t) => (
                 <g key={t}>
@@ -156,7 +156,7 @@ export default async function Observatorio({ searchParams }: { searchParams: Pro
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
         <Panel title="Tabela por bairro" pad={false}>
-          <div className="overflow-x-auto px-2 pb-3">
+          <div className="overflow-x-auto px-2 pb-3" tabIndex={0} role="region" aria-label="Tabela por bairro (tabela que rola para o lado)">
             <table className="lista min-w-[640px]">
               <thead>
                 <tr>

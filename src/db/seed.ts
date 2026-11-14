@@ -6,12 +6,16 @@ import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 import { WORKFLOWS_PADRAO } from "../lib/workflow";
+import { areaPadraoDaSigla } from "../lib/areas";
 import type { CompraDemo } from "./demo/compras";
 import { COMPRAS_CONFORMIDADE, cnpj } from "./valor";
 import type { DemoCtx } from "./demo/contexto";
 import { feriadosDemo } from "./demo/feriados";
 
 export const SLUG_DEMO = "vale-das-araucarias";
+
+/** Órgão orçamentário da LOA de demonstração (src/modulos/financas/demo.ts, UNIDADES) ligado a cada secretaria. */
+export const ORGAO_DA_SIGLA: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "03", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 function canon(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);
@@ -59,12 +63,19 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     ["SESAU", "Secretaria de Saúde", 5],
     ["SEDUC", "Secretaria de Educação", 5],
     ["SEINFRA", "Secretaria de Infraestrutura", 5],
+    ["SEMAS", "Secretaria de Assistência Social", 5],
+    ["SEFAZ", "Secretaria da Fazenda", 5],
   ] as const;
   const setores: Record<string, string> = {};
-  for (const [sigla, nome, sla] of setoresDef) {
-    const [s] = await db.insert(schema.setores).values({ municipioId: mun.id, sigla, nome, slaPadraoDias: sla }).returning();
-    setores[sigla] = s.id;
-  }
+  const linhasSetores = setoresDef.map(([sigla, nome, sla]) => ({
+    municipioId: mun.id,
+    sigla,
+    nome,
+    slaPadraoDias: sla,
+    area: areaPadraoDaSigla(sigla),
+    orgaoOrcamentario: ORGAO_DA_SIGLA[sigla] ?? null,
+  }));
+  for (const s of await db.insert(schema.setores).values(linhasSetores).returning()) setores[s.sigla] = s.id;
 
   const senha = await bcrypt.hash("123456", 10);
   const usuariosDef: [string, string, string, string, string[], string][] = [
@@ -79,17 +90,16 @@ export async function seedBase(db: NodePgDatabase<typeof schema>): Promise<DemoC
     ["99999999999", "Fernanda Requisitante", "ubs@valedasaraucarias.rs.gov.br", "Coordenadora de UBS", ["REQUISITANTE"], "SESAU"],
     ["10101010101", "Paulo Educação", "educacao@valedasaraucarias.rs.gov.br", "Secretário de Educação", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SEDUC"],
     ["12121212121", "Sandra Administração", "admin@valedasaraucarias.rs.gov.br", "Secretária de Administração", ["SECRETARIO", "REQUISITANTE", "ORDENADOR", "FISCAL"], "SEMAD"],
+    ["17171717171", "Helena Assistência", "assistenciasocial@valedasaraucarias.rs.gov.br", "Secretária de Assistência Social", ["SECRETARIO", "REQUISITANTE", "FISCAL"], "SEMAS"],
+    ["18181818181", "Tiago Cras", "cras@valedasaraucarias.rs.gov.br", "Coordenador do CRAS", ["REQUISITANTE"], "SEMAS"],
+    ["19191919191", "Otávio Fazenda", "fazenda@valedasaraucarias.rs.gov.br", "Secretário da Fazenda", ["SECRETARIO", "REQUISITANTE"], "SEFAZ"],
+    ["20202020202", "Bianca Fazenda", "assessoria.fazenda@valedasaraucarias.rs.gov.br", "Assessora da Fazenda", ["REQUISITANTE"], "SEFAZ"],
   ];
   // usuário de sistema que registra o que chega pelo portal e pelo WhatsApp (não faz login)
   usuariosDef.push(["00000000000", "Atendimento digital", "atendimento@valedasaraucarias.rs.gov.br", "Canal digital", ["PROTOCOLO"], "PROT"]);
   const usuarios: Record<string, string> = {};
-  for (const [cpf, nome, email, cargo, papeis, setor] of usuariosDef) {
-    const [u] = await db
-      .insert(schema.usuarios)
-      .values({ municipioId: mun.id, cpf, nome, email, cargo, papeis, senhaHash: senha, setorId: setores[setor], ativo: cpf !== "00000000000" })
-      .returning();
-    usuarios[cpf] = u.id;
-  }
+  const linhasUsuarios = usuariosDef.map(([cpf, nome, email, cargo, papeis, setor]) => ({ municipioId: mun.id, cpf, nome, email, cargo, papeis, senhaHash: senha, setorId: setores[setor], ativo: cpf !== "00000000000" }));
+  for (const u of await db.insert(schema.usuarios).values(linhasUsuarios).returning()) usuarios[u.cpf] = u.id;
 
   const tipos: Record<string, string> = {};
   for (const w of WORKFLOWS_PADRAO) {

@@ -1,8 +1,8 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { contratoNotas } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
 import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 import { situacaoDasNotas } from "@/modulos/contratos/dados";
@@ -11,7 +11,7 @@ import { numeroContrato, rotuloMes } from "@/modulos/contratos/regras";
 import { AcoesNota } from "@/modulos/contratos/acoes-nota";
 
 export default async function AtestosPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/contratos/atestos");
   const { ver } = await searchParams;
   const notas = (
     await db.query.contratoNotas.findMany({

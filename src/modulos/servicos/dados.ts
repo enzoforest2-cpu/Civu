@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { feriados, setores, servicosCatalogo, servicosEquipes, servicosEventos, servicosOcorrencias, servicosOrdens, type MaterialUsado } from "@/db/schema";
 import { temPapel, type SessaoUsuario } from "@/lib/auth";
+import { veTudo } from "@/lib/areas";
 import { exigirEscopo, type SessaoPortal } from "@/lib/portal";
 import { addDiasUteis } from "@/lib/dates";
 import { EM_ABERTO, fmtDia, hojeIso, type StatusOcorrencia } from "./constantes";
@@ -21,9 +22,9 @@ export async function feriadosDe(municipioId: string): Promise<Set<string>> {
   return new Set(rows.map((r) => String(r.data)));
 }
 
-/** Quem pode agir sobre uma ocorrência/OS: servidor do setor responsável ou administrador. */
+/** Quem pode agir sobre uma ocorrência/OS: servidor do setor responsável (o administrador vê, mas não age). */
 export function podeAtuar(u: SessaoUsuario, setorId: string) {
-  return temPapel(u, "ADMIN") || u.setorId === setorId;
+  return u.setorId === setorId;
 }
 
 function exigeSetor(u: SessaoUsuario, setorId: string) {
@@ -685,7 +686,7 @@ export async function ordensDeCampo(u: SessaoUsuario, equipeId?: string) {
   let visiveis = minhas;
   if (!visiveis.length)
     visiveis = await db.query.servicosEquipes.findMany({
-      where: temPapel(u, "ADMIN")
+      where: veTudo(u)
         ? eq(servicosEquipes.municipioId, u.municipioId)
         : and(eq(servicosEquipes.municipioId, u.municipioId), eq(servicosEquipes.setorId, u.setorId ?? "")),
     });

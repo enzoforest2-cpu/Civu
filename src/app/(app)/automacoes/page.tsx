@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { ArrowRight, FileSignature, History, Play } from "lucide-react";
 import { db } from "@/db";
 import { setores as tSetores } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { fmtDataHora } from "@/lib/dates";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
@@ -19,8 +18,7 @@ export const metadata = { title: "Automações · Civu" };
 const TOM_GRAV: Record<Gravidade, "bad" | "warn" | "neutral"> = { ALTA: "bad", MEDIA: "warn", BAIXA: "neutral" };
 
 export default async function AutomacoesPage() {
-  const u = await requireUser();
-  if (!pode.verAutomacoes(u)) redirect("/painel");
+  const u = await exigirRota("/automacoes", pode.verAutomacoes);
   const [regras, execucoes, alertas, setores] = await Promise.all([
     listarRegras(u.municipioId),
     listarExecucoes(u.municipioId),

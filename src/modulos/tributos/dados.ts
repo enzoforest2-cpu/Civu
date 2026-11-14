@@ -1,6 +1,5 @@
 import "server-only";
 // Consultas e regras com banco do módulo de tributos. Toda checagem de acesso do portal é feita aqui, no servidor.
-import { redirect } from "next/navigation";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -23,7 +22,9 @@ import {
   tribPrevisoes,
   tribProprietarios,
 } from "@/db/schema";
-import { requireUser, type SessaoUsuario } from "@/lib/auth";
+import { requireUser, temPapel, type SessaoUsuario } from "@/lib/auth";
+import { exigirAreaNaAcao, exigirRota } from "@/lib/acesso";
+import { podeVerArea } from "@/lib/areas";
 import { ErroAcesso, exigirEscopo, type SessaoPortal } from "@/lib/portal";
 import { atualizar, avaliarItbi, diaISO, mediana, r2, type Pendencia, tipoCertidao } from "./regras";
 import { CHAVE_FLUXO_ALVARA } from "./fluxo";
@@ -31,16 +32,21 @@ import { CHAVE_FLUXO_ALVARA } from "./fluxo";
 // ---------------------------------------------------------------------------
 // Acesso
 // ---------------------------------------------------------------------------
-const PAPEIS_TRIBUTOS = ["ADMIN", "TESOURARIA", "CONTABILIDADE", "ORDENADOR"];
-
+/** Telas de tributos: área da Fazenda (e quem vê a prefeitura inteira). Regra em src/lib/areas.ts. */
 export function podeTributos(u: SessaoUsuario) {
-  return u.papeis.some((p) => PAPEIS_TRIBUTOS.includes(p));
+  return podeVerArea(u, "FAZENDA");
 }
 
-/** Gestão: exige servidor com papel de fazenda (tesouraria, contabilidade, ordenador) ou administrador. */
-export async function requireTributos() {
+/** Gestão: exige acesso à área da Fazenda; sem acesso, abre "Sem acesso a esta área". */
+export async function requireTributos(caminho = "/tributos") {
+  return exigirRota(caminho);
+}
+
+/** Server actions da tributação (avaliar ITBI, emitir alvará): Fazenda com papel de tesouraria/tributação. */
+export async function requireTributosAgir() {
   const u = await requireUser();
-  if (!podeTributos(u)) redirect("/painel");
+  exigirAreaNaAcao(u, ["FAZENDA"], ErroAcesso);
+  if (!temPapel(u, "TESOURARIA")) throw new ErroAcesso("Só a tributação (papel de tesouraria) registra esta decisão.");
   return u;
 }
 

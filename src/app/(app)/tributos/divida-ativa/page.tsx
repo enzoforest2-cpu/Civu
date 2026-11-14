@@ -14,7 +14,7 @@ const SIT: Record<string, { rotulo: string; tone: Tone }> = {
 };
 
 export default async function DividaAtiva({ searchParams }: { searchParams: Promise<{ situacao?: string; tributo?: string; devedor?: string; n?: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/divida-ativa");
   const sp = await searchParams;
   const todas = await listarDividaAtiva(u.municipioId, {});
   const lista = todas.filter((d) => (!sp.situacao || d.situacao === sp.situacao) && (!sp.tributo || d.lancamento.tributo === sp.tributo));
@@ -69,7 +69,7 @@ export default async function DividaAtiva({ searchParams }: { searchParams: Prom
                 <Vazio>Nenhuma inscrição neste filtro.</Vazio>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Inscrições em dívida ativa (tabela que rola para o lado)">
                 <table className="lista min-w-[760px]">
                   <thead>
                     <tr>

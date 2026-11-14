@@ -1,6 +1,6 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { ClipboardPlus } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { bairrosComOcorrencias, catalogo, contagemPorSetor, fila, setoresResponsaveis, SITUACOES_FILA } from "@/modulos/servicos/dados";
 import { Aba, SlaChip, StatusChip } from "@/modulos/servicos/componentes";
 import { CANAIS } from "@/modulos/servicos/constantes";
@@ -16,7 +16,7 @@ type SP = {
 };
 
 export default async function FilaOcorrencias({ searchParams }: { searchParams: Promise<SP> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos");
   const sp = await searchParams;
   const setores = await setoresResponsaveis(u.municipioId);
   const meu = setores.find((s) => s.id === u.setorId);
@@ -155,13 +155,9 @@ export default async function FilaOcorrencias({ searchParams }: { searchParams: 
                       <tr key={o.id} className="linha">
                         <td>
                           {sel && (
-                            <input
-                              type="checkbox"
-                              name="ids"
-                              value={o.id}
-                              aria-label={`Selecionar ${o.protocolo}`}
-                              className="h-4 w-4 accent-[var(--color-brand)]"
-                            />
+                            <label className="-m-3.5 inline-flex cursor-pointer p-3.5">
+                              <input type="checkbox" name="ids" value={o.id} aria-label={`Selecionar ${o.protocolo}`} className="h-4 w-4 accent-[var(--color-brand)]" />
+                            </label>
                           )}
                         </td>
                         <td className="min-w-[200px]">

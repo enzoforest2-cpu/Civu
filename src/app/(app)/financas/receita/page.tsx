@@ -1,15 +1,14 @@
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel } from "@/components/ui";
 import { anoCorrente, fmtIso, receita } from "@/modulos/financas/dados";
-import { AbasFinancas, GraficoMensal, Kpi, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas, GraficoMensal, Kpi } from "@/modulos/financas/ui";
 import { MESES, MESES_LONGOS, fmtCompacto, fmtPct } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReceitaPage({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/receita");
   const sp = await searchParams;
   const ano = anoCorrente();
   const rec = await receita(u.municipioId, ano);
@@ -26,7 +25,7 @@ export default async function ReceitaPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <Cabecalho titulo="Receita" sub={`Previsão da LOA, desdobrada mês a mês, comparada com o que foi arrecadado até ${fmtIso(rec.hoje)}.`} />
-      <AbasFinancas atual="/financas/receita" />
+      <AbasFinancas atual="/financas/receita" u={u} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi rotulo={`Previsto no ano`} valor={fmtCompacto(t.previstoAno)} sub="receita bruta da LOA" />

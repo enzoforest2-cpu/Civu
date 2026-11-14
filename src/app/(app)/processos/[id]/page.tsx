@@ -48,7 +48,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const meta = (p.metadados ?? {}) as Record<string, unknown>;
   const camposMeta = p.def.camposAbertura ?? [];
   const noMeuSetor = p.setorAtualId === u.setorId;
-  const podeTramitarLivre = !p.encerradoEm && (p.estado.setor === "LIVRE" || u.papeis.includes("ADMIN") || u.papeis.includes("PROTOCOLO"));
+  const podeTramitarLivre = !p.encerradoEm && (p.estado.setor === "LIVRE" || u.papeis.includes("PROTOCOLO"));
   // Trilho: só as etapas que valem para a modalidade do processo; o ramo escolhido conta como caminho normal
   const caminho = caminhoDoProcesso(p.def, meta);
   const ordemCaminho = caminho.map((e) => e.chave);
@@ -75,13 +75,13 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const idxContratacao = Math.min(...ETAPAS_CONTRATACAO.map((e) => ordemCaminho.indexOf(e)).filter((i) => i >= 0));
   const chegouContratacao = tipoCompra && Number.isFinite(idxContratacao) && (ordemCaminho.indexOf(p.estadoAtual) >= idxContratacao || !!p.encerradoEm);
   // Os dados se registram na instrução e na autorização da contratação direta e na etapa do contrato (o motor recusa fora delas)
-  const podeContratacao = !p.encerradoEm && ETAPAS_CONTRATACAO.includes(p.estadoAtual) && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE", "ADMIN"].includes(x));
+  const podeContratacao = !p.encerradoEm && ETAPAS_CONTRATACAO.includes(p.estadoAtual) && u.papeis.some((x) => ["COMPRAS", "CONTABILIDADE"].includes(x));
   // Depois do contrato, até a fila de pagamento, fonte e valor se corrigem com motivo por quem age na etapa
   // Onde o formulário completo de contratação aparece, ele já cobre fonte e valor.
   const podeCorrigir = !p.encerradoEm && pode && !podeContratacao && ETAPAS_CORRECAO_CONTRATACAO.includes(p.estadoAtual) && !!contratacao?.fornecedor && !!contratacao?.cnpj;
   // Falta algum dado (ex.: a sessão preencheu o vencedor, mas não a fonte de recurso): o formulário já abre
   const contratacaoIncompleta = !regraContratacao(contratacao, FONTES).ok;
-  const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO", "ADMIN"].includes(x));
+  const podeRemessa = u.papeis.some((x) => ["COMPRAS", "CONTROLE_INTERNO"].includes(x));
   const exigencia = meta.exigencia as Exigencia | undefined;
   const papeisAssina = u.papeis.filter((x) => x !== "ADMIN");
   // Cada pendência leva ao formulário que a resolve (C1). Sem o formulário na página, não há link.
@@ -183,7 +183,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
           {/* O que fazer agora */}
           {!p.encerradoEm && (
             <section className="panel overflow-hidden">
-              {!p.recebidoEm && (noMeuSetor || u.papeis.includes("ADMIN")) && (
+              {!p.recebidoEm && noMeuSetor && (
                 <ActionForm action={receberAction}>
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warn/25 bg-warn-soft px-6 py-4">
                     <div className="text-[14.5px] text-ink">

@@ -8,7 +8,14 @@ Produção: https://tramite-mocha.vercel.app (projeto Vercel `tramite`, região 
 
 ## Escopo publicado
 
-O produto é o **sistema de protocolo e o fluxo da contratação**, do pedido da secretaria ao pagamento da empresa. Os módulos da visão ampla da Civu (serviços urbanos, tributos, obras públicas, painel do prefeito, receita e índices fiscais, integrações, portal do cidadão) estão no código e no ramo `civu-completo`, mas desligados: a lista `FORA_DO_ESCOPO` em `src/lib/escopo.ts` tira esses itens do menu e `src/proxy.ts` redireciona as rotas. Não religue nada sem o Enzo pedir.
+Desde 13/11/2026 a Civu volta a ser o **sistema único do município** (especificação em `docs/especificacoes/comando-da-prefeitura.md`): protocolo e contratação, finanças, contratos, tributos, serviços urbanos, obras, sala do prefeito, integrações, transparência e portal do cidadão completo estão ligados. A lista `FORA_DO_ESCOPO` em `src/lib/escopo.ts` está vazia, mas o mecanismo continua (um prefixo nela tira o item do menu e `src/proxy.ts` redireciona a rota).
+
+### Áreas e acesso por perfil
+
+- Cada setor pertence a uma **área** (coluna `area` em `setores`; `orgao_orcamentario` liga a secretaria ao órgão da LOA). As áreas e as regras ficam em `src/lib/areas.ts`; o administrador muda o vínculo em /configuracoes.
+- `podeVerArea(usuario, area)` e `podeVerRota(usuario, caminho)` decidem o menu (`itensDoMenu` em `src/lib/modulos.ts`) e as páginas (`exigirRota` em `src/lib/acesso.ts`); server actions usam `exigirAreaNaAcao`. Tela bloqueada abre "Sem acesso a esta área" (/sem-acesso), nunca volta ao painel em silêncio. Tela nova de área: acrescente a regra em `ROTAS_DE_AREA` e chame `exigirRota` na página.
+- Gabinete, Controle Interno e o papel ADMIN veem todas as áreas. **Ver não é agir:** o ADMIN administra (cadastros, usuários, fluxos, automações, integrações) mas não passa em `podeAgir`, `temPapel` nem nas checagens de ação em processo; a única exceção é reencaminhar processo parado numa etapa que saiu do fluxo. Para checagem de administração, liste `"ADMIN"` explicitamente.
+- Página inicial: gabinete → `/gabinete` (Sala do prefeito); secretário(a) → `/secretaria` (Minha secretaria); demais → `/painel`.
 
 ## Divisão de trabalho
 
@@ -26,7 +33,8 @@ A interface (telas, layout, visual) está sendo feita em outra conversa. Antes d
 src/lib/            núcleo: workflow.ts (fluxos e papéis), engine.ts (motor de processos),
                     auth.ts (sessão de servidor), portal.ts (sessão de cidadão/empresa e representação),
                     conformidade.ts (limite de dispensa, fracionamento, prazos PNCP/TCE),
-                    pagamentos.ts (fila cronológica), modulos.ts (registro de menus e atalhos)
+                    pagamentos.ts (fila cronológica), modulos.ts (registro de menus e atalhos),
+                    areas.ts (áreas e quem vê o quê), acesso.ts (guarda das páginas por área)
 src/app/(app)/      telas da gestão (exigem login de servidor)
 src/app/portal/     Civu Cidadão / Civu Empresas (exigem login no portal)
 src/app/<rota>      páginas públicas: /consulta, /fila-de-pagamentos, /obras, /transparencia, /verificar, /entrar, /login
@@ -72,7 +80,7 @@ npx tsc --noEmit -p .  # tipos
 npx next build         # precisa passar antes de enviar
 ```
 
-Acessos de demonstração (senha `123456`): servidores em `/login`, por exemplo 11111111111 (prefeita), 22222222222 (protocolo), 33333333333 (compras), 44444444444 (contabilidade), 77777777777 (tesouraria), 99999999999 (requisitante), 40404040404 (equipe de campo). Cidadãos e empresas em `/entrar`: Ana (cidadã), Carlos (Mendes Materiais), Juliana (contadora), Roberto (Hidrobombas), Marta (Cariri Médica).
+Acessos de demonstração (senha `123456`): servidores em `/login`, por exemplo 11111111111 (prefeita), 22222222222 (protocolo), 33333333333 (compras), 44444444444 (contabilidade), 77777777777 (tesouraria), 99999999999 (requisitante), 40404040404 (equipe de campo). Secretários(as): 88888888888 (Saúde), 10101010101 (Educação), 12121212121 (Administração), 16161616161 (Infraestrutura), 17171717171 (Assistência Social, SEMAS), 19191919191 (Fazenda, SEFAZ). Servidores das secretarias novas: 18181818181 (CRAS, SEMAS) e 20202020202 (assessoria da Fazenda, SEFAZ). Cidadãos e empresas em `/entrar`: Ana (cidadã), Carlos (Mendes Materiais), Juliana (contadora), Roberto (Hidrobombas), Marta (Cariri Médica).
 
 ## Padrões de texto e interface
 
@@ -86,9 +94,9 @@ Uma análise completa (o que existe, o que falta, mercado, preço) foi publicada
 
 1. Painel do prefeito (`/gabinete`) recebendo indicadores de finanças, tributos, obras, serviços e contratos, mais economia com memória de cálculo.
 2. Anexos de verdade (PDF e foto): hoje documentos são só texto.
-3. Permissões por atribuição: o papel ADMIN passa por todas as checagens (`temPapel`, `podeAgir`), inclusive segregação liquidar/pagar; qualquer servidor abre qualquer processo.
+3. Permissões por atribuição: desde 13/11/2026 o ADMIN não age em processo e cada pessoa vê a sua área (ver "Áreas e acesso por perfil"); ainda falta o recorte dos dados pela pasta (qualquer servidor abre qualquer processo).
 4. Notificação ao cidadão e retorno de integrações (banco, PNCP) dentro do fluxo; "enviado ao banco" diferente de "pago".
 5. Página pública sem login (hoje `/` redireciona para `/login`).
 6. Para editais: PNCP real, LicitaCon (e-Validador), gov.br e ICP-Brasil reais, ouvidoria e e-SIC, API REST, 2FA, backup, exportação completa, banco próprio fora do Spherum.
 
-Decisões ainda abertas com o Enzo: substituir ou integrar o ERP da prefeitura; preço; primeiro estado (RS ou MA); papel de tributação; ADMIN sem acesso total.
+Decisões ainda abertas com o Enzo: substituir ou integrar o ERP da prefeitura; preço; primeiro estado (RS ou MA); papel de tributação.

@@ -8,6 +8,7 @@ import { gestaoAlertas, gestaoRegras, setores, usuarios } from "@/db/schema";
 import { requireUser, type SessaoUsuario } from "@/lib/auth";
 import { ErroFluxo, juntarDocumento } from "@/lib/engine";
 import { PAPEIS, type Papel } from "@/lib/workflow";
+import { ehArea, nomeDaArea } from "@/lib/areas";
 import type { ActionState } from "@/app/actions";
 import { pode } from "./permissoes";
 import { decidirEmLote, type ResultadoLote } from "./gabinete";
@@ -320,6 +321,37 @@ export async function atualizarAcessoAction(_: ActionState, fd: FormData): Promi
       });
     revalidatePath("/governanca");
     return { ok: `Acesso de ${alvo.nome} atualizado.` };
+  } catch (e) {
+    return trata(e);
+  }
+}
+
+/** Área temática do setor (decide o que as pessoas dele veem) e órgão orçamentário ligado: só o administrador. */
+export async function configurarSetorAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requireUser();
+    exigir(pode.configurarSetores(u), "Só o administrador do sistema define a área dos setores.");
+    const setor = await db.query.setores.findFirst({ where: and(eq(setores.id, str(fd, "setorId")), eq(setores.municipioId, u.municipioId)) });
+    if (!setor) throw new ErroFluxo("Setor não encontrado.");
+    const areaTxt = str(fd, "area");
+    if (areaTxt && !ehArea(areaTxt)) throw new ErroFluxo("Escolha uma das áreas da lista.");
+    const area = areaTxt || null;
+    const orgao = str(fd, "orgaoOrcamentario") || null;
+    if (orgao && !/^\d{1,4}$/.test(orgao)) throw new ErroFluxo("O órgão orçamentário é o código numérico da LOA (ex.: 06).");
+    if (area === setor.area && orgao === setor.orgaoOrcamentario) return { ok: "Nada mudou." };
+    await db.update(setores).set({ area, orgaoOrcamentario: orgao }).where(eq(setores.id, setor.id));
+    await registrarAuditoria({
+      municipioId: u.municipioId,
+      autorId: u.id,
+      acao: "SETOR_AREA",
+      objetoTipo: "SETOR",
+      objetoId: setor.id,
+      objetoRotulo: setor.nome,
+      antes: { área: nomeDaArea(setor.area), órgão: setor.orgaoOrcamentario ?? "—" },
+      depois: { área: nomeDaArea(area), órgão: orgao ?? "—" },
+    });
+    revalidatePath("/configuracoes");
+    return { ok: `${setor.nome}: área ${nomeDaArea(area)}${orgao ? `, órgão orçamentário ${orgao}` : ""}.` };
   } catch (e) {
     return trata(e);
   }

@@ -6,6 +6,7 @@ import { login, logout, requireUser, confirmarSenha } from "@/lib/auth";
 import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarDocumento, assinarDocumento, despachar, registrarContratacao, registrarRemessaTce, abrirExigencia } from "@/lib/engine";
 import { analisarFracionamento, type AnaliseFracionamento } from "@/lib/conformidade";
 import type { Papel } from "@/lib/workflow";
+import { paginaInicial } from "@/lib/areas";
 
 export type ActionState = { erro?: string; ok?: string } | null;
 
@@ -21,7 +22,7 @@ const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 export async function loginAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await login(str(fd, "cpf"), str(fd, "senha"));
   if (!u) return { erro: "CPF ou senha inválidos." };
-  redirect("/painel");
+  redirect(paginaInicial(u));
 }
 
 export async function logoutAction() {

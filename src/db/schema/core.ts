@@ -48,6 +48,10 @@ export const setores = tramite.table(
     sigla: text("sigla").notNull(),
     nome: text("nome").notNull(),
     slaPadraoDias: integer("sla_padrao_dias").notNull().default(5),
+    /** área temática (src/lib/areas.ts): define o que as pessoas do setor veem; null = só as telas comuns */
+    area: text("area"),
+    /** código do órgão orçamentário da LOA (fin_dotacoes.orgao, ex.: "06") ligado ao setor; null = sem pasta própria */
+    orgaoOrcamentario: text("orgao_orcamentario"),
   },
   (t) => [uniqueIndex("setor_municipio_sigla").on(t.municipioId, t.sigla)],
 );

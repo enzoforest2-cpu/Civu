@@ -19,7 +19,8 @@ export type SessaoUsuario = {
   cargo: string | null;
   papeis: Papel[];
   setorId: string | null;
-  setor: { id: string; sigla: string; nome: string } | null;
+  /** `area`: área temática do setor (src/lib/areas.ts), que decide o que a pessoa vê */
+  setor: { id: string; sigla: string; nome: string; area: string | null } | null;
   municipioId: string;
   municipio: { id: string; nome: string; uf: string; slug: string };
 };
@@ -60,7 +61,7 @@ export const getSessionUser = cache(async (): Promise<SessaoUsuario | null> => {
     cargo: u.cargo,
     papeis: u.papeis as Papel[],
     setorId: u.setorId,
-    setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
+    setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome, area: u.setor.area } : null,
     municipioId: u.municipioId,
     municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
   };
@@ -72,10 +73,17 @@ export async function requireUser(): Promise<SessaoUsuario> {
   return u;
 }
 
-export function temPapel(u: SessaoUsuario, ...papeis: Papel[]): boolean {
-  if (u.papeis.includes("ADMIN")) return true;
+/**
+ * A pessoa tem um destes papéis? O administrador NÃO passa aqui por ser administrador: ele administra
+ * (configurações, usuários, fluxos), mas só age em processo pelos papéis que tiver. Para checagens de
+ * administração, liste "ADMIN" explicitamente ou use `ehAdministrador`.
+ */
+export function temPapel(u: { papeis: readonly string[] }, ...papeis: Papel[]): boolean {
   return papeis.some((p) => u.papeis.includes(p));
 }
+
+/** Administrador do sistema: configura cadastros, usuários, fluxos, automações e integrações. */
+export const ehAdministrador = (u: { papeis: readonly string[] }) => u.papeis.includes("ADMIN");
 
 /** Reautenticação por senha (usada ao assinar). */
 export async function confirmarSenha(usuarioId: string, senha: string): Promise<boolean> {

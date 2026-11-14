@@ -312,9 +312,12 @@ export function avaliarGates(p: ProcessoCompleto, feriados: Set<string>, hoje: s
   });
 }
 
-/** O usuário pode agir no estado atual? (papel compatível e, se o estado é de um setor, estar nele) */
+/**
+ * O usuário pode agir no estado atual? (papel compatível e, se o estado é de um setor, estar nele)
+ * Ser administrador não basta: o ADMIN administra o sistema, mas age em processo só pelos papéis que tiver.
+ * A exceção é a etapa que saiu do fluxo (estadoDeReserva), que só o administrador reencaminha.
+ */
 export function podeAgir(u: SessaoUsuario, p: ProcessoCompleto): boolean {
-  if (temPapel(u, "ADMIN")) return true;
   if (!temPapel(u, ...p.estado.papeis)) return false;
   if (p.estado.setor === "LIVRE") return true;
   if (p.estado.setor === null) return u.setorId === p.abertoPor.setorId || u.id === p.abertoPorId;
@@ -501,9 +504,10 @@ export async function tramitar(u: SessaoUsuario, processoId: string, paraSetorId
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
   if (!getEstado(p.def, p.estadoAtual) && !temPapel(u, "ADMIN"))
     throw new ErroFluxo(`Este processo está numa etapa que saiu do fluxo (${nomeDaEtapa(null, p.estadoAtual)}). Só o administrador pode movimentá-lo: peça a ele que o reencaminhe.`);
-  if (p.estado.setor !== "LIVRE" && !temPapel(u, "ADMIN", "PROTOCOLO"))
+  const reencaminhaReserva = !getEstado(p.def, p.estadoAtual) && temPapel(u, "ADMIN");
+  if (p.estado.setor !== "LIVRE" && !reencaminhaReserva && !temPapel(u, "PROTOCOLO"))
     throw new ErroFluxo("Nesta etapa o processo só se movimenta pelo fluxo (avançar ou devolver).");
-  if (p.setorAtualId && p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN", "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
+  if (p.setorAtualId && p.setorAtualId !== u.setorId && !reencaminhaReserva && !temPapel(u, "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
   const destino = await db.query.setores.findFirst({ where: and(eq(setores.id, paraSetorId), eq(setores.municipioId, u.municipioId)) });
   if (!destino) throw new ErroFluxo("Setor de destino inválido.");
   const fer = await feriadosDo(u.municipioId);
@@ -521,7 +525,7 @@ export async function receber(u: SessaoUsuario, processoId: string) {
   const p = await carregarProcesso(u.municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (p.recebidoEm) return;
-  if (p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN")) throw new ErroFluxo("O processo não está no seu setor.");
+  if (p.setorAtualId !== u.setorId) throw new ErroFluxo("O processo não está no seu setor.");
   // um só comando: o recebimento e o evento
   await db.execute(sqlEvento(p.id, u.id, "RECEBIMENTO", { paraSetorId: p.setorAtualId }, db.update(processos).set({ recebidoEm: new Date() }).where(eq(processos.id, p.id))));
 }
@@ -545,6 +549,7 @@ export async function juntarDocumento(u: SessaoUsuario, processoId: string, tipo
 export async function assinarDocumento(u: SessaoUsuario, documentoId: string, papel: Papel) {
   const d = await db.query.documentos.findFirst({ where: eq(documentos.id, documentoId), with: { processo: true } });
   if (!d || d.processo.municipioId !== u.municipioId) throw new ErroFluxo("Documento não encontrado.");
+  if (papel === "ADMIN") throw new ErroFluxo("O administrador do sistema não assina documentos de processo: assine com o seu papel na etapa.");
   if (!temPapel(u, papel)) throw new ErroFluxo(`Você não pode assinar como ${nomePapel(papel).toLowerCase()}: seu perfil não tem esse papel.`);
   const carimbo = new Date().toISOString();
   const hashAssinado = sha256(`${d.hash}|${u.cpf}|${papel}|${carimbo}`);
@@ -565,7 +570,7 @@ export async function despachar(u: SessaoUsuario, processoId: string, texto: str
 
 /** Dados da contratação: alimentam a fila cronológica de pagamentos e a remessa ao Tribunal de Contas. */
 export async function registrarContratacao(u: SessaoUsuario, processoId: string, input: { fornecedor: string; cnpj: string; valor: string; fonte: string }) {
-  if (!temPapel(u, "COMPRAS", "CONTABILIDADE", "ADMIN")) throw new ErroFluxo("Só compras ou contabilidade registram os dados da contratação.");
+  if (!temPapel(u, "COMPRAS", "CONTABILIDADE")) throw new ErroFluxo("Só compras ou contabilidade registram os dados da contratação.");
   const p = await carregarProcesso(u.municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (p.encerradoEm) throw new ErroFluxo("Processo já encerrado.");
@@ -638,7 +643,7 @@ export async function corrigirFonteValor(u: SessaoUsuario, processoId: string, i
 
 /** Registra o envio da contratação ao sistema do Tribunal de Contas, com o número do recibo. */
 export async function registrarRemessaTce(u: SessaoUsuario, processoId: string, recibo: string) {
-  if (!temPapel(u, "COMPRAS", "CONTROLE_INTERNO", "ADMIN")) throw new ErroFluxo("Só compras ou controle interno registram a remessa ao TCE.");
+  if (!temPapel(u, "COMPRAS", "CONTROLE_INTERNO")) throw new ErroFluxo("Só compras ou controle interno registram a remessa ao TCE.");
   const p = await carregarProcesso(u.municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (!recibo.trim()) throw new ErroFluxo("Informe o número do recibo ou protocolo do envio.");
@@ -672,7 +677,7 @@ export async function usuarioAtendimentoDigital(municipioId: string): Promise<Se
     cargo: u.cargo,
     papeis: u.papeis as Papel[],
     setorId: u.setorId,
-    setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome } : null,
+    setor: u.setor ? { id: u.setor.id, sigla: u.setor.sigla, nome: u.setor.nome, area: u.setor.area } : null,
     municipioId: u.municipioId,
     municipio: { id: u.municipio.id, nome: u.municipio.nome, uf: u.municipio.uf, slug: u.municipio.slug },
   };
@@ -709,7 +714,7 @@ export async function abrirExigencia(u: SessaoUsuario, processoId: string, texto
   const p = await carregarProcesso(u.municipioId, processoId);
   if (!p) throw new ErroFluxo("Processo não encontrado.");
   if (!p.interessadoPessoaId && !p.interessadoEmpresaId) throw new ErroFluxo("Este processo não tem interessado externo.");
-  if (p.setorAtualId !== u.setorId && !temPapel(u, "ADMIN", "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
+  if (p.setorAtualId !== u.setorId && !temPapel(u, "PROTOCOLO")) throw new ErroFluxo("O processo não está no seu setor.");
   if (!texto.trim()) throw new ErroFluxo("Escreva o que o interessado precisa enviar.");
   const fer = await feriadosDo(u.municipioId);
   const exig: Exigencia = { texto: texto.trim(), prazo: addDiasUteis(new Date(), Math.max(1, prazoDiasUteis), fer).toISOString(), abertaEm: new Date().toISOString(), autor: u.nome };

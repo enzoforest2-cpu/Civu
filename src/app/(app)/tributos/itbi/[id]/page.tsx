@@ -19,7 +19,7 @@ function Linha({ r, v, forte }: { r: React.ReactNode; v: React.ReactNode; forte?
 }
 
 export default async function AvaliarItbi({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/itbi");
   const { id } = await params;
   const it = await carregarItbi(u.municipioId, id);
   if (!it) notFound();
@@ -80,7 +80,7 @@ export default async function AvaliarItbi({ params }: { params: Promise<{ id: st
             {comps.length === 0 ? (
               <p className="text-[14px] text-ink-2">Nenhuma transação comparável. A referência mínima é o valor venal e a avaliação deve ser individual (vistoria ou laudo).</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Comparáveis usados na referência (tabela que rola para o lado)">
                 <table className="lista min-w-[460px]">
                   <thead>
                     <tr>

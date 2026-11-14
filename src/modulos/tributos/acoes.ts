@@ -9,7 +9,7 @@ import { tribCertidoes, tribDividaAtiva, tribGuias, tribImoveis, tribInscricoes,
 import { ErroAcesso, requirePortal } from "@/lib/portal";
 import { ErroFluxo, abrirProcessoExterno, avancar, carregarProcesso, juntarDocumento, receber } from "@/lib/engine";
 import type { ActionState } from "@/app/actions";
-import { avaliacaoSugerida, debitosEmAberto, dividasDoDono, donoPortal, hojeISO, imovelDoDono, municipioPortal, pedidosAlvara, pendenciasCertidao, requireTributos, type Dono } from "./dados";
+import { avaliacaoSugerida, debitosEmAberto, dividasDoDono, donoPortal, hojeISO, imovelDoDono, municipioPortal, pedidosAlvara, pendenciasCertidao, requireTributosAgir, type Dono } from "./dados";
 import { ITBI_ALIQUOTA, codigoVerificacao, diaISO, linhaDigitavelFicticia, pixFicticio, r2, simularParcelamento, tipoCertidao } from "./regras";
 import { CHAVE_FLUXO_ALVARA } from "./fluxo";
 
@@ -301,7 +301,7 @@ export async function contestarItbiAction(_: ActionState, fd: FormData): Promise
 export async function avaliarItbiAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const id = str(fd, "itbiId");
   try {
-    const u = await requireTributos();
+    const u = await requireTributosAgir();
     const it = await db.query.tribItbi.findFirst({ where: and(eq(tribItbi.id, id), eq(tribItbi.municipioId, u.municipioId)), with: { imovel: true } });
     if (!it) throw new ErroAcesso("Declaração não encontrada.");
     if (!["EM_AVALIACAO", "CONTESTADO"].includes(it.situacao)) throw new ErroAcesso("Esta declaração já foi avaliada.");
@@ -385,7 +385,7 @@ export async function pedirAlvaraAction(_: ActionState, fd: FormData): Promise<A
 
 export async function emitirAlvaraAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
-    const u = await requireTributos();
+    const u = await requireTributosAgir();
     const processoId = str(fd, "processoId");
     const p = await carregarProcesso(u.municipioId, processoId);
     if (!p || p.tipo.chave !== CHAVE_FLUXO_ALVARA) throw new ErroAcesso("Pedido de alvará não encontrado.");

@@ -1,7 +1,7 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardPlus, MapPin } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { candidatasDuplicidade, carregarOcorrencia, podeAtuar, todosSetores } from "@/modulos/servicos/dados";
 import { triagemAction } from "@/modulos/servicos/acoes";
 import { Estrelas, LinhaDoTempo, SlaChip, StatusChip, StatusOrdemChip } from "@/modulos/servicos/componentes";
@@ -11,7 +11,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Chip, Panel } from "@/components/ui";
 
 export default async function OcorrenciaGestao({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos");
   const { id } = await params;
   const o = await carregarOcorrencia(u.municipioId, id);
   if (!o) notFound();

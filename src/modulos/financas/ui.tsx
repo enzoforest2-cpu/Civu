@@ -2,10 +2,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { fmtMoeda } from "@/lib/dates";
-import type { SessaoUsuario } from "@/lib/auth";
-import { Vazio } from "@/components/ui";
 import { MESES, fmtCompacto, fmtPct } from "./classificacao";
 import { foraDoEscopo } from "@/lib/escopo";
+import { podeVerRota, type UsuarioComArea } from "@/lib/areas";
 
 const ABAS = [
   { href: "/financas", rotulo: "Visão geral" },
@@ -16,11 +15,12 @@ const ABAS = [
   { href: "/financas/indices", rotulo: "Índices legais" },
 ];
 
-export function AbasFinancas({ atual }: { atual: string }) {
+/** Abas de finanças; com `u`, mostra só as seções que a pessoa pode abrir (secretarias veem só o orçamento). */
+export function AbasFinancas({ atual, u }: { atual: string; u?: UsuarioComArea }) {
   return (
     <nav aria-label="Seções de finanças" className="-mx-4 mb-7 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div className="flex w-max gap-1 rounded-full border border-line bg-white p-1">
-        {ABAS.filter((a) => !foraDoEscopo(a.href)).map((a) => {
+        {ABAS.filter((a) => !foraDoEscopo(a.href) && (!u || podeVerRota(u, a.href))).map((a) => {
           const ativo = a.href === atual;
           return (
             <Link
@@ -35,21 +35,6 @@ export function AbasFinancas({ atual }: { atual: string }) {
         })}
       </div>
     </nav>
-  );
-}
-
-export const PAPEIS_FINANCAS = ["ADMIN", "ORDENADOR", "CONTABILIDADE", "TESOURARIA", "CONTROLE_INTERNO", "SECRETARIO"] as const;
-export const podeVerFinancas = (u: SessaoUsuario) => u.papeis.some((p) => (PAPEIS_FINANCAS as readonly string[]).includes(p));
-
-export function SemAcesso() {
-  return (
-    <div className="mx-auto max-w-xl py-10">
-      <h1 className="display mb-6 text-[28px] leading-[1.1] font-semibold text-ink sm:text-[34px]">Finanças</h1>
-      <Vazio>
-        As telas de finanças são para gestão, contabilidade, tesouraria, controle interno e secretários. Se precisar destes dados, peça à
-        contabilidade.
-      </Vazio>
-    </div>
   );
 }
 

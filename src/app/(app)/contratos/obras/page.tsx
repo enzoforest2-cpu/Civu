@@ -1,6 +1,6 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { ExternalLink, MapPin } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { fmtData, fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Vazio } from "@/components/ui";
 import { listarContratos } from "@/modulos/contratos/dados";
@@ -8,7 +8,7 @@ import { dataLocal, rotuloMes } from "@/modulos/contratos/regras";
 import { BarraPct, ChipObra, CurvaS, pct } from "@/modulos/contratos/componentes";
 
 export default async function ObrasGestaoPage() {
-  const u = await requireUser();
+  const u = await exigirRota("/contratos/obras");
   const obras = (await listarContratos(u.municipioId)).filter((c) => c.obra);
   const ordem = { PARALISADA: 0, ATRASADA: 1, EM_DIA: 2, NAO_INICIADA: 3, CONCLUIDA: 4 };
   obras.sort((a, b) => ordem[a.obra!.situacao] - ordem[b.obra!.situacao]);

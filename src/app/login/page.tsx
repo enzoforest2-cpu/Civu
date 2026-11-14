@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { paginaInicial } from "@/lib/areas";
 import { loginAction } from "@/app/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Marca, MarcaCompleta } from "@/components/marca";
+import { MarcaCompleta } from "@/components/marca";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ const PARADAS = ["Pedido", "Autorização", "Compras", "Orçamento", "Contrato",
 
 export default async function LoginPage() {
   const u = await getSessionUser();
-  if (u) redirect("/painel");
+  if (u) redirect(paginaInicial(u));
   return (
     <main className="flex min-h-screen bg-surface">
       <aside className="relative hidden w-[52%] flex-col justify-between overflow-hidden bg-brand-2 p-14 text-white lg:flex">

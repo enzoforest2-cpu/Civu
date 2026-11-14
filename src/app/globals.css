@@ -303,3 +303,24 @@ html:has(#menu-celular:popover-open) {
 main [id] {
   scroll-margin-top: 5.5rem;
 }
+
+/*
+ * Alvos de toque de 44 px em todas as telas (mesma técnica da utilidade alvo-toque): links, botões e resumos
+ * pequenos (e rótulos de caixas de marcar) ganham área clicável invisível, sem mudar o desenho. Fica na camada base para que qualquer
+ * utilidade de posição (absolute, sticky...) continue valendo. Links dentro de frases (p a) ficam de fora
+ * (exceção do critério 2.5.8) e `.sem-alvo` desliga onde atrapalhar.
+ */
+@layer base {
+  :where(main, header, nav) :where(a, button, summary, label:has(> input[type="checkbox"], > input[type="radio"])):not(.sem-alvo, p a) {
+    position: relative;
+  }
+  :where(main, header, nav) :where(a, button, summary, label:has(> input[type="checkbox"], > input[type="radio"])):not(.sem-alvo, p a)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

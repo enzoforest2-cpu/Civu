@@ -796,7 +796,7 @@ export const servicosDemo: ModuloDemo = {
       ["SMSU", "Secretaria de Serviços Urbanos", 5],
       ["SMMA", "Secretaria de Meio Ambiente", 5],
     ] as const)
-      await db.insert(schema.setores).values({ municipioId: mun, sigla, nome, slaPadraoDias: sla }).onConflictDoNothing();
+      await db.insert(schema.setores).values({ municipioId: mun, sigla, nome, slaPadraoDias: sla, area: "INFRAESTRUTURA" }).onConflictDoNothing();
     const setRows = await db.query.setores.findMany({ where: eq(schema.setores.municipioId, mun) });
     const setor = Object.fromEntries(setRows.map((s) => [s.sigla, s])) as Record<string, (typeof setRows)[number]>;
 

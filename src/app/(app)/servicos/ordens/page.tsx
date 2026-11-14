@@ -1,5 +1,5 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
 import { listarOrdens, setoresResponsaveis } from "@/modulos/servicos/dados";
 import { Aba, StatusOrdemChip } from "@/modulos/servicos/componentes";
 import { fmtDia, hojeIso } from "@/modulos/servicos/constantes";
@@ -14,7 +14,7 @@ const SITUACOES: Record<string, string> = {
 };
 
 export default async function OrdensPage({ searchParams }: { searchParams: Promise<{ setor?: string; status?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos/ordens");
   const sp = await searchParams;
   const setores = await setoresResponsaveis(u.municipioId);
   const meu = setores.find((s) => s.id === u.setorId);

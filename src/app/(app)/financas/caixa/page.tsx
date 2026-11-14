@@ -1,17 +1,16 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel } from "@/components/ui";
 import { CENARIOS, anoCorrente, caixa, fmtIso, projecao, type Cenario } from "@/modulos/financas/dados";
-import { AbasFinancas, GraficoSaldo, Kpi, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { AbasFinancas, GraficoSaldo, Kpi } from "@/modulos/financas/ui";
 import { fmtCompacto, nomeGrupo } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function CaixaPage({ searchParams }: { searchParams: Promise<{ cenario?: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/caixa");
   const sp = await searchParams;
   const cenario: Cenario = sp.cenario && sp.cenario in CENARIOS ? (sp.cenario as Cenario) : "base";
   const ano = anoCorrente();
@@ -23,7 +22,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <Cabecalho titulo="Caixa e projeção" sub="Dinheiro em conta por fonte de recurso, o que já está comprometido com ele e como o saldo deve andar nos próximos 90 dias." />
-      <AbasFinancas atual="/financas/caixa" />
+      <AbasFinancas atual="/financas/caixa" u={u} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi rotulo="Saldo em contas" valor={fmtCompacto(t.saldo)} sub={extrato ? `extratos de ${fmtIso(extrato)} (simulados)` : "sem contas cadastradas"} />
@@ -33,7 +32,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
       </div>
 
       <Panel title="Disponibilidade por fonte" pad={false} className="mb-6">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Disponibilidade por fonte (tabela que rola para o lado)">
           <table className="lista">
             <thead>
               <tr>
@@ -95,18 +94,18 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
               De {fmtIso(proj.hoje)} a {fmtIso(proj.fim)}, por fonte. Estimativa: não é registro contábil.
             </p>
           </div>
-          <div className="flex gap-1 rounded-full border border-line bg-white p-1" role="tablist" aria-label="Cenário">
+          <nav className="flex gap-1 rounded-full border border-line bg-white p-1" aria-label="Cenário">
             {(Object.keys(CENARIOS) as Cenario[]).map((c) => (
               <Link
                 key={c}
                 href={`/financas/caixa?cenario=${c}#projecao`}
                 aria-current={c === cenario ? "page" : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium ${c === cenario ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken"}`}
+                className={`alvo-toque rounded-full px-3.5 py-1.5 text-[14px] font-medium ${c === cenario ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken"}`}
               >
                 {CENARIOS[c].nome}
               </Link>
             ))}
-          </div>
+          </nav>
         </div>
 
         {negativas.length > 0 ? (
@@ -166,7 +165,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
       </section>
 
       <Panel title="Contas bancárias" pad={false} className="mt-6">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Contas bancárias (tabela que rola para o lado)">
           <table className="lista">
             <thead>
               <tr>

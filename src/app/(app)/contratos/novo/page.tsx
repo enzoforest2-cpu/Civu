@@ -1,10 +1,11 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/db";
 import { processos, setores, tiposProcesso, unidadesGestoras } from "@/db/schema";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { FONTES } from "@/lib/workflow";
 import { fmtCnpj } from "@/lib/pagamentos";
 import { Cabecalho } from "@/components/ui";
@@ -12,7 +13,7 @@ import { usuariosDoMunicipio } from "@/modulos/contratos/operacoes";
 import { FormContrato } from "@/modulos/contratos/form-contrato";
 
 export default async function NovoContratoPage() {
-  const u = await requireUser();
+  const u = await exigirRota("/contratos/novo");
   if (!temPapel(u, "COMPRAS")) redirect("/contratos");
   const [empresas, usuarios, sets, ugs, procs] = await Promise.all([
     db.query.empresas.findMany({ orderBy: (e, { asc }) => [asc(e.razaoSocial)] }),

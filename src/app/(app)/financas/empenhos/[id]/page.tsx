@@ -1,10 +1,11 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { inArray } from "drizzle-orm";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { db } from "@/db";
 import { processos, tiposProcesso } from "@/db/schema";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { fmtCnpj } from "@/lib/pagamentos";
 import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
@@ -12,14 +13,13 @@ import { Chip, Panel, Vazio } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { addDiasIso, anoCorrente, caixa, execucao, fmtIso, hojeIso } from "@/modulos/financas/dados";
 import { anularEmpenhoAction, liquidarAction, pagarAction, vincularProcessoAction } from "@/modulos/financas/acoes";
-import { BarraExecucao, LegendaExecucao, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { BarraExecucao, LegendaExecucao } from "@/modulos/financas/ui";
 import { FONTES_DETALHE, NATUREZAS_DESPESA, TIPOS_EMPENHO, nomeGrupo } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmpenhoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ novo?: string; aviso?: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/empenhos");
   const { id } = await params;
   const sp = await searchParams;
   const ano = anoCorrente();

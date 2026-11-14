@@ -1,6 +1,6 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { equipes as listarEquipes, ocorrenciasParaOrdem, podeAtuar } from "@/modulos/servicos/dados";
 import { criarOrdemAction } from "@/modulos/servicos/acoes";
 import { SlaChip, StatusChip } from "@/modulos/servicos/componentes";
@@ -9,7 +9,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Cabecalho, Panel, Vazio } from "@/components/ui";
 
 export default async function NovaOrdem({ searchParams }: { searchParams: Promise<{ ids?: string | string[] }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/servicos/ordens");
   const { ids } = await searchParams;
   const lista = await ocorrenciasParaOrdem(u, ([] as string[]).concat(ids ?? []));
   const validas = lista.filter((o) => o.status === "ABERTA" || o.status === "ACEITA");

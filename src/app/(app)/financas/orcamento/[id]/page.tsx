@@ -1,20 +1,20 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requireUser, temPapel } from "@/lib/auth";
+import { temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
 import { Chip, Panel, Vazio } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { anoCorrente, execucao, fmtIso, hojeIso } from "@/modulos/financas/dados";
 import { anularReservaAction, creditoAction, reservaAction } from "@/modulos/financas/acoes";
-import { BarraExecucao, LegendaExecucao, SemAcesso, podeVerFinancas } from "@/modulos/financas/ui";
+import { BarraExecucao, LegendaExecucao } from "@/modulos/financas/ui";
 import { FONTES_DETALHE, FUNCOES, NATUREZAS_DESPESA, SUBFUNCOES, TIPOS_CREDITO, TIPOS_EMPENHO, nomeGrupo } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function DotacaoPage({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
-  if (!podeVerFinancas(u)) return <SemAcesso />;
+  const u = await exigirRota("/financas/orcamento");
   const { id } = await params;
   const ex = await execucao(u.municipioId, anoCorrente());
   const d = ex.dotacoes.find((x) => x.id === id);
@@ -44,7 +44,7 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
         {NATUREZAS_DESPESA[d.natureza]} · {FONTES_DETALHE[d.fonte]?.nome} · UG {d.ug?.codigo} {d.ug?.nome}
       </p>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <Panel>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
@@ -80,7 +80,7 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
                 <Vazio>Nenhum empenho nesta dotação.</Vazio>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Empenhos da dotação (tabela que rola para o lado)">
                 <table className="lista">
                   <thead>
                     <tr>

@@ -46,6 +46,7 @@ export const ACAO_ROTULO: Record<string, string> = {
   USUARIO_DESATIVADO: "Usuário desativado",
   USUARIO_SETOR: "Setor do usuário alterado",
   USUARIO_PAPEIS: "Papéis do usuário alterados",
+  SETOR_AREA: "Área ou órgão orçamentário do setor alterado",
   REGRA_CRIADA: "Regra de automação criada",
   REGRA_ATIVADA: "Regra de automação ativada",
   REGRA_SUSPENSA: "Regra de automação suspensa",

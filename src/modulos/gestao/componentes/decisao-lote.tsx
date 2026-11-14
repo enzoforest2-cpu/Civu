@@ -115,13 +115,15 @@ export function DecisaoLote({ itens, podeDecidir }: { itens: ItemLote[]; podeDec
         {itens.map((i) => (
           <li key={i.id} className="flex items-start gap-3 py-3.5">
             {podeDecidir && (
-              <input
-                type="checkbox"
-                className="mt-1.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
-                checked={sel.includes(i.id)}
-                onChange={() => alternar(i.id)}
-                aria-label={`Selecionar ${i.numero}`}
-              />
+              <label className="-m-3.5 inline-flex shrink-0 cursor-pointer p-3.5">
+                <input
+                  type="checkbox"
+                  className="mt-1.5 h-4 w-4 accent-[var(--color-brand)]"
+                  checked={sel.includes(i.id)}
+                  onChange={() => alternar(i.id)}
+                  aria-label={`Selecionar ${i.numero}`}
+                />
+              </label>
             )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">

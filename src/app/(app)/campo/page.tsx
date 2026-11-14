@@ -1,6 +1,6 @@
+import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
 import { CheckCircle2, MapPin } from "lucide-react";
-import { requireUser } from "@/lib/auth";
 import { ordensDeCampo } from "@/modulos/servicos/dados";
 import { StatusOrdemChip } from "@/modulos/servicos/componentes";
 import { Concluir, Iniciar, Materiais } from "@/modulos/servicos/execucao";
@@ -10,7 +10,7 @@ import { fmtDataHora } from "@/lib/dates";
 import { Vazio } from "@/components/ui";
 
 export default async function CampoPage({ searchParams }: { searchParams: Promise<{ equipe?: string }> }) {
-  const u = await requireUser();
+  const u = await exigirRota("/campo");
   const { equipe } = await searchParams;
   const r = await ordensDeCampo(u, equipe);
   const hoje = r.hoje ?? "";

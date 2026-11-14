@@ -7,7 +7,7 @@ import { fmtMoeda } from "@/lib/dates";
 import { Panel, Vazio } from "@/components/ui";
 
 export default async function Imoveis({ searchParams }: { searchParams: Promise<{ q?: string; bairro?: string; uso?: string; p?: string }> }) {
-  const u = await requireTributos();
+  const u = await requireTributos("/tributos/imoveis");
   const sp = await searchParams;
   const [r, bs] = await Promise.all([listarImoveis(u.municipioId, { q: sp.q?.trim(), bairro: sp.bairro, uso: sp.uso, pagina: Number(sp.p) || 1 }), bairros(u.municipioId)]);
   const qs = (p: number) => {
@@ -48,7 +48,7 @@ export default async function Imoveis({ searchParams }: { searchParams: Promise<
             <Vazio>Nenhum imóvel com esses filtros.</Vazio>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Imóveis (tabela que rola para o lado)">
             <table className="lista min-w-[760px]">
               <thead>
                 <tr>

@@ -1,10 +1,15 @@
 // Registro dos módulos da Civu: menu da gestão (agrupado) e atalhos dos portais.
 // Cada módulo declara seus itens em src/modulos/<modulo>/registro.ts e é importado aqui.
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, FolderOpen, Globe, Inbox, LayoutGrid, ListOrdered, Settings2, ShieldCheck } from "lucide-react";
+import { BookOpen, Building, FolderOpen, Globe, Inbox, LayoutGrid, ListOrdered, Settings2, ShieldCheck } from "lucide-react";
 import type { Papel } from "./workflow";
 import { foraDoEscopo } from "./escopo";
+import { podeVerRota, type UsuarioComArea } from "./areas";
 
+/**
+ * Item do menu da gestão. Quem vê: a regra de área da rota (`podeVerRota`, src/lib/areas.ts) e, se houver,
+ * `papeis` (um filtro a mais, para telas de um papel específico; inclua "ADMIN" onde o administrador deve ver).
+ */
 export type ItemGestao = { href: string; rotulo: string; icone: LucideIcon; papeis?: Papel[]; grupo: ChaveGrupo; ordem?: number };
 
 export type ChaveGrupo = "visao" | "atendimento" | "financas" | "compras" | "obras" | "pessoas" | "inteligencia" | "admin" | "publico";
@@ -32,6 +37,7 @@ export type AtalhoPortal = {
 };
 
 const NUCLEO: ItemGestao[] = [
+  { href: "/secretaria", rotulo: "Minha secretaria", icone: Building, grupo: "visao", ordem: 7, papeis: ["SECRETARIO"] },
   { href: "/painel", rotulo: "Painel", icone: LayoutGrid, grupo: "visao", ordem: 10 },
   { href: "/caixa", rotulo: "Minha caixa", icone: Inbox, grupo: "atendimento", ordem: 10 },
   { href: "/processos", rotulo: "Processos", icone: FolderOpen, grupo: "atendimento", ordem: 20 },
@@ -55,3 +61,8 @@ const MODULOS: { gestao?: ItemGestao[]; portal?: AtalhoPortal[] }[] = [servicos,
 
 export const ITENS_GESTAO: ItemGestao[] = [...NUCLEO, ...MODULOS.flatMap((m) => m.gestao ?? [])].filter((i) => !foraDoEscopo(i.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
 export const ATALHOS_PORTAL: AtalhoPortal[] = [...ATALHOS_NUCLEO, ...MODULOS.flatMap((m) => m.portal ?? [])].filter((a) => !foraDoEscopo(a.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
+
+/** Menu de uma pessoa: os itens que ela pode abrir (a mesma regra que as páginas conferem no servidor). */
+export function itensDoMenu(u: UsuarioComArea): ItemGestao[] {
+  return ITENS_GESTAO.filter((i) => podeVerRota(u, i.href) && (!i.papeis || i.papeis.some((p) => u.papeis.includes(p))));
+}

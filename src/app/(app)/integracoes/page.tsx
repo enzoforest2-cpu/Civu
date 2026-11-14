@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { exigirRota } from "@/lib/acesso";
 import { fmtDataHora } from "@/lib/dates";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
@@ -16,8 +15,7 @@ const ROTULO_CHAMADA: Record<string, string> = { SUCESSO: "Sucesso", FALHA: "Fal
 const DIRECAO: Record<string, string> = { ENVIO: "Envio", CONSULTA: "Consulta", RETORNO: "Retorno" };
 
 export default async function IntegracoesPage({ searchParams }: { searchParams: Promise<{ conector?: string }> }) {
-  const u = await requireUser();
-  if (!pode.verIntegracoes(u)) redirect("/painel");
+  const u = await exigirRota("/integracoes", pode.verIntegracoes);
   const { conector } = await searchParams;
   const [lista, chamadas] = await Promise.all([listarIntegracoes(u.municipioId), chamadasRecentes(u.municipioId, conector || undefined)]);
   const admin = pode.configurarIntegracoes(u);
@@ -126,7 +124,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
               <Vazio>Nenhuma chamada registrada{filtrado ? " para esta integração" : ""}.</Vazio>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Chamadas registradas (tabela que rola para o lado)">
               <table className="lista">
                 <thead>
                   <tr>

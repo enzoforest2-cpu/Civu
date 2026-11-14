@@ -130,7 +130,7 @@ export default async function TributosPainel() {
         }
         pad={false}
       >
-        <div className="overflow-x-auto px-2 pb-3">
+        <div className="overflow-x-auto px-2 pb-3" tabIndex={0} role="region" aria-label="Maiores devedores (tabela que rola para o lado)">
           <table className="lista min-w-[640px]">
             <thead>
               <tr>
