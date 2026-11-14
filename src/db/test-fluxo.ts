@@ -476,6 +476,82 @@ async function main() {
   ok("pagamento: fila, envio, rejeição, reenvio, aceite, segundo retorno recusado; cadeia íntegra");
 
   // =========================================================================
+  // Repasses (Comando da prefeitura, Parte 3): a execução do repasse soma os processos vinculados; autorização por área
+  // =========================================================================
+  {
+    const rep = await import("../modulos/repasses/operacoes");
+    const repDados = await import("../modulos/repasses/dados");
+    const secEducacao = await sessao("10101010101");
+    const adminCompras = { ...compras, papeis: ["ADMIN"] as never };
+    const esperaRecusa = async (m: string, fn: () => Promise<unknown>) => {
+      try { await fn(); } catch (e) { if (e instanceof rep.ErroRepasse) { ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
+      falha("deveria falhar: " + m);
+    };
+    const entrada = {
+      setorId: secretario.setorId!, tipo: "CONVENIO", concedente: "Fundo de teste", objeto: "TESTE FLUXO — convênio da saúde",
+      valorPrevisto: "60.000,00", valorRecebido: "30.000", prazoExecucao: "2027-12-31", situacao: "EM_EXECUCAO",
+    };
+    await esperaRecusa("secretário de educação cadastra repasse da saúde", () => rep.criarRepasse(secEducacao, entrada));
+    await esperaRecusa("controle interno cadastra repasse (vê, não edita)", () => rep.criarRepasse(controladora, entrada));
+    await esperaRecusa("controle interno cadastra repasse no próprio setor (sem pasta)", () => rep.criarRepasse(controladora, { ...entrada, setorId: controladora.setorId! }));
+    await esperaRecusa("papel ADMIN cadastra repasse de outra área", () => rep.criarRepasse(adminCompras, entrada));
+    const { id: repId } = await rep.criarRepasse(secretario, entrada);
+    await esperaRecusa("secretário de educação altera repasse da saúde", () => rep.editarRepasse(secEducacao, repId, { ...entrada, valorRecebido: "60000" }));
+    await rep.editarRepasse(prefeita, repId, { ...entrada, valorRecebido: "60.000,00" });
+    if ((await repDados.repassesVisiveis(secEducacao)).some((r) => r.id === repId)) falha("secretário de educação não pode ler repasse da saúde");
+    if (!(await repDados.repassesVisiveis(controladora)).some((r) => r.id === repId)) falha("controle interno lê os repasses de todas as áreas");
+    if (!(await repDados.repassesVisiveis(requisitante)).some((r) => r.id === repId)) falha("servidora da saúde lê o repasse da própria área");
+    ok("repasse: só a área responsável e o Gabinete cadastram e alteram; outra secretaria não lê; controle lê");
+
+    // vínculos: o processo pago (p, já arquivado) e um liquidado que está na fila
+    const naFila = naFrente!.aFrente[0];
+    if (!naFila.valor) falha("o teste precisa de um processo liquidado com valor na fila");
+    await esperaRecusa("educação vincula processo ao repasse da saúde", () => rep.vincularProcesso(secEducacao, repId, p.id));
+    await esperaRecusa("papel ADMIN vincula processo", () => rep.vincularProcesso(adminCompras, repId, p.id));
+    await rep.vincularProcesso(secretario, repId, p.id);
+    await rep.vincularProcesso(secretario, repId, naFila.processoId, "Despesa prevista no plano de trabalho.");
+    await esperaErro("vincular de novo ao mesmo repasse", () => rep.vincularProcesso(secretario, repId, p.id), "O processo já está vinculado a este repasse.");
+    // aberto já vinculado (sem contratação ainda: não conta valor)
+    const ab = await engine.abrirProcesso(requisitante, {
+      tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: assunto("aberto com repasse"), metadados: { ...dadosCompra, repasseId: "forjado" },
+      repasse: await rep.repasseParaVincular(requisitante, repId),
+    });
+    const cab = await carregar(ab.id);
+    if (meta(cab).repasseId !== repId) falha("abertura com repasse grava metadados.repasseId (e ignora o campo forjado)");
+    if ((cab.eventos[0].dados as { repasse?: { id: string } }).repasse?.id !== repId) falha("o evento de abertura registra o repasse");
+    let det = (await repDados.carregarRepasse(requisitante.municipioId, repId)) ?? falha("repasse sumiu");
+    const esperado = { contratado: 8700 + naFila.valor!, liquidado: 8700 + naFila.valor!, pago: 8700 };
+    for (const k of ["contratado", "liquidado", "pago"] as const)
+      if (Math.abs(det.execucao[k] - esperado[k]) > 0.005) falha(`execução.${k}: esperado ${esperado[k]}, veio ${det.execucao[k]}`);
+    if (det.execucao.percentual !== 14.5) falha("percentual executado = pago ÷ previsto (8.700 de 60.000 = 14,5%), veio " + det.execucao.percentual);
+    if (det.processos.length !== 3 || det.execucao.processos !== 3) falha("o repasse lista os 3 processos vinculados");
+    if (det.valorRecebido !== 60000) falha("a alteração do Gabinete deveria valer");
+    if (det.linhaDoTempo.filter((e) => e.processo).length !== 3) falha("linha do tempo: 2 vínculos e 1 abertura vinculada, veio " + JSON.stringify(det.linhaDoTempo.map((e) => e.titulo)));
+    if (!det.linhaDoTempo.some((e) => e.titulo === "Dados alterados" && e.detalhe?.includes("Valor recebido"))) falha("alteração registrada na linha do tempo");
+    const cp = await carregar(p.id);
+    if (!cp.eventos.some((e) => e.tipo === "VINCULO_REPASSE") || !engine.verificarCadeia(cp.eventos).ok) falha("o vínculo entra no livro do processo pelo motor, com a cadeia íntegra");
+    ok(`repasse soma a execução dos processos vinculados: contratado ${det.execucao.contratado}, liquidado ${det.execucao.liquidado}, pago ${det.execucao.pago} (14,5%)`);
+
+    await esperaRecusa("desvincular sem motivo", () => rep.desvincularProcesso(secretario, naFila.processoId, "curto"));
+    await rep.desvincularProcesso(secretario, naFila.processoId, "Despesa paga com recurso próprio, não com o convênio.");
+    det = (await repDados.carregarRepasse(requisitante.municipioId, repId)) ?? falha("repasse sumiu");
+    if (det.execucao.contratado !== 8700 || det.execucao.liquidado !== 8700 || det.execucao.pago !== 8700) falha("depois de desvincular, sai da soma: " + JSON.stringify(det.execucao));
+    const cf = await carregar(naFila.processoId);
+    if (meta(cf).repasseId || !engine.verificarCadeia(cf.eventos).ok) falha("desvincular tira metadados.repasseId e mantém a cadeia");
+    if (!(await repDados.repassesEmRisco(requisitante.municipioId)).every((r) => r.risco.emRisco)) falha("repassesEmRisco só traz repasses em risco");
+    ok("desvincular exige motivo, tira o processo da soma e fica no livro");
+
+    // obrigações da área: mesma regra de edição
+    const ob = { setorId: secretario.setorId!, nome: "TESTE FLUXO — relatório", destinatario: "Conselho de teste", periodicidade: "MENSAL", proximoVencimento: "2026-01-31" };
+    await esperaRecusa("educação cadastra obrigação da saúde", () => rep.criarObrigacao(secEducacao, ob));
+    const { id: obId } = await rep.criarObrigacao(requisitante, ob);
+    await esperaRecusa("controle interno registra entrega", () => rep.registrarEntrega(controladora, obId, { entregueEm: "2026-01-30", comprovante: "REC-1" }));
+    const ent = await rep.registrarEntrega(prefeita, obId, { entregueEm: "2026-01-30", comprovante: "REC-1" });
+    if (ent.proximoVencimento !== "2026-02-28") falha("entrega mensal passa ao próximo vencimento (fim de fevereiro), veio " + ent.proximoVencimento);
+    ok("obrigação: só a área e o Gabinete cadastram e registram entrega; a mensal passa ao mês seguinte");
+  }
+
+  // =========================================================================
   // C) Contratação direta por dispensa de valor até o empenho
   // =========================================================================
   const d = await ateInstrucao("dispensa por valor");

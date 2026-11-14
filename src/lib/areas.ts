@@ -112,6 +112,9 @@ export const ROTAS_DE_AREA: RegraRota[] = [
   { prefixo: "/contratos", areas: ["COMPRAS"], pasta: true },
   { prefixo: "/contratos/novo", areas: ["COMPRAS"] },
   { prefixo: "/obrigacoes", areas: ["COMPRAS"] },
+  // Repasses, emendas, convênios e obrigações de entrega: de cada secretaria com pasta (o recorte pela área fica na tela)
+  { prefixo: "/repasses", areas: ["GABINETE"], pasta: true },
+  { prefixo: "/obrigacoes-da-area", areas: ["GABINETE"], pasta: true },
   // Controle e administração
   { prefixo: "/governanca", areas: ["CONTROLE_INTERNO"] },
   { prefixo: "/integracoes", areas: ["FAZENDA", "COMPRAS"] },

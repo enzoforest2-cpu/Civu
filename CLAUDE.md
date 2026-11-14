@@ -17,6 +17,13 @@ Desde 13/11/2026 a Civu volta a ser o **sistema único do município** (especifi
 - Gabinete, Controle Interno e o papel ADMIN veem todas as áreas. **Ver não é agir:** o ADMIN administra (cadastros, usuários, fluxos, automações, integrações) mas não passa em `podeAgir`, `temPapel` nem nas checagens de ação em processo; a única exceção é reencaminhar processo parado numa etapa que saiu do fluxo. Para checagem de administração, liste `"ADMIN"` explicitamente.
 - Página inicial: gabinete → `/gabinete` (Sala do prefeito); secretário(a) → `/secretaria` (Minha secretaria); demais → `/painel`.
 
+### Repasses e obrigações da área (módulo `repasses`)
+
+- `/repasses` (emendas, convênios, transferências) e `/obrigacoes-da-area` (calendário de entregas de cada secretaria). Só secretarias de área com pasta respondem por eles. Cadastrar e alterar: quem é da área da secretaria responsável ou do Gabinete (`podeEditarNaArea`); ler: `podeVerNaArea`. Controle Interno e ADMIN só leem.
+- O vínculo processo↔repasse é do motor: `vincularRepasse` (evento VINCULO_REPASSE) e o campo `repasse` de `abrirProcesso`; fica em `metadados.repasseId`. A execução (contratado, liquidado, pago) é calculada dos processos vinculados com o valor de `metadados.contratacao.valor`, como a fila de pagamentos.
+- Alertas de prazo de repasse e obrigação em dias corridos (30, 15, 5, vencido), em `src/modulos/repasses/regras.ts`. As obrigações da demonstração são exemplos e não afirmam prazo legal.
+- Leituras para a cabine e a sala do prefeito em `src/modulos/repasses/dados.ts`; provedor de indicadores em `src/modulos/repasses/indicadores.ts` (registrado em EXTERNOS).
+
 ## Divisão de trabalho
 
 A interface (telas, layout, visual) está sendo feita em outra conversa. Antes de mexer em qualquer arquivo de página ou componente visual, faça `git pull` e confirme com o Enzo se a tarefa é sua. Prefira trabalhar em lógica, dados, integrações, segurança e testes. Sempre `git pull --rebase` antes de começar e antes de enviar.
@@ -38,7 +45,7 @@ src/lib/            núcleo: workflow.ts (fluxos e papéis), engine.ts (motor de
 src/app/(app)/      telas da gestão (exigem login de servidor)
 src/app/portal/     Civu Cidadão / Civu Empresas (exigem login no portal)
 src/app/<rota>      páginas públicas: /consulta, /fila-de-pagamentos, /obras, /transparencia, /verificar, /entrar, /login
-src/modulos/<m>/    módulos: servicos, contratos, financas, tributos, gestao
+src/modulos/<m>/    módulos: servicos, contratos, financas, tributos, gestao, repasses
 src/db/schema/      core.ts, portal.ts e um arquivo por módulo; index.ts exporta todos
 src/db/seed.ts      município, setores, usuários, fluxos, processos, pessoas e empresas de demonstração
 src/db/demo/        registro dos dados de demonstração por módulo (DEMO_VERSAO)
@@ -52,7 +59,7 @@ drizzle/            migrações SQL geradas
 2. Lógica em `src/modulos/<modulo>/` (consultas em `dados.ts`, server actions em `acoes.ts`).
 3. Menu e atalhos do portal em `src/modulos/<modulo>/registro.ts`, importado em `src/lib/modulos.ts`.
 4. Demonstração em `src/modulos/<modulo>/demo.ts` (`ModuloDemo`), registrada em `src/db/demo/index.ts`.
-5. Indicadores para o painel do prefeito: `src/modulos/gestao/indicadores.ts` explica como plugar um provedor (hoje nenhum módulo está plugado; é a lacuna mais urgente).
+5. Indicadores para o painel do prefeito: `src/modulos/gestao/indicadores.ts` explica como plugar um provedor (hoje só `repasses` está plugado).
 
 ## Regras do domínio que não podem quebrar
 

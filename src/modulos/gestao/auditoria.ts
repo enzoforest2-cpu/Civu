@@ -73,6 +73,7 @@ export const EVENTO_ROTULO: Record<string, string> = {
   DADOS_CONTRATACAO: "Dados da contratação",
   CORRECAO_CONTRATACAO: "Correção de fonte ou valor da contratação",
   REMESSA_TCE: "Remessa ao Tribunal de Contas",
+  VINCULO_REPASSE: "Vínculo com repasse",
   EXIGENCIA: "Exigência ao interessado",
   RESPOSTA_EXIGENCIA: "Resposta do interessado",
   MODALIDADE: "Forma de contratação definida",

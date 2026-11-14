@@ -5,3 +5,4 @@ export * from "./contratos";
 export * from "./financas";
 export * from "./tributos";
 export * from "./gestao";
+export * from "./repasses";

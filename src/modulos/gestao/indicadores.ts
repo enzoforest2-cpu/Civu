@@ -356,6 +356,7 @@ const NUCLEO: ProvedorIndicadores[] = [provedorAtendimento, provedorObrigacoes, 
 // ---- módulos: cada um acrescenta UMA linha aqui (veja o comentário no topo) ----
 const EXTERNOS: (() => Promise<{ provedor: ProvedorIndicadores }>)[] = [
   // () => import("@/modulos/servicos/indicadores"),
+  () => import("@/modulos/repasses/indicadores"),
 ];
 
 export type ResultadoPainel = {

@@ -147,6 +147,11 @@ export async function abrirProcesso(
     metadados?: Record<string, unknown>;
     /** Processo aberto por pessoa ou empresa no portal (ou em nome dela). */
     externo?: { pessoaId: string; empresaId: string | null; canal: string; nomeExibicao: string };
+    /**
+     * Repasse que financia a despesa (opcional). Quem chama confere antes se o repasse existe e se a pessoa pode vinculá-lo
+     * (src/modulos/repasses/operacoes.ts, `repasseParaVincular`); aqui ele fica em metadados.repasseId e no evento de abertura.
+     */
+    repasse?: { id: string; rotulo: string };
   },
 ) {
   const tipo = await db.query.tiposProcesso.findFirst({ where: and(eq(tiposProcesso.id, input.tipoId), eq(tiposProcesso.municipioId, u.municipioId)) });
@@ -163,6 +168,11 @@ export async function abrirProcesso(
 
   // Limite de dispensa: registra no processo a situação no momento da abertura (art. 75, §1º)
   const meta: Record<string, unknown> = { ...(input.metadados ?? {}) };
+  delete meta.repasseId; // o vínculo com repasse só entra pelo campo próprio, já conferido
+  if (input.repasse) {
+    if (!def.estados.some((e) => e.filaCronologica)) throw new ErroFluxo("Só processos de compra ou de pagamento se vinculam a repasse.");
+    meta.repasseId = input.repasse.id;
+  }
   let alertaFracionamento: Record<string, unknown> | null = null;
   if (meta.natureza && meta.modalidade === "DISPENSA_VALOR") {
     const a = await analisarFracionamento({
@@ -212,6 +222,7 @@ export async function abrirProcesso(
       .returning();
     const dadosAbertura: Record<string, unknown> = { numero, tipo: tipo.chave };
     if (alertaFracionamento) dadosAbertura.alertaFracionamento = alertaFracionamento;
+    if (input.repasse) dadosAbertura.repasse = { id: input.repasse.id, rotulo: input.repasse.rotulo };
     if (input.externo) dadosAbertura.solicitante = { pessoaId: input.externo.pessoaId, empresaId: input.externo.empresaId, nome: input.externo.nomeExibicao, canal: input.externo.canal };
     await registrarEvento(tx, p.id, u.id, "ABERTURA", { paraEstado: inicial.chave, paraSetorId: setorAtualId, dados: dadosAbertura });
     return p;
@@ -638,6 +649,33 @@ export async function corrigirFonteValor(u: SessaoUsuario, processoId: string, i
     if (depois.fonte === antes.fonte && depois.valor === antes.valor) throw new ErroFluxo("A fonte e o valor informados são os mesmos de agora. Altere ao menos um deles.");
     await gravarMeta(tx, p.id, { ...meta, contratacao: { ...atual, fonte: depois.fonte, valor: depois.valor } });
     await registrarEvento(tx, p.id, u.id, "CORRECAO_CONTRATACAO", { dados: { antes, depois, motivo, etapa: p.estadoAtual } });
+  });
+}
+
+/**
+ * Vincula o processo a um repasse (emenda, convênio, transferência) ou desfaz o vínculo (`repasse` null). O vínculo fica em
+ * metadados.repasseId e no livro (evento VINCULO_REPASSE, com o vínculo anterior e o motivo): a execução do repasse é a soma
+ * dos processos vinculados. Só processos com pagamento (fila cronológica) se vinculam. Vale também com o processo encerrado
+ * (uma despesa já paga pode ser atribuída ao repasse depois). A autorização por área é do módulo de repasses, que chama esta
+ * função depois de conferir quem pede (src/modulos/repasses/operacoes.ts).
+ */
+export async function vincularRepasse(u: SessaoUsuario, processoId: string, repasse: { id: string; rotulo: string } | null, motivo?: string) {
+  const p = await carregarProcesso(u.municipioId, processoId);
+  if (!p) throw new ErroFluxo("Processo não encontrado.");
+  if (!p.def.estados.some((e) => e.filaCronologica)) throw new ErroFluxo("Só processos de compra ou de pagamento se vinculam a repasse.");
+  return db.transaction(async (tx) => {
+    const [linha] = await tx.select({ meta: processos.metadados }).from(processos).where(eq(processos.id, p.id)).for("update");
+    const meta = { ...((linha?.meta as Record<string, unknown> | null) ?? {}) };
+    const anterior = typeof meta.repasseId === "string" ? meta.repasseId : null;
+    if (repasse && anterior === repasse.id) throw new ErroFluxo("O processo já está vinculado a este repasse.");
+    if (!repasse && !anterior) throw new ErroFluxo("O processo não está vinculado a nenhum repasse.");
+    if (repasse) meta.repasseId = repasse.id;
+    else delete meta.repasseId;
+    await gravarMeta(tx, p.id, meta);
+    const dados: Record<string, unknown> = { repasseId: repasse?.id ?? null, anteriorId: anterior };
+    if (repasse) dados.rotulo = repasse.rotulo;
+    if (motivo?.trim()) dados.motivo = motivo.trim();
+    await registrarEvento(tx, p.id, u.id, "VINCULO_REPASSE", { dados });
   });
 }
 

@@ -7,11 +7,12 @@ import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarD
 import { analisarFracionamento, type AnaliseFracionamento } from "@/lib/conformidade";
 import type { Papel } from "@/lib/workflow";
 import { paginaInicial } from "@/lib/areas";
+import { ErroRepasse, repasseParaVincular } from "@/modulos/repasses/operacoes";
 
 export type ActionState = { erro?: string; ok?: string } | null;
 
 function trata(e: unknown): ActionState {
-  if (e instanceof ErroFluxo) return { erro: e.message };
+  if (e instanceof ErroFluxo || e instanceof ErroRepasse) return { erro: e.message };
   if (e instanceof Error && e.message === "NAO_AUTENTICADO") redirect("/login");
   console.error(e);
   return { erro: "Erro inesperado. Tente novamente." };
@@ -36,7 +37,10 @@ export async function abrirProcessoAction(_: ActionState, fd: FormData): Promise
     const u = await requireUser();
     const metadados: Record<string, unknown> = {};
     for (const [k, v] of fd.entries()) if (k.startsWith("meta.") && String(v).trim()) metadados[k.slice(5)] = String(v).trim();
+    const repasseId = str(fd, "repasseId");
+    const repasse = repasseId ? await repasseParaVincular(u, repasseId) : undefined;
     const p = await abrirProcesso(u, {
+      repasse,
       tipoId: str(fd, "tipoId"),
       unidadeGestoraId: str(fd, "unidadeGestoraId"),
       assunto: str(fd, "assunto"),

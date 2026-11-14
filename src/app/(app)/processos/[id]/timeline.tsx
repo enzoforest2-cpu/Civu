@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, Send, Undo2, CheckCircle2, Landmark, Building2 } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, Flag, MessageSquare, PenLine, Paperclip, Send, Undo2, CheckCircle2, Landmark, Building2, HandCoins } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { dataBr } from "./etapas/util";
@@ -30,6 +30,7 @@ const ESTILO: Record<string, { icon: LucideIcon; cor: string }> = {
   DADOS_CONTRATACAO: { icon: Building2, cor: "bg-brand-soft text-brand-2" },
   CORRECAO_CONTRATACAO: { icon: Building2, cor: "bg-warn-soft text-warn" },
   REMESSA_TCE: { icon: Landmark, cor: "bg-ok-soft text-ok" },
+  VINCULO_REPASSE: { icon: HandCoins, cor: "bg-brand-soft text-brand-2" },
   EXIGENCIA: { icon: MessageSquare, cor: "bg-warn-soft text-warn" },
   RESPOSTA_EXIGENCIA: { icon: MessageSquare, cor: "bg-ok-soft text-ok" },
 };
@@ -51,6 +52,8 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
               const so = (e.dados as { solicitante: { nome: string; canal: string } }).solicitante;
               titulo = `Pedido de ${so.nome} pelo ${so.canal === "WHATSAPP" ? "WhatsApp" : "portal"}`;
             }
+            const rep = (e.dados as { repasse?: { rotulo: string } } | null)?.repasse;
+            if (rep) detalhe = `Vinculado ao repasse ${rep.rotulo}.`;
             const al = (e.dados as { alertaFracionamento?: { situacao: string; total: number; limite: number } } | null)?.alertaFracionamento;
             if (al)
               detalhe =
@@ -86,6 +89,10 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
           case "RESPOSTA_EXIGENCIA":
             titulo = `${d.nome ?? "Interessado"} respondeu pelo portal`;
             detalhe = d.texto;
+            break;
+          case "VINCULO_REPASSE":
+            titulo = d.repasseId ? `Vinculou ao repasse ${d.rotulo ?? ""}`.trim() : "Desvinculou do repasse";
+            detalhe = d.motivo ?? undefined;
             break;
           case "REMESSA_TCE":
             titulo = `Enviado ao ${d.sistema ?? "Tribunal de Contas"}`;

@@ -56,8 +56,9 @@ import * as contratos from "@/modulos/contratos/registro";
 import * as financas from "@/modulos/financas/registro";
 import * as tributos from "@/modulos/tributos/registro";
 import * as gestao from "@/modulos/gestao/registro";
+import * as repasses from "@/modulos/repasses/registro";
 
-const MODULOS: { gestao?: ItemGestao[]; portal?: AtalhoPortal[] }[] = [servicos, contratos, financas, tributos, gestao];
+const MODULOS: { gestao?: ItemGestao[]; portal?: AtalhoPortal[] }[] = [servicos, contratos, financas, tributos, gestao, repasses];
 
 export const ITENS_GESTAO: ItemGestao[] = [...NUCLEO, ...MODULOS.flatMap((m) => m.gestao ?? [])].filter((i) => !foraDoEscopo(i.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));
 export const ATALHOS_PORTAL: AtalhoPortal[] = [...ATALHOS_NUCLEO, ...MODULOS.flatMap((m) => m.portal ?? [])].filter((a) => !foraDoEscopo(a.href)).sort((a, b) => (a.ordem ?? 50) - (b.ordem ?? 50));

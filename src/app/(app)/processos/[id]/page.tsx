@@ -23,6 +23,8 @@ import { Timeline } from "./timeline";
 import { IrPara } from "./ir-para";
 import { PainelDaEtapa } from "./etapas";
 import { CorrecaoContratacao } from "./etapas/correcao-contratacao";
+import { repasseBasico } from "@/modulos/repasses/dados";
+import { podeVerNaArea } from "@/modulos/repasses/regras";
 
 const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; texto: string }> = {
   cumprida: { tone: "ok", texto: "Cumprida" },
@@ -47,6 +49,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const listaSetores = await db.query.setores.findMany({ where: eq(setores.municipioId, u.municipioId), orderBy: setores.nome });
   const meta = (p.metadados ?? {}) as Record<string, unknown>;
   const camposMeta = p.def.camposAbertura ?? [];
+  const repasse = typeof meta.repasseId === "string" ? await repasseBasico(u.municipioId, meta.repasseId) : null;
   const noMeuSetor = p.setorAtualId === u.setorId;
   const podeTramitarLivre = !p.encerradoEm && (p.estado.setor === "LIVRE" || u.papeis.includes("PROTOCOLO"));
   // Trilho: só as etapas que valem para a modalidade do processo; o ramo escolhido conta como caminho normal
@@ -504,7 +507,35 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                     </div>
                   );
                 })}
+                {repasse && (
+                  <div>
+                    <dt className="text-[12.5px] text-ink-3">Repasse que paga esta despesa</dt>
+                    <dd className="text-[14.5px] text-ink">
+                      {podeVerNaArea(u, repasse.area) ? (
+                        <Link href={`/repasses/${repasse.id}`} className="font-semibold text-brand-2 hover:underline">
+                          {repasse.rotulo}
+                        </Link>
+                      ) : (
+                        repasse.rotulo
+                      )}
+                      <span className="block text-[13px] text-ink-2">{repasse.objeto}</span>
+                    </dd>
+                  </div>
+                )}
               </dl>
+            </Panel>
+          )}
+
+          {camposMeta.length === 0 && repasse && (
+            <Panel title="Repasse que paga esta despesa">
+              {podeVerNaArea(u, repasse.area) ? (
+                <Link href={`/repasses/${repasse.id}`} className="font-semibold text-brand-2 hover:underline">
+                  {repasse.rotulo}
+                </Link>
+              ) : (
+                <span className="font-semibold text-ink">{repasse.rotulo}</span>
+              )}
+              <p className="text-[13px] text-ink-2">{repasse.objeto}</p>
             </Panel>
           )}
 

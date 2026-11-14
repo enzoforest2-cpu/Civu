@@ -28,7 +28,7 @@ export const nomeFonte = (f: string) => FONTES[f] ?? "Fonte não informada";
  * ainda sem confirmação) e `pago` (confirmado). Há etapa de envio quando o primeiro avanço da fila leva a um estado que pode
  * devolver o processo à fila (banco recusou); sem isso, o primeiro avanço da fila já é o pagamento.
  */
-async function estadosDeFila(municipioId: string) {
+export async function estadosDeFila(municipioId: string) {
   const tipos = await db.query.tiposProcesso.findMany({ where: eq(tiposProcesso.municipioId, municipioId) });
   const m = new Map<string, { fila: string; enviado?: string; pago: string }>();
   for (const t of tipos) {

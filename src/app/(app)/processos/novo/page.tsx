@@ -5,12 +5,14 @@ import { requireUser } from "@/lib/auth";
 import { Cabecalho } from "@/components/ui";
 import { NovoProcessoForm } from "./form";
 import type { WorkflowDef } from "@/lib/workflow";
+import { repassesParaVincular } from "@/modulos/repasses/dados";
 
 export default async function NovoProcessoPage() {
   const u = await requireUser();
-  const [tipos, ugs] = await Promise.all([
+  const [tipos, ugs, repasses] = await Promise.all([
     db.query.tiposProcesso.findMany({ where: eq(tiposProcesso.municipioId, u.municipioId) }),
     db.query.unidadesGestoras.findMany({ where: eq(unidadesGestoras.municipioId, u.municipioId) }),
+    repassesParaVincular(u),
   ]);
   const tiposUi = tipos
     .filter((t) => t.ativo)
@@ -25,7 +27,7 @@ export default async function NovoProcessoPage() {
   return (
     <>
       <Cabecalho titulo="Abrir processo" sub="Preencha o pedido. O protocolo dá o número e o processo começa a andar." />
-      <NovoProcessoForm tipos={tiposUi} ugs={ugs.map((x) => ({ id: x.id, nome: x.nome }))} setor={u.setor?.nome ?? "sem setor"} />
+      <NovoProcessoForm tipos={tiposUi} ugs={ugs.map((x) => ({ id: x.id, nome: x.nome }))} setor={u.setor?.nome ?? "sem setor"} repasses={repasses} />
     </>
   );
 }

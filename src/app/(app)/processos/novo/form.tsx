@@ -16,7 +16,9 @@ const DICA: Record<string, string> = {
   modalidade: "Se não souber, escolha “Ainda não sei”: compras define.",
 };
 
-export function NovoProcessoForm({ tipos, ugs, setor }: { tipos: Tipo[]; ugs: { id: string; nome: string }[]; setor: string }) {
+type RepasseOpcao = { id: string; rotulo: string; objeto: string; setor: string };
+
+export function NovoProcessoForm({ tipos, ugs, setor, repasses = [] }: { tipos: Tipo[]; ugs: { id: string; nome: string }[]; setor: string; repasses?: RepasseOpcao[] }) {
   const [tipoId, setTipoId] = useState(tipos[0]?.id ?? "");
   const tipo = tipos.find((t) => t.id === tipoId);
   const [campos, setCampos] = useState({ ug: ugs[0]?.id ?? "", natureza: "", modalidade: "", valor: "" });
@@ -150,6 +152,24 @@ export function NovoProcessoForm({ tipos, ugs, setor }: { tipos: Tipo[]; ugs: { 
                   </div>
                 ))}
               </div>
+              {tipo.chave === "COMPRA" && repasses.length > 0 && (
+                <div className="mt-4">
+                  <label className="label" htmlFor="repasseId">
+                    Repasse que paga esta compra <span className="font-normal text-ink-3">(opcional)</span>
+                  </label>
+                  <select id="repasseId" name="repasseId" className="input" defaultValue="" aria-describedby="repasseId-dica">
+                    <option value="">Nenhum: recurso próprio ou ainda não definido</option>
+                    {repasses.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.rotulo}: {r.objeto} ({r.setor})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="hint" id="repasseId-dica">
+                    Emenda, convênio ou transferência da sua área. O que for pago neste processo entra na execução do repasse. Dá para vincular depois, na página do repasse.
+                  </p>
+                </div>
+              )}
               {checar && analise && (
                 <div className="mt-5" aria-live="polite">
                   <LimiteDispensa a={analise} ug={ugs.find((g) => g.id === campos.ug)?.nome} />
