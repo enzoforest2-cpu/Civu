@@ -337,5 +337,55 @@ export function COMPRAS_SEED(ano: number): CompraDemo[] {
       periodo: [1, 1],
       atual: ["DFD"],
     },
+    // Cabines da Assistência Social e da Fazenda (Comando da prefeitura, Parte 2): um pedido esperando o(a) secretário(a)
+    // e outro já fora da secretaria, em cada pasta
+    {
+      // 7. Assistência Social: pedido do CRAS esperando a aprovação da secretária
+      assunto: "Aquisição de cestas básicas emergenciais para famílias acompanhadas pelo CRAS",
+      req: "18181818181",
+      meta: {
+        objeto: "120 cestas básicas para atendimento emergencial", natureza: "GENEROS_ALIMENTICIOS", modalidade: "DISPENSA_VALOR",
+        justificativa: "Estoque do benefício eventual de alimentação acaba antes do fim do trimestre.", quantidade: "120 cestas",
+        valorEstimado: 21600, dataPretendida: `${ano}-12-15`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "APROVACAO_SECRETARIO",
+      periodo: [3, 1],
+    },
+    {
+      // 8. Assistência Social: oficinas do centro de convivência em instrução em compras
+      assunto: "Contratação de oficinas de convivência para idosos do CRAS",
+      req: "17171717171",
+      meta: {
+        objeto: "Oficinas semanais de atividade física, artesanato e memória para 60 idosos", natureza: "SERVICOS_GERAIS", modalidade: "LICITACAO",
+        justificativa: "Grupo de convivência do CRAS sem oficineiros desde o fim do contrato anterior.", quantidade: "40 semanas",
+        valorEstimado: 96000, dataPretendida: `${ano + 1}-02-01`, prioridade: "MEDIA", noPCA: "SIM",
+      },
+      ate: "INSTRUCAO",
+      periodo: [18, 6],
+    },
+    {
+      // 9. Fazenda: renovação de licenças esperando o secretário
+      assunto: "Renovação das licenças do sistema de arrecadação tributária",
+      req: "20202020202",
+      meta: {
+        objeto: "Licenças de uso e suporte do sistema de arrecadação por 12 meses", natureza: "SERVICOS_TI", modalidade: "OUTRA_DIRETA",
+        justificativa: "As licenças atuais vencem em janeiro; sem elas não há emissão de guias do IPTU.", quantidade: "12 meses",
+        valorEstimado: 58400, dataPretendida: `${ano + 1}-01-10`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "APROVACAO_SECRETARIO",
+      periodo: [4, 3],
+    },
+    {
+      // 10. Fazenda: carnês do IPTU parados no gabinete com o prazo vencido
+      assunto: "Impressão e postagem dos carnês do IPTU do próximo exercício",
+      req: "19191919191",
+      meta: {
+        objeto: "Impressão, envelopamento e postagem de 9.800 carnês do IPTU", natureza: "SERVICOS_GERAIS", modalidade: "LICITACAO",
+        justificativa: "Os carnês precisam chegar aos contribuintes antes do vencimento da cota única, em fevereiro.", quantidade: "9.800 carnês",
+        valorEstimado: 42300, dataPretendida: `${ano + 1}-01-20`, prioridade: "ALTA", noPCA: "SIM",
+      },
+      ate: "AUTORIZACAO",
+      periodo: [12, 7],
+    },
   ];
 }

@@ -103,6 +103,8 @@ export const contratosDemo: ModuloDemo = {
       ["serraalta", cnpj("126948350001"), "Construtora Serra Alta Ltda", "Serra Alta", "DEMAIS", ["4211-1/01"], end("Rua Sinimbu", "1870", "Centro", "Caxias do Sul")],
       ["ampliar", cnpj("409173620001"), "Ampliar Engenharia e Construções Ltda", "Ampliar Engenharia", "EPP", ["4120-4/00"], end("Rua Coberta", "45", "Centro", "Bento Gonçalves")],
       ["pilarsul", cnpj("357280140001"), "Pilar Sul Construções Ltda", "Pilar Sul", "DEMAIS", ["4120-4/00"], end("Av. Itália", "990", "São Bento", "Bento Gonçalves")],
+      ["tributasul", cnpj("468215930001"), "Tributa Sul Sistemas de Gestão Ltda", "Tributa Sul", "EPP", ["6203-1/00"], end("Rua Os Dezoito do Forte", "640", "Centro", "Caxias do Sul")],
+      ["saborserra", cnpj("539162740001"), "Sabor da Serra Alimentação Coletiva Ltda", "Sabor da Serra", "ME", ["5620-1/01"], end("Rua Garibaldi", "1022", "Centro")],
     ];
     const E: Record<string, string> = { ...ctx.empresas };
     for (const [k, c, razaoSocial, nomeFantasia, porte, atividades, endereco] of novasEmpresas) {
@@ -455,6 +457,47 @@ export const contratosDemo: ModuloDemo = {
       fiscalId: U["12121212121"],
       gestorId: U["33333333333"],
     });
+
+    // ===================================================================
+    // Cabines da Assistência Social e da Fazenda: um contrato vigente em cada pasta
+    // ===================================================================
+    const cRefeicoes = await contrato({
+      ano: Number(d(-280).slice(0, 4)),
+      numero: 29,
+      objeto: "Fornecimento de lanches e refeições para os grupos de convivência do CRAS",
+      natureza: "SERVICO_CONTINUO",
+      modalidade: "PREGAO",
+      empresaId: E.saborserra,
+      setorId: ctx.setores.SEMAS,
+      unidadeGestoraId: ctx.ugs["01"],
+      valorGlobal: "86400.00",
+      fonte: "ASSISTENCIA",
+      assinadoEm: d(-280),
+      vigenciaInicio: d(-275),
+      vigenciaFim: d(72),
+      fiscalId: U["17171717171"],
+      gestorId: U["33333333333"],
+    });
+    await historico(cRefeicoes.id, U["17171717171"], 410, [-8, -7, -6, -5, -4, -3, -2].map((k) => [k, 7200] as [number, number]));
+    await nota(cRefeicoes.id, U["17171717171"], { numero: "688", valor: 7200, comp: m(-1), situacao: "AGUARDANDO_ATESTO", criadaHa: 3 });
+    const cSistema = await contrato({
+      ano: Number(d(-320).slice(0, 4)),
+      numero: 9,
+      objeto: "Licença de uso, suporte e hospedagem do sistema de gestão tributária",
+      natureza: "SERVICO_CONTINUO",
+      modalidade: "INEXIGIBILIDADE",
+      empresaId: E.tributasul,
+      setorId: ctx.setores.SEFAZ,
+      unidadeGestoraId: ctx.ugs["01"],
+      valorGlobal: "57600.00",
+      fonte: "ORDINARIOS",
+      assinadoEm: d(-320),
+      vigenciaInicio: d(-318),
+      vigenciaFim: d(47),
+      fiscalId: U["19191919191"],
+      gestorId: U["33333333333"],
+    });
+    await historico(cSistema.id, U["19191919191"], 1201, [-9, -8, -7, -6, -5, -4, -3, -2, -1].map((k) => [k, 4800] as [number, number]));
 
     // ===================================================================
     // 8. Limpeza — encerrado por fim da vigência; 9. Ar-condicionado — rescindido

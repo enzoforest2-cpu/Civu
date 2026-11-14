@@ -7,6 +7,7 @@ import { Cabecalho, Panel, Vazio } from "@/components/ui";
 import { alertasContratos, listarContratos } from "@/modulos/contratos/dados";
 import { NATUREZAS_CONTRATO, dataLocal } from "@/modulos/contratos/regras";
 import { BarraSaldo, ChipContrato, ChipObra, Numero, pct } from "@/modulos/contratos/componentes";
+import { recorteDaPasta } from "@/modulos/gestao/cabine";
 
 const ABAS = [
   { chave: "ativos", rotulo: "Em vigor" },
@@ -18,11 +19,15 @@ const ABAS = [
 
 const ICONE = { VIGENCIA: AlertTriangle, SALDO: Wallet, ATESTO: ClipboardCheck, OBRA: TrendingDown, ADITIVO: AlertTriangle };
 
-export default async function ContratosPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string; alertas?: string }> }) {
+export default async function ContratosPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string; alertas?: string; pasta?: string }> }) {
   const u = await exigirRota("/contratos");
   const sp = await searchParams;
-  const todos = await listarContratos(u.municipioId);
+  // Recorte pela pasta, no servidor: secretarias finalísticas veem só os contratos da própria secretaria
+  const recorte = await recorteDaPasta(u, sp.pasta);
+  const doMunicipio = await listarContratos(u.municipioId);
+  const todos = recorte.cabine ? doMunicipio.filter((c) => !!c.setorId && recorte.cabine!.ids.includes(c.setorId)) : doMunicipio;
   const alertas = await alertasContratos(u.municipioId, todos);
+  const qPasta = recorte.cabine && !recorte.forcado ? `&pasta=${recorte.cabine.setor.sigla}` : "";
   const aba = ABAS.find((a) => a.chave === sp.aba)?.chave ?? "ativos";
   const q = (sp.q ?? "").trim().toLowerCase();
   const filtroAba = (c: (typeof todos)[number]) => filtroAbaDe(aba, c);
@@ -43,7 +48,11 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
     <>
       <Cabecalho
         titulo="Contratos"
-        sub="Vigência, saldo, aditivos e notas de cada contrato, do atesto do fiscal até o pagamento na ordem cronológica."
+        sub={
+          recorte.cabine
+            ? `Contratos da ${recorte.cabine.setor.nome}: vigência, saldo, aditivos e notas, do atesto do fiscal até o pagamento na ordem cronológica.`
+            : "Vigência, saldo, aditivos e notas de cada contrato, do atesto do fiscal até o pagamento na ordem cronológica."
+        }
         acao={
           temPapel(u, "COMPRAS") ? (
             <Link href="/contratos/novo" className="btn btn-primary">
@@ -69,7 +78,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
         className="mb-6"
         action={
           alertas.length > 5 ? (
-            <Link href={mostrarTodos ? "/contratos" : "/contratos?alertas=todos"} className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
+            <Link href={mostrarTodos ? `/contratos?aba=${aba}${qPasta}` : `/contratos?alertas=todos${qPasta}`} className="alvo-toque text-[14px] font-semibold text-brand-2 hover:underline">
               {mostrarTodos ? "Mostrar menos" : "Ver todos"}
             </Link>
           ) : undefined
@@ -105,7 +114,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
           {ABAS.map((a) => (
             <Link
               key={a.chave}
-              href={`/contratos?aba=${a.chave}${q ? `&q=${encodeURIComponent(sp.q ?? "")}` : ""}`}
+              href={`/contratos?aba=${a.chave}${qPasta}${q ? `&q=${encodeURIComponent(sp.q ?? "")}` : ""}`}
               aria-current={aba === a.chave ? "page" : undefined}
               className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 text-[14px] font-medium transition-colors ${
                 aba === a.chave ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-2 hover:border-line-2 hover:text-ink"
@@ -118,6 +127,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
         </div>
         <form className="relative w-full sm:w-72" action="/contratos">
           <input type="hidden" name="aba" value={aba} />
+          {qPasta && <input type="hidden" name="pasta" value={recorte.cabine!.setor.sigla} />}
           <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input name="q" defaultValue={sp.q ?? ""} className="input !py-2 !pl-9" placeholder="Objeto, empresa, CNPJ ou número" aria-label="Buscar contrato" />
         </form>
@@ -126,7 +136,13 @@ export default async function ContratosPage({ searchParams }: { searchParams: Pr
       <Panel pad={false}>
         {lista.length === 0 ? (
           <div className="p-6">
-            <Vazio>{q ? `Nenhum contrato encontrado para "${sp.q}".` : "Nenhum contrato nesta situação."}</Vazio>
+            <Vazio>
+              {q
+                ? `Nenhum contrato encontrado para "${sp.q}".`
+                : recorte.forcado && todos.length === 0
+                  ? "A sua secretaria ainda não tem contratos. Eles aparecem aqui quando Compras registra um contrato com a secretaria como responsável."
+                  : "Nenhum contrato nesta situação."}
+            </Vazio>
           </div>
         ) : (
           <>

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { AREAS, AREA_CHAVES, AREA_DA_SIGLA, ehArea, paginaInicial, podeVerArea, podeVerRota, regraDaRota, urlSemAcesso, veTudo, type Area, type UsuarioComArea } from "./areas";
+import { AREAS, AREA_CHAVES, AREA_DA_SIGLA, cabineDoSetor, ehArea, ehCabine, paginaInicial, podeAbrirCabine, setoresDaCabine, veTodasAsPastas, type SetorDaCabine, podeVerArea, podeVerRota, regraDaRota, urlSemAcesso, veTudo, type Area, type UsuarioComArea } from "./areas";
 
 const pessoa = (papeis: string[], area: Area | null): UsuarioComArea => ({ papeis, setor: area === null ? null : { area } });
 
@@ -131,4 +131,49 @@ test("migração 0003 preenche a área pela mesma tabela de siglas de areas.ts",
   const sql = readFileSync(path.join(process.cwd(), "drizzle/0003_areas_dos_setores.sql"), "utf8");
   const pares = [...sql.matchAll(/WHEN '([A-Z]+)' THEN '([A-Z_]+)'/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(Object.fromEntries(pares), AREA_DA_SIGLA);
+});
+
+// ---------------------------------------------------------------------------
+// Cabine da secretaria (Parte 2)
+// ---------------------------------------------------------------------------
+const ORGAO: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "03", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
+const SETORES: SetorDaCabine[] = Object.entries(AREA_DA_SIGLA).map(([sigla, area]) => ({ id: sigla, sigla, nome: sigla, area, orgaoOrcamentario: ORGAO[sigla] ?? null }));
+const comSetor = (u: UsuarioComArea, setorId: string | null) => ({ ...u, setorId });
+const cab = (sigla: string) => SETORES.find((s) => s.sigla === sigla)!;
+
+test("cabines: secretarias com órgão, Compras e Controle; gabinete e setores de apoio não", () => {
+  const com = SETORES.filter(ehCabine).map((s) => s.sigla).sort();
+  assert.deepEqual(com, ["CGM", "COMPRAS", "SEDUC", "SEFAZ", "SEINFRA", "SEMAD", "SEMAS", "SESAU"]);
+  // setores de apoio caem na cabine da área
+  assert.equal(cabineDoSetor(SETORES, "CONTAB")?.sigla, "SEFAZ");
+  assert.equal(cabineDoSetor(SETORES, "TRIB")?.sigla, "SEFAZ");
+  assert.equal(cabineDoSetor(SETORES, "SMSU")?.sigla, "SEINFRA");
+  assert.equal(cabineDoSetor(SETORES, "GAB"), null);
+  assert.equal(cabineDoSetor(SETORES, "PGM"), null);
+  assert.deepEqual(setoresDaCabine(SETORES, cab("SEFAZ")).sort(), ["CONTAB", "SEFAZ", "TES", "TRIB"]);
+  assert.deepEqual(setoresDaCabine(SETORES, cab("SEINFRA")).sort(), ["SEINFRA", "SMMA", "SMSU"]);
+  assert.deepEqual(setoresDaCabine(SETORES, cab("SESAU")), ["SESAU"]);
+});
+
+test("cabines: secretário de uma pasta não abre a de outra; gabinete, controle e administrador abrem todas", () => {
+  const saude = comSetor(PERFIS.secretarioSaude, "SESAU");
+  const infra = comSetor(PERFIS.secretarioInfra, "SEINFRA");
+  for (const s of SETORES.filter(ehCabine)) {
+    assert.equal(podeAbrirCabine(saude, s, SETORES), s.sigla === "SESAU", "saúde → " + s.sigla);
+    assert.equal(podeAbrirCabine(infra, s, SETORES), s.sigla === "SEINFRA", "infra → " + s.sigla);
+    assert.equal(podeAbrirCabine(comSetor(PERFIS.prefeita, "GAB"), s, SETORES), true);
+    assert.equal(podeAbrirCabine(comSetor(PERFIS.controladora, "CGM"), s, SETORES), true);
+    assert.equal(podeAbrirCabine(comSetor(PERFIS.administradorTi, "SEMAD"), s, SETORES), true);
+  }
+  // servidor de apoio abre a cabine da área; quem não tem cabine não abre nenhuma
+  assert.equal(podeAbrirCabine(comSetor(PERFIS.contador, "CONTAB"), cab("SEFAZ"), SETORES), true);
+  assert.equal(podeAbrirCabine(comSetor(PERFIS.contador, "CONTAB"), cab("SESAU"), SETORES), false);
+  assert.equal(podeAbrirCabine(comSetor(PERFIS.procurador, "PGM"), cab("SESAU"), SETORES), false);
+  // setor sem cabine nunca abre como cabine
+  assert.equal(podeAbrirCabine(comSetor(PERFIS.prefeita, "GAB"), cab("GAB"), SETORES), false);
+});
+
+test("recorte por pasta: Fazenda, Compras e visão total veem todas; secretarias finalísticas só a sua", () => {
+  for (const k of ["prefeita", "controladora", "administradorTi", "secretarioFazenda", "contador", "compras"] as const) assert.equal(veTodasAsPastas(PERFIS[k]), true, k);
+  for (const k of ["secretarioSaude", "secretarioInfra", "secretariaAssistencia", "ordenadoraAdministracao", "requisitanteSaude"] as const) assert.equal(veTodasAsPastas(PERFIS[k]), false, k);
 });

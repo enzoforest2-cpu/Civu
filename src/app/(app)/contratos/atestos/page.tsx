@@ -9,19 +9,24 @@ import { situacaoDasNotas } from "@/modulos/contratos/dados";
 import { ehFiscalDo, podeEnviarLiquidacao } from "@/modulos/contratos/operacoes";
 import { numeroContrato, rotuloMes } from "@/modulos/contratos/regras";
 import { AcoesNota } from "@/modulos/contratos/acoes-nota";
+import { recorteDaPasta } from "@/modulos/gestao/cabine";
 
-export default async function AtestosPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+export default async function AtestosPage({ searchParams }: { searchParams: Promise<{ ver?: string; pasta?: string }> }) {
   const u = await exigirRota("/contratos/atestos");
-  const { ver } = await searchParams;
+  const { ver, pasta } = await searchParams;
+  // Recorte pela pasta: secretaria finalística vê as notas dos contratos dela e as dos contratos em que a pessoa é fiscal ou gestora
+  const recorte = await recorteDaPasta(u, pasta);
+  const daPasta = (c: { setorId: string | null; fiscalId: string | null; gestorId: string | null }) =>
+    !recorte.cabine || (!!c.setorId && recorte.cabine.ids.includes(c.setorId)) || (recorte.forcado && (c.fiscalId === u.id || c.gestorId === u.id));
   const notas = (
     await db.query.contratoNotas.findMany({
       where: inArray(contratoNotas.situacao, ["AGUARDANDO_ATESTO", "ATESTADA"]),
       with: { contrato: { with: { empresa: true, fiscal: { columns: { id: true, nome: true } } } }, enviadaPor: { columns: { nome: true } } },
       orderBy: (n, { asc }) => [asc(n.criadoEm)],
     })
-  ).filter((n) => n.contrato.municipioId === u.municipioId);
+  ).filter((n) => n.contrato.municipioId === u.municipioId && daPasta(n.contrato));
   const minhasTodas = notas.filter((n) => n.contrato.fiscalId === u.id || n.contrato.gestorId === u.id);
-  const soMinhas = ver !== "todas" && minhasTodas.length > 0;
+  const soMinhas = ver !== "todas" && !pasta && minhasTodas.length > 0;
   const lista = soMinhas ? minhasTodas : notas;
   const st = await situacaoDasNotas(u.municipioId, lista);
   const atrasadas = lista.filter((n) => (st[n.id]?.diasUteisSemAtesto ?? 0) > 5).length;

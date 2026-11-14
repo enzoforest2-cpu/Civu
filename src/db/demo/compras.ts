@@ -251,6 +251,8 @@ export async function criarComprasDemo(db: NodePgDatabase<typeof s>, base: Base,
     SESAU: { sec: await sessao("88888888888"), fiscal: await sessao("88888888888") },
     SEDUC: { sec: await sessao("10101010101"), fiscal: await sessao("10101010101") },
     SEMAD: { sec: await sessao("12121212121"), fiscal: await sessao("12121212121") },
+    SEMAS: { sec: await sessao("17171717171"), fiscal: await sessao("17171717171") },
+    SEFAZ: { sec: await sessao("19191919191"), fiscal: await sessao("19191919191") },
   };
   const tipo = await db.query.tiposProcesso.findFirst({ where: eq(s.tiposProcesso.id, base.tipos.COMPRA) });
   const def = tipo!.definicao as WorkflowDef;

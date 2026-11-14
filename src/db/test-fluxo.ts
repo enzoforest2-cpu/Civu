@@ -14,7 +14,7 @@ const origLoad = (Module as unknown as { _load: (req: string, ...a: unknown[]) =
 async function main() {
   const { db } = await import("./index");
   const { usuarios, unidadesGestoras, tiposProcesso, processos } = await import("./schema");
-  const { eq, and } = await import("drizzle-orm");
+  const { eq, and, inArray } = await import("drizzle-orm");
   const engine = await import("../lib/engine");
   const { avancosDisponiveis, caminhoDoProcesso, FONTES } = await import("../lib/workflow");
   const { isDiaUtil } = await import("../lib/dates");
@@ -670,6 +670,54 @@ async function main() {
   ca = await carregar(pa.id);
   if (!ca.recebidoEm) falha("o setor de destino deveria receber normalmente");
   ok("ADMIN não age em processo: não avança, não assina, não recebe nem registra contratação ou remessa");
+
+  // ---- cabine da secretaria (Comando da prefeitura, Parte 2): recorte por pasta conferido no servidor
+  {
+    const cab = await import("../modulos/gestao/cabine");
+    const secSaude = await sessao("88888888888");
+    const secInfra = await sessao("16161616161");
+    const contadorCab = await sessao("44444444444");
+    const a1 = await cab.autorizarCabine(secSaude, "SEINFRA");
+    if (a1.ok || a1.motivo !== "sem-acesso") falha("secretário de saúde não pode abrir a cabine da infraestrutura");
+    const a2 = await cab.autorizarCabine(secInfra, "sesau");
+    if (a2.ok) falha("secretário de infraestrutura não pode abrir a cabine da saúde");
+    const propria = await cab.autorizarCabine(secSaude, "SESAU");
+    if (!propria.ok) falha("secretário de saúde abre a própria cabine");
+    for (const sigla of ["SESAU", "SEINFRA", "SEFAZ", "SEMAS", "COMPRAS", "CGM"]) {
+      if (!(await cab.autorizarCabine(prefeita, sigla)).ok) falha("a prefeita abre a cabine " + sigla);
+      if (!(await cab.autorizarCabine(controladora, sigla)).ok) falha("o controle interno abre a cabine " + sigla);
+    }
+    if (!(await cab.autorizarCabine(contadorCab, "SEFAZ")).ok) falha("a contabilidade abre a cabine da Fazenda");
+    if ((await cab.autorizarCabine(prefeita, "GAB")).ok) falha("o gabinete não tem cabine (é a Sala do prefeito)");
+    ok("cabine: secretário abre só a própria; gabinete e controle abrem todas; setor de apoio abre a da área");
+
+    // as listas filtradas da pasta (?pasta=SEINFRA em contratos e orçamento) também recusam outra secretaria
+    let redirecionou = false;
+    try { await cab.recorteDaPasta(secSaude, "SEINFRA"); } catch (e) { redirecionou = (e as Error).message === "REDIRECT"; }
+    if (!redirecionou) falha("pedir a pasta de outra secretaria deve levar a 'Sem acesso'");
+    const rSaude = await cab.recorteDaPasta(secSaude);
+    if (!rSaude.forcado || rSaude.cabine?.setor.sigla !== "SESAU") falha("secretaria finalística vê só a própria pasta: " + JSON.stringify(rSaude.cabine?.setor));
+    const rPref = await cab.recorteDaPasta(prefeita, "SEINFRA");
+    if (rPref.forcado || rPref.cabine?.setor.sigla !== "SEINFRA") falha("a prefeita filtra qualquer pasta sem recorte imposto");
+    if ((await cab.recorteDaPasta(contadorCab)).forcado) falha("a Fazenda vê contratos e orçamento de todas as pastas");
+
+    // os dados da cabine são só da pasta
+    if (!propria.ok) throw new Error();
+    const d = await cab.carregarCabine(prefeita.municipioId, propria.cabine);
+    const ids = new Set(propria.cabine.ids);
+    const donos = d.processos.length
+      ? await db.select({ setor: usuarios.setorId }).from(processos).innerJoin(usuarios, eq(usuarios.id, processos.abertoPorId)).where(inArray(processos.id, d.processos.map((p) => p.id)))
+      : [];
+    if (!donos.length || donos.some((x) => !ids.has(x.setor ?? ""))) falha("processos da cabine devem ser abertos pela própria pasta");
+    if (d.contratos.some((c) => !ids.has(c.setorId ?? ""))) falha("contratos da cabine devem ser da própria pasta");
+    if (d.repasses.some((r) => !ids.has(r.setor.id)) || d.obrigacoes.some((o) => !ids.has(o.setor.id))) falha("repasses e obrigações da cabine devem ser da pasta");
+    if (!d.orcamento.orgaos.every((o) => o === "06")) falha("orçamento da saúde deve ser do órgão 06: " + d.orcamento.orgaos.join(","));
+    const dInfra = await cab.carregarCabine(prefeita.municipioId, (await cab.autorizarCabine(prefeita, "SEINFRA") as { cabine: typeof propria.cabine }).cabine);
+    const pAprov = dInfra.pendencias.find((p) => p.tipo === "APROVACAO");
+    if (!pAprov?.aprovar) falha("a cabine da infraestrutura deve trazer a aprovação pendente do secretário");
+    if (!dInfra.pendencias.some((p) => p.tipo === "ASSINATURA" && p.documentos.length)) falha("a cabine da infraestrutura deve trazer o TR para o secretário assinar");
+    ok(`cabine da saúde: ${d.processos.length} processos, ${d.contratos.length} contratos e ${d.repasses.length} repasses, todos da pasta; pendências do secretário de infraestrutura encontradas`);
+  }
 
   console.log("\nTodos os testes passaram.");
   process.exit(0);

@@ -1,6 +1,7 @@
 import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { cabinesDoMunicipio, recorteDaPasta, semAcessoCabine } from "@/modulos/gestao/cabine";
 import { AlertTriangle, ArrowLeft, ExternalLink, HardHat } from "lucide-react";
 import { temPapel } from "@/lib/auth";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
@@ -32,6 +33,12 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const c = await carregarContrato(u.municipioId, id);
   if (!c) notFound();
+  // Recorte pela pasta: secretaria finalística abre só os contratos dela (ou aqueles em que a pessoa é fiscal ou gestora)
+  const recorte = await recorteDaPasta(u);
+  if (recorte.forcado && !(c.setorId && recorte.cabine?.ids.includes(c.setorId)) && c.fiscalId !== u.id && c.gestorId !== u.id) {
+    const dono = (await cabinesDoMunicipio(u.municipioId)).find((x) => !!c.setorId && x.ids.includes(c.setorId));
+    redirect(semAcessoCabine(dono?.setor.sigla ?? "", dono?.setor.area ?? c.setor?.area ?? null, `/contratos/${id}`));
+  }
   const { fin, obra } = c;
   const gerir = podeGerir(u, c) && c.situacao === "ATIVO";
   const fiscal = ehFiscalDo(u, c);

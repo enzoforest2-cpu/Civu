@@ -5,17 +5,26 @@ import { fmtMoeda } from "@/lib/dates";
 import { Cabecalho, Chip, Panel, Vazio } from "@/components/ui";
 import { anoCorrente, execucao, fmtIso } from "@/modulos/financas/dados";
 import { AbasFinancas, BarraExecucao, Classificacao, LegendaExecucao } from "@/modulos/financas/ui";
+import { recorteDaPasta } from "@/modulos/gestao/cabine";
 import { FONTES_DETALHE, FUNCOES, NATUREZAS_DESPESA, TIPOS_CREDITO, fmtCompacto, fmtPct } from "@/modulos/financas/classificacao";
 
 export const dynamic = "force-dynamic";
 
-type SP = { ug?: string; funcao?: string; fonte?: string; q?: string; saldo?: string };
+type SP = { ug?: string; funcao?: string; fonte?: string; q?: string; saldo?: string; orgao?: string; pasta?: string };
 
 export default async function OrcamentoPage({ searchParams }: { searchParams: Promise<SP> }) {
   const u = await exigirRota("/financas/orcamento");
   const sp = await searchParams;
   const ano = anoCorrente();
-  const ex = await execucao(u.municipioId, ano);
+  const ex0 = await execucao(u.municipioId, ano);
+  // Recorte pela pasta, no servidor: secretaria finalística vê só as dotações do órgão dela; Fazenda e visão total veem
+  // tudo e podem filtrar por órgão (?orgao=06) ou por secretaria (?pasta=SESAU)
+  const recorte = await recorteDaPasta(u, sp.pasta);
+  const orgaosPermitidos = recorte.cabine ? recorte.cabine.orgaos : null;
+  const orgao = sp.orgao && (!orgaosPermitidos || orgaosPermitidos.includes(sp.orgao)) ? sp.orgao : "";
+  const dotacoesVisiveis = ex0.dotacoes.filter((d) => (!orgaosPermitidos || orgaosPermitidos.includes(d.orgao)) && (!orgao || d.orgao === orgao));
+  const ex = { ...ex0, dotacoes: dotacoesVisiveis };
+  const orgaosLista = [...new Map(ex0.dotacoes.filter((d) => !orgaosPermitidos || orgaosPermitidos.includes(d.orgao)).map((d) => [d.orgao, d.orgaoNome])).entries()].sort();
   const q = (sp.q ?? "").toLowerCase();
   const lista = ex.dotacoes.filter(
     (d) =>
@@ -38,17 +47,34 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
     <>
       <Cabecalho
         titulo="Orçamento"
-        sub={`Lei Orçamentária Anual de ${ano} por dotação: quanto foi autorizado, quanto já foi comprometido (empenhado), entregue (liquidado) e pago.`}
+        sub={
+          recorte.forcado
+            ? `Orçamento da ${recorte.cabine?.setor.nome ?? "sua secretaria"} na Lei Orçamentária Anual de ${ano}: quanto foi autorizado, comprometido (empenhado), entregue (liquidado) e pago.`
+            : `Lei Orçamentária Anual de ${ano} por dotação: quanto foi autorizado, quanto já foi comprometido (empenhado), entregue (liquidado) e pago.`
+        }
       />
       <AbasFinancas atual="/financas/orcamento" u={u} />
 
-      <form method="get" className="panel mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
+      <form method="get" className="panel mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
         <div className="relative">
           <label className="label" htmlFor="q">
             Buscar
           </label>
           <Search size={16} className="pointer-events-none absolute bottom-3.5 left-3 text-ink-3" />
           <input id="q" name="q" defaultValue={sp.q} className="input !pl-9" placeholder="Ação, programa ou natureza" />
+        </div>
+        <div>
+          <label className="label" htmlFor="orgao">
+            Órgão
+          </label>
+          <select id="orgao" name="orgao" className="input" defaultValue={orgao}>
+            {orgaosLista.length !== 1 && <option value="">Todos</option>}
+            {orgaosLista.map(([cod, nome]) => (
+              <option key={cod} value={cod}>
+                {cod} · {nome}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="label" htmlFor="ug">
@@ -91,7 +117,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
         </div>
         <div className="flex items-end gap-2">
           <button className="btn btn-primary">Filtrar</button>
-          {(filtrado || sp.saldo) && (
+          {(filtrado || sp.saldo || (orgao && !recorte.forcado)) && (
             <Link href="/financas/orcamento" className="btn btn-quiet">
               Limpar
             </Link>
@@ -123,7 +149,7 @@ export default async function OrcamentoPage({ searchParams }: { searchParams: Pr
           {sp.saldo === "baixo" ? (
             <Chip tone="warn">Mostrando dotações com menos de 3% de saldo</Chip>
           ) : (
-            <Link href="/financas/orcamento?saldo=baixo" className="font-semibold text-brand-2 hover:underline">
+            <Link href={`/financas/orcamento?saldo=baixo${orgao ? `&orgao=${orgao}` : ""}`} className="font-semibold text-brand-2 hover:underline">
               Ver dotações quase esgotadas
             </Link>
           )}

@@ -155,6 +155,60 @@ export function paginaInicial(u: UsuarioComArea): "/gabinete" | "/secretaria" | 
   return "/painel";
 }
 
+// ---------------------------------------------------------------------------
+// Cabine da secretaria (Parte 2): qual setor tem cabine, quais setores ela agrupa e quem a abre
+// ---------------------------------------------------------------------------
+
+/** O mínimo de um setor para decidir a cabine (linha de `setores`). */
+export type SetorDaCabine = { id: string; sigla: string; nome: string; area: string | null; orgaoOrcamentario: string | null };
+
+/** Áreas sem pasta orçamentária que têm cabine porque têm módulo próprio (fila de contratações; auditoria). */
+export const AREAS_CABINE_SEM_PASTA: readonly Area[] = ["COMPRAS", "CONTROLE_INTERNO"];
+
+/**
+ * O setor tem cabine? Secretarias de área com pasta e órgão orçamentário ligado (SESAU, SEDUC, SEFAZ...), mais
+ * Compras e Controle Interno. O Gabinete não: a cabine dele é a Sala do prefeito.
+ */
+export function ehCabine(s: SetorDaCabine): boolean {
+  if (!ehArea(s.area) || s.area === "GABINETE") return false;
+  if (AREAS_CABINE_SEM_PASTA.includes(s.area)) return true;
+  return AREAS.some((a) => a.chave === s.area && a.pasta) && !!s.orgaoOrcamentario;
+}
+
+/**
+ * Cabine de um setor: a dele, se tiver; senão a única cabine da mesma área (Contabilidade, Tesouraria e Tributos
+ * ficam na cabine da Fazenda; Serviços Urbanos e Meio Ambiente na de Infraestrutura). Sem cabine única: null.
+ */
+export function cabineDoSetor(setores: readonly SetorDaCabine[], setorId: string | null | undefined): SetorDaCabine | null {
+  const s = setores.find((x) => x.id === setorId);
+  if (!s) return null;
+  if (ehCabine(s)) return s;
+  const mesmas = setores.filter((x) => x.area === s.area && ehCabine(x));
+  return ehArea(s.area) && mesmas.length === 1 ? mesmas[0] : null;
+}
+
+/** Setores cujos processos, contratos e repasses entram na cabine: ela e os setores da área que dependem dela. */
+export function setoresDaCabine(setores: readonly SetorDaCabine[], cabine: SetorDaCabine): string[] {
+  return setores.filter((x) => x.id === cabine.id || (!ehCabine(x) && cabineDoSetor(setores, x.id)?.id === cabine.id)).map((x) => x.id);
+}
+
+/** Quem abre a cabine: Gabinete, Controle Interno e administrador abrem qualquer uma; os demais só a do próprio setor. */
+export function podeAbrirCabine(u: UsuarioComArea & { setorId: string | null }, cabine: SetorDaCabine, setores: readonly SetorDaCabine[]): boolean {
+  if (!ehCabine(cabine)) return false;
+  if (veTudo(u)) return true;
+  return cabineDoSetor(setores, u.setorId)?.id === cabine.id;
+}
+
+/**
+ * Vê contratos e orçamento de todas as pastas (sem recorte)? Gabinete, Controle Interno, administrador, Fazenda
+ * (execução do município inteiro) e Compras (gestão de todos os contratos). As demais secretarias veem só a pasta.
+ */
+export function veTodasAsPastas(u: UsuarioComArea): boolean {
+  if (veTudo(u)) return true;
+  const a = areaDoUsuario(u);
+  return a === "FAZENDA" || a === "COMPRAS";
+}
+
 /** Endereço da página "Sem acesso a esta área" para uma tela bloqueada. */
 export function urlSemAcesso(caminho: string): string {
   const area = areaDaRota(caminho);

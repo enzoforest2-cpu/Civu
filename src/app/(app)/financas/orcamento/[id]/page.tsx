@@ -1,6 +1,7 @@
 import { exigirRota } from "@/lib/acesso";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { cabinesDoMunicipio, recorteDaPasta, semAcessoCabine } from "@/modulos/gestao/cabine";
 import { ArrowLeft } from "lucide-react";
 import { temPapel } from "@/lib/auth";
 import { fmtMoeda } from "@/lib/dates";
@@ -19,6 +20,12 @@ export default async function DotacaoPage({ params }: { params: Promise<{ id: st
   const ex = await execucao(u.municipioId, anoCorrente());
   const d = ex.dotacoes.find((x) => x.id === id);
   if (!d) notFound();
+  // Recorte pela pasta: secretaria finalística abre só as dotações do órgão dela
+  const recorte = await recorteDaPasta(u);
+  if (recorte.forcado && !recorte.cabine?.orgaos.includes(d.orgao)) {
+    const dono = (await cabinesDoMunicipio(u.municipioId)).find((c) => c.orgaos.includes(d.orgao));
+    redirect(semAcessoCabine(dono?.setor.sigla ?? "", dono?.setor.area ?? null, `/financas/orcamento/${id}`));
+  }
   const reservas = ex.reservasCalc.filter((r) => r.dotacaoId === d.id).sort((a, b) => b.numero - a.numero);
   const empenhos = ex.empenhos.filter((e) => e.dotacaoId === d.id).sort((a, b) => b.numero - a.numero);
   const contab = temPapel(u, "CONTABILIDADE");
