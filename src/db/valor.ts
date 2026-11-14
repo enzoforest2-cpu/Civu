@@ -143,7 +143,8 @@ export function COMPRAS_CONFORMIDADE(ano: number): CompraDemo[] {
       req: "12121212121",
       meta: base(ano, "Dedetização e desratização de 14 prédios", 12800, "SERVICOS_GERAIS", "DISPENSA_VALOR"),
       ate: "CONTRATADO",
-      periodo: [50, 20],
+      // assinado há 3 dias: dentro do prazo da etapa e do PNCP (a Administração fica "Em dia" no mapa das secretarias)
+      periodo: [50, 3],
       contratacao: { fornecedor: "Dedetizadora Limpa Mais Ltda", cnpj: cnpj("663399880001"), valor: "12650.00", fonte: "ORDINARIOS" },
       atual: ["CONTRATO"],
     },
@@ -152,7 +153,8 @@ export function COMPRAS_CONFORMIDADE(ano: number): CompraDemo[] {
       req: "10101010101",
       meta: base(ano, "Carteiras, mesas e armários para 6 salas", 74000, "EQUIPAMENTOS", "LICITACAO"),
       ate: "CONTRATADO",
-      periodo: [80, 5],
+      // assinado há 35 dias e ainda sem extrato no PNCP (prazo de 20 dias úteis): o exemplo de publicação vencida
+      periodo: [80, 35],
       contratacao: { fornecedor: "Móveis Escolares Serra Gaúcha Ltda", cnpj: cnpj("812345670001"), valor: "71900.00", fonte: "EDUCACAO" },
       atual: ["CONTRATACAO", "CONTRATO"],
     },

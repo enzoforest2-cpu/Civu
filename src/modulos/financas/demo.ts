@@ -74,8 +74,9 @@ const CREDOR_PESSOAL: Record<string, string> = {
 
 const UNIDADES: Record<string, { orgao: string; orgaoNome: string; unidade: string; unidadeNome: string; ug: string }> = {
   GAB: { orgao: "02", orgaoNome: "Gabinete do Prefeito", unidade: "02.01", unidadeNome: "Gabinete do Prefeito", ug: "01" },
-  ADM: { orgao: "03", orgaoNome: "Secretaria de Administração e Fazenda", unidade: "03.01", unidadeNome: "Secretaria de Administração e Fazenda", ug: "01" },
-  ENC: { orgao: "03", orgaoNome: "Secretaria de Administração e Fazenda", unidade: "03.02", unidadeNome: "Encargos gerais do município", ug: "01" },
+  ADM: { orgao: "03", orgaoNome: "Secretaria de Administração", unidade: "03.01", unidadeNome: "Secretaria de Administração", ug: "01" },
+  FAZ: { orgao: "04", orgaoNome: "Secretaria da Fazenda", unidade: "04.01", unidadeNome: "Secretaria da Fazenda", ug: "01" },
+  ENC: { orgao: "04", orgaoNome: "Secretaria da Fazenda", unidade: "04.02", unidadeNome: "Encargos gerais do município", ug: "01" },
   EDU: { orgao: "05", orgaoNome: "Secretaria de Educação", unidade: "05.01", unidadeNome: "Secretaria de Educação", ug: "01" },
   SAU: { orgao: "06", orgaoNome: "Secretaria de Saúde", unidade: "06.01", unidadeNome: "Fundo Municipal de Saúde", ug: "02" },
   ASS: { orgao: "07", orgaoNome: "Secretaria de Assistência Social", unidade: "07.01", unidadeNome: "Fundo Municipal de Assistência Social", ug: "01" },
@@ -108,7 +109,8 @@ const PROGRAMAS: Record<string, string> = {
 const ACOES: Record<string, string> = {
   "0001": "Serviço da dívida contratual",
   "2001": "Manutenção do Gabinete",
-  "2003": "Manutenção da Administração e Fazenda",
+  "2003": "Manutenção da Administração",
+  "2004": "Manutenção da Fazenda: arrecadação, contabilidade e tesouraria",
   "2005": "Defesa civil",
   "2030": "Remuneração dos profissionais da educação — FUNDEB",
   "2031": "Manutenção do ensino fundamental",
@@ -142,15 +144,19 @@ type Dot = [string, string, string, string, string, string, string, number, Ex[]
 const DOTACOES: Dot[] = [
   ["GAB", "04", "122", "0001", "2001", "3.1.90.11", "1500.0000", 2400],
   ["GAB", "04", "122", "0001", "2001", "3.3.90.39", "1500.0000", 600, [{ c: "servicos", frac: 0.9, liq: 0.8, h: "Comunicação institucional e publicidade legal" }]],
-  ["ADM", "04", "122", "0002", "2003", "3.1.90.11", "1500.0000", 13000],
+  ["ADM", "04", "122", "0002", "2003", "3.1.90.11", "1500.0000", 10000],
   ["ADM", "04", "122", "0002", "2003", "3.1.90.13", "1500.0000", 3400],
   ["ADM", "04", "122", "0002", "2003", "3.1.91.13", "1500.0000", 1400],
   ["ADM", "04", "122", "0002", "2003", "3.3.90.30", "1500.0000", 900, [{ c: "atacado", frac: 0.55, liq: 0.8, h: "Material de consumo das secretarias" }]],
-  ["ADM", "04", "122", "0002", "2003", "3.3.90.39", "1500.0000", 4000, [{ c: "servicos", frac: 0.72, liq: 0.8, h: "Locações, manutenção predial e serviços administrativos" }]],
-  ["ADM", "04", "122", "0002", "2003", "3.3.90.40", "1500.0000", 1100, [{ c: "ti", frac: 0.92, liq: 0.8, tipo: "GLOBAL", h: "Sistemas de gestão e licenças de software" }]],
+  ["ADM", "04", "122", "0002", "2003", "3.3.90.39", "1500.0000", 3200, [{ c: "servicos", frac: 0.72, liq: 0.8, h: "Locações, manutenção predial e serviços administrativos" }]],
+  ["ADM", "04", "122", "0002", "2003", "3.3.90.40", "1500.0000", 600, [{ c: "ti", frac: 0.92, liq: 0.8, tipo: "GLOBAL", h: "Sistemas de gestão e licenças de software" }]],
   ["ADM", "04", "122", "0002", "2003", "3.3.90.46", "1500.0000", 3400, [{ c: "alimentacao", frac: 0.95, liq: 0.83, h: "Auxílio-alimentação dos servidores" }]],
   ["ADM", "04", "122", "0002", "2003", "4.4.90.52", "1500.0000", 900, [{ c: "informatica", frac: 0.5, liq: 0.6, tipo: "ORDINARIO", h: "Computadores e equipamentos de rede" }]],
   ["ADM", "06", "182", "0003", "2005", "3.3.90.30", "1500.0000", 300, [{ c: "atacado", frac: 0.6, liq: 0.7, h: "Lonas, telhas e kits para defesa civil" }]],
+  // Fazenda (arrecadação, contabilidade e tesouraria): separada da Administração na LOA
+  ["FAZ", "04", "123", "0002", "2004", "3.1.90.11", "1500.0000", 3000],
+  ["FAZ", "04", "129", "0002", "2004", "3.3.90.39", "1500.0000", 800, [{ c: "servicos", frac: 0.7, liq: 0.8, h: "Cobrança bancária, entrega de carnês e serviços de arrecadação" }]],
+  ["FAZ", "04", "129", "0002", "2004", "3.3.90.40", "1500.0000", 500, [{ c: "ti", frac: 0.9, liq: 0.8, tipo: "GLOBAL", h: "Sistema tributário e nota fiscal de serviço eletrônica" }]],
   ["ENC", "28", "843", "0000", "0001", "3.2.90.21", "1500.0000", 1400, [{ c: "divida", frac: 0.97, liq: 0.83, h: "Juros do financiamento de máquinas rodoviárias" }]],
   ["ENC", "28", "843", "0000", "0001", "4.6.90.71", "1500.0000", 3900, [{ c: "divida", frac: 0.97, liq: 0.83, h: "Amortização do financiamento de máquinas rodoviárias" }]],
   // Educação

@@ -440,7 +440,7 @@ export const contratosDemo: ModuloDemo = {
     // 7. Dedetização — recém-assinado, ligado ao processo de dispensa
     // ===================================================================
     await contrato({
-      ano: Number(d(-22).slice(0, 4)),
+      ano: Number(d(-3).slice(0, 4)),
       numero: 41,
       objeto: "Dedetização e desratização de 14 prédios públicos, com 3 aplicações no ano",
       natureza: "SERVICO",
@@ -451,9 +451,9 @@ export const contratosDemo: ModuloDemo = {
       unidadeGestoraId: ctx.ugs["01"],
       valorGlobal: "12650.00",
       fonte: "ORDINARIOS",
-      assinadoEm: d(-22),
-      vigenciaInicio: d(-22),
-      vigenciaFim: d(343),
+      assinadoEm: d(-3),
+      vigenciaInicio: d(-3),
+      vigenciaFim: d(362),
       fiscalId: U["12121212121"],
       gestorId: U["33333333333"],
     });

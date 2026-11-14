@@ -15,7 +15,7 @@ import { feriadosDemo } from "./demo/feriados";
 export const SLUG_DEMO = "vale-das-araucarias";
 
 /** Órgão orçamentário da LOA de demonstração (src/modulos/financas/demo.ts, UNIDADES) ligado a cada secretaria. */
-export const ORGAO_DA_SIGLA: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "03", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
+export const ORGAO_DA_SIGLA: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "04", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 function canon(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);

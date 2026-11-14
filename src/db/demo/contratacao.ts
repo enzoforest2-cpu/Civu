@@ -30,6 +30,8 @@ export const contratacaoDemo: ModuloDemo = {
     const fernanda = await sessao("99999999999");
     const marcos = await sessao("88888888888");
     const paulo = await sessao("10101010101");
+    const tiago = await sessao("18181818181"); // CRAS (Assistência Social)
+    const helena = await sessao("17171717171"); // secretária de Assistência Social
     const protocolo = await sessao("22222222222");
     const prefeita = await sessao("11111111111");
     const compras = await sessao("33333333333");
@@ -221,7 +223,7 @@ export const contratacaoDemo: ModuloDemo = {
 
     // 8. PAGAMENTO_ENVIADO: contratação direta executada, liquidada e enviada ao banco, aguardando o retorno
     const pag: Pedido = {
-      assunto: "Serviço de impressão de material do programa de assistência social", req: fernanda, sec: marcos, ug: "01", papelReq: "REQUISITANTE",
+      assunto: "Serviço de impressão de material do programa de assistência social", req: tiago, sec: helena, ug: "01", papelReq: "REQUISITANTE",
       dados: meta("Impressão de cartilhas e folhetos do programa de assistência social", 9800, "SERVICOS_GERAIS", "OUTRA_DIRETA", "Material de orientação às famílias atendidas pelo programa.", "3 mil cartilhas"),
     };
     const rPag = await ateInstrucao(pag);
@@ -246,12 +248,12 @@ export const contratacaoDemo: ModuloDemo = {
     await engine.juntarDocumento(compras, rPag.id, "PORTARIA_FISCAL", "Portaria de fiscalização", "Designa gestor e fiscal do contrato, com suplente.");
     await engine.juntarDocumento(compras, rPag.id, "PUBLICACAO_PNCP", "Publicação no PNCP", "Contrato publicado no PNCP (simulado).");
     await engine.avancar(compras, rPag.id, "EXECUCAO");
-    await engine.juntarDocumento(marcos, rPag.id, "ORDEM_FORNECIMENTO", "Ordem de serviço", "Execute-se o serviço nos termos do contrato.");
-    await engine.juntarDocumento(marcos, rPag.id, "NOTA_FISCAL", "Nota fiscal", "Nota fiscal de serviço apresentada pelo fornecedor.");
-    const atesto = await engine.juntarDocumento(marcos, rPag.id, "ATESTO", "Atesto do fiscal", "Serviço recebido e conferido.");
-    await engine.assinarDocumento(marcos, atesto.id, "FISCAL");
-    await engine.juntarDocumento(marcos, rPag.id, "CERTIDOES", "Certidões de regularidade", "Certidões vigentes.");
-    await engine.avancar(marcos, rPag.id, "LIQUIDADO");
+    await engine.juntarDocumento(helena, rPag.id, "ORDEM_FORNECIMENTO", "Ordem de serviço", "Execute-se o serviço nos termos do contrato.");
+    await engine.juntarDocumento(helena, rPag.id, "NOTA_FISCAL", "Nota fiscal", "Nota fiscal de serviço apresentada pelo fornecedor.");
+    const atesto = await engine.juntarDocumento(helena, rPag.id, "ATESTO", "Atesto do fiscal", "Serviço recebido e conferido.");
+    await engine.assinarDocumento(helena, atesto.id, "FISCAL");
+    await engine.juntarDocumento(helena, rPag.id, "CERTIDOES", "Certidões de regularidade", "Certidões vigentes.");
+    await engine.avancar(helena, rPag.id, "LIQUIDADO");
     await engine.receber(contador, rPag.id);
     const liq = await engine.juntarDocumento(contador, rPag.id, "NOTA_LIQUIDACAO", "Nota de liquidação", "Direito do credor verificado.");
     await engine.assinarDocumento(prefeita, liq.id, "ORDENADOR");
