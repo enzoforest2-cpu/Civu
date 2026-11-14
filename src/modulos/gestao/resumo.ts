@@ -22,7 +22,18 @@ export type DadosResumo = {
   alertasAltos: number;
   alertasTotal: number;
   setorMaisCarregado: { nome: string; n: number; atrasados: number } | null;
+  /** Mapa das secretarias (semáforo de cada pasta), repasses e obrigações das áreas — opcionais */
+  secretarias?: { nome: string; nivel: "verde" | "amarelo" | "vermelho" }[];
+  repassesEmRisco?: number;
+  valorRepassesEmRisco?: number;
+  repassesVencidos?: number;
+  obrigacoesAreaVencidas?: number;
+  pendenciasSecretarios?: number;
 };
+
+/** "Saúde", "Saúde e Fazenda", "Saúde, Educação e Fazenda" */
+const lista = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} e ${xs.at(-1)}`);
+const curto = (nome: string) => nome.replace(/^Secretaria (Municipal )?(de |da |do |dos |das )?/i, "");
 
 const n = (x: number, um: string, varios: string) => `${x.toLocaleString("pt-BR")} ${x === 1 ? um : varios}`;
 const dataCurta = (d: Date) => d.toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza", day: "2-digit", month: "2-digit" });
@@ -75,6 +86,29 @@ export function gerarResumoSemanal(d: DadosResumo): { titulo: string; paragrafos
       : "Não há pagamentos aguardando na fila.";
   p.push((legal.length ? `Na conformidade, ${legal.join(" e ")}. ` : "PNCP e Tribunal de Contas estão em dia. ") + pag);
 
+  if (d.secretarias?.length) {
+    const vermelhas = d.secretarias.filter((x) => x.nivel === "vermelho").map((x) => curto(x.nome));
+    const amarelas = d.secretarias.filter((x) => x.nivel === "amarelo").map((x) => curto(x.nome));
+    const sec: string[] = [];
+    if (!vermelhas.length && !amarelas.length) sec.push(`No mapa das secretarias, as ${d.secretarias.length} estão em dia.`);
+    else {
+      const partes: string[] = [];
+      if (vermelhas.length) partes.push(`${vermelhas.length === 1 ? "uma está em situação crítica" : `${vermelhas.length} estão em situação crítica`} (${lista(vermelhas)})`);
+      if (amarelas.length) partes.push(`${amarelas.length === 1 ? "uma pede atenção" : `${amarelas.length} pedem atenção`} (${lista(amarelas)})`);
+      const verdes = d.secretarias.length - vermelhas.length - amarelas.length;
+      sec.push(`No mapa das secretarias, ${partes.join(" e ")}${verdes ? `; ${verdes === 1 ? "a outra está em dia" : `as outras ${verdes} estão em dia`}` : ""}.`);
+    }
+    if (d.repassesEmRisco)
+      sec.push(
+        `${n(d.repassesEmRisco, "repasse está em risco", "repasses estão em risco")}` +
+          (d.valorRepassesEmRisco ? `, somando ${moeda(d.valorRepassesEmRisco)}` : "") +
+          (d.repassesVencidos ? `, ${d.repassesVencidos === 1 ? "um deles" : `${d.repassesVencidos} deles`} com prazo vencido ou pendência.` : "."),
+      );
+    if (d.obrigacoesAreaVencidas) sec.push(`${n(d.obrigacoesAreaVencidas, "obrigação de entrega das secretarias está vencida", "obrigações de entrega das secretarias estão vencidas")}.`);
+    if (d.pendenciasSecretarios) sec.push(`${n(d.pendenciasSecretarios, "aprovação ou assinatura espera", "aprovações e assinaturas esperam")} os(as) secretários(as).`);
+    p.push(sec.join(" "));
+  }
+
   if (d.alertasTotal)
     p.push(
       d.alertasAltos
@@ -83,7 +117,7 @@ export function gerarResumoSemanal(d: DadosResumo): { titulo: string; paragrafos
     );
 
   const titulo =
-    d.alertasAltos || d.obrigacoesVencidas
+    d.alertasAltos || d.obrigacoesVencidas || d.secretarias?.some((x) => x.nivel === "vermelho") || d.repassesVencidos
       ? "Semana com pontos que pedem decisão"
       : d.atrasados > 0 || d.aguardandoGabinete > 0
         ? "Semana com pendências sob controle"

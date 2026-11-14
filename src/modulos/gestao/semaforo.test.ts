@@ -29,7 +29,7 @@ test("semáforo: atrasos — 1 a 2 amarelo, 3 ou mais vermelho", () => {
   assert.equal(sinal(avaliarSemaforo({ ...base, atrasados: 2 }), "atrasos").nivel, "amarelo");
   const v = avaliarSemaforo({ ...base, atrasados: LIMITES_SEMAFORO.atrasadosVermelho });
   assert.equal(v.nivel, "vermelho");
-  assert.match(v.porque, /^Crítico por atrasos: 3 processos atrasados de 10/);
+  assert.match(v.porque, /^Crítico\. Atrasos: 3 processos atrasados de 10 em andamento\.$/);
 });
 
 test("semáforo: execução contra o ritmo do ano", () => {
@@ -62,7 +62,7 @@ test("semáforo: a cor é a do pior sinal e o porquê cita só os sinais dessa c
   const s = avaliarSemaforo({ ...base, atrasados: 1, pendenciasAssinatura: 1 });
   assert.equal(s.nivel, "amarelo");
   assert.equal(s.rotulo, "Atenção");
-  assert.match(s.porque, /^Atenção por atrasos e assinaturas do\(a\) secretário\(a\): /);
+  assert.match(s.porque, /^Atenção\. Atrasos: 1 processo atrasado de 10 em andamento\. Assinaturas do\(a\) secretário\(a\): 1 item espera o\(a\) secretário\(a\)\.$/);
   assert.doesNotMatch(s.porque, /execução/);
 });
 
@@ -70,4 +70,35 @@ test("fração do ano decorrida", () => {
   assert.ok(Math.abs(fracaoDoAno(new Date("2026-01-01T15:00:00Z")) - 1 / 365) < 1e-9);
   assert.ok(Math.abs(fracaoDoAno(new Date("2026-12-31T15:00:00Z")) - 1) < 1e-9);
   assert.ok(Math.abs(fracaoDoAno(new Date("2026-07-02T15:00:00Z")) - 183 / 365) < 1e-9);
+});
+
+test("resumo da sala cita o mapa das secretarias, repasses e obrigações (regras, sem IA)", async () => {
+  const { gerarResumoSemanal } = await import("./resumo");
+  const base = {
+    municipio: "Vale", inicio: new Date("2026-11-07T12:00:00Z"), fim: new Date("2026-11-14T12:00:00Z"), abertos: 3, abertosAnterior: 2, concluidos: 1, concluidosAnterior: 1,
+    estoque: 10, estoqueAnterior: 9, atrasados: 0, aguardandoGabinete: 0, gabineteVencendo: 0, obrigacoesVencidas: 0, obrigacoesProximas: 0,
+    pagamentosNaFila: 0, valorNaFila: 0, quebrasOrdem: 0, alertasAltos: 0, alertasTotal: 0, setorMaisCarregado: null,
+  };
+  const r = gerarResumoSemanal({
+    ...base,
+    secretarias: [
+      { nome: "Secretaria de Saúde", nivel: "vermelho" },
+      { nome: "Secretaria da Fazenda", nivel: "amarelo" },
+      { nome: "Secretaria de Educação", nivel: "amarelo" },
+      { nome: "Secretaria de Assistência Social", nivel: "verde" },
+    ],
+    repassesEmRisco: 2,
+    valorRepassesEmRisco: 150000,
+    repassesVencidos: 1,
+    obrigacoesAreaVencidas: 1,
+    pendenciasSecretarios: 3,
+  });
+  const texto = r.paragrafos.join(" ");
+  assert.match(texto, /uma está em situação crítica \(Saúde\) e 2 pedem atenção \(Fazenda e Educação\); a outra está em dia\./);
+  assert.match(texto, /2 repasses estão em risco, somando R\$\s150\.000, um deles com prazo vencido ou pendência\./);
+  assert.match(texto, /1 obrigação de entrega das secretarias está vencida\./);
+  assert.match(texto, /3 aprovações e assinaturas esperam os\(as\) secretários\(as\)\./);
+  assert.equal(r.titulo, "Semana com pontos que pedem decisão");
+  // sem os campos novos, o resumo continua como antes
+  assert.doesNotMatch(gerarResumoSemanal(base).paragrafos.join(" "), /mapa das secretarias/);
 });

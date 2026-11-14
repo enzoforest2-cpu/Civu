@@ -586,7 +586,7 @@ function BlocoDaArea({ d, cab }: { d: DadosCabine; cab: Cabine }) {
             href="/servicos/indicadores"
             valor={p.ocorrencias.concluidas30 ? fmtPct((p.ocorrencias.noPrazo30 / p.ocorrencias.concluidas30) * 100, 0) : "—"}
             rotulo="concluídos no prazo"
-            detalhe={`${pl(p.ocorrencias.concluidas30, "chamado concluído", "chamados concluídos")} em 30 dias`}
+            detalhe={`de ${pl(p.ocorrencias.concluidas30, "chamado registrado e concluído", "chamados registrados e concluídos")} em 30 dias`}
           />
         </div>
         <h3 className="mb-1 text-[13px] font-semibold tracking-wide text-ink-3 uppercase">Obras em andamento</h3>

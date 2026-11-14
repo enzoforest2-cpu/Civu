@@ -719,6 +719,26 @@ async function main() {
     ok(`cabine da saúde: ${d.processos.length} processos, ${d.contratos.length} contratos e ${d.repasses.length} repasses, todos da pasta; pendências do secretário de infraestrutura encontradas`);
   }
 
+  // ---- sala do prefeito (Parte 4): provedores plugados e um provedor que falha não derruba a sala
+  {
+    const ind = await import("../modulos/gestao/indicadores");
+    const painel = await ind.carregarIndicadores(prefeita.municipioId);
+    for (const m of ["Finanças", "Tributos", "Contratos e obras", "Serviços urbanos", "Repasses e convênios"]) {
+      const x = painel.porModulo.find((p) => p.modulo === m);
+      if (!x || x.erro || !x.indicadores.length) falha(`provedor "${m}" deveria estar plugado e com indicadores: ${JSON.stringify(x?.erro)}`);
+      for (const i of x!.indicadores) if (!i.origem.href.startsWith("/") || !i.responsavel || !["realizado", "projetado"].includes(i.natureza)) falha(`indicador ${i.chave} sem origem, responsável ou natureza`);
+    }
+    const quebrado = { modulo: "Teste quebrado", carregar: async () => { throw new Error("falha simulada"); } };
+    const origErro = console.error; console.error = () => {};
+    const r = await ind.executarProvedores(prefeita.municipioId, [quebrado, ind.provedorPagamentos]);
+    console.error = origErro;
+    if (r.porModulo[0].erro !== "Fonte indisponível no momento." || !r.porModulo[1].indicadores.length) falha("um provedor que falha não pode derrubar os outros");
+    const cab = await import("../modulos/gestao/cabine");
+    const mapa = await cab.mapaDasSecretarias(prefeita.municipioId);
+    if (mapa.cartoes.length < 6 || mapa.cartoes.some((c) => c.semaforo.sinais.length !== 4 || !c.semaforo.porque)) falha("mapa das secretarias: um cartão por secretaria, com os quatro sinais e o porquê");
+    ok(`sala do prefeito: 5 provedores plugados com origem, responsável e natureza; provedor com erro vira "fonte indisponível"; mapa com ${mapa.cartoes.length} secretarias`);
+  }
+
   console.log("\nTodos os testes passaram.");
   process.exit(0);
 }

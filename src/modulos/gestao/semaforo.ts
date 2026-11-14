@@ -130,7 +130,7 @@ export function avaliarSemaforo(s: SinaisSecretaria): Semaforo {
   const porque =
     nivel === "verde"
       ? "Os quatro sinais estão dentro do esperado."
-      : `${NOME_NIVEL[nivel]} por ${ruins.map((x) => x.rotulo.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " e $1")}: ${ruins.map((x) => x.texto.replace(/\.$/, "")).join("; ")}.`;
+      : `${NOME_NIVEL[nivel]}. ${ruins.map((x) => `${x.rotulo}: ${x.texto.charAt(0).toLowerCase()}${x.texto.slice(1)}`).join(" ")}`;
   return { nivel, rotulo: NOME_NIVEL[nivel], sinais, porque };
 }
 

@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/purity -- painel depende da hora atual; renderizado a cada requisição */
 import Link from "next/link";
-import { AlertOctagon, AlertTriangle, ArrowUpRight, CalendarClock, Info, PenLine, Sparkles } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ArrowUpRight, CalendarClock, Info, PenLine, Sparkles, Timer } from "lucide-react";
 import { exigirRota } from "@/lib/acesso";
 import { obrigacoes } from "@/lib/conformidade";
 import { filaDePagamentos, historicoDePagamentos } from "@/lib/pagamentos";
@@ -13,6 +13,10 @@ import { gerarResumoSemanal } from "@/modulos/gestao/resumo";
 import { DecisaoLote, type ItemLote } from "@/modulos/gestao/componentes/decisao-lote";
 import { CartaoIndicador } from "@/modulos/gestao/componentes/tendencia";
 import type { Gravidade } from "@/modulos/gestao/avaliador";
+import { mapaDasSecretarias, type CartaoSecretaria } from "@/modulos/gestao/cabine";
+import { RegrasSemaforo, SeloSemaforo } from "@/modulos/gestao/componentes/semaforo";
+import { ChipPrazo } from "@/modulos/repasses/componentes";
+import { fmtPct } from "@/modulos/financas/classificacao";
 
 export const metadata = { title: "Sala do prefeito · Civu" };
 
@@ -25,7 +29,7 @@ const GRAV: Record<Gravidade, { rotulo: string; tom: "bad" | "warn" | "neutral";
 export default async function GabinetePage() {
   const u = await exigirRota("/gabinete", pode.verGabinete);
 
-  const [itens, assinaturas, painel, obs, filas, hist, semana] = await Promise.all([
+  const [itens, assinaturas, painel, obs, filas, hist, semana, mapa] = await Promise.all([
     itensGabinete(u.municipioId),
     assinaturasPendentes(u.municipioId),
     carregarIndicadores(u.municipioId),
@@ -33,7 +37,9 @@ export default async function GabinetePage() {
     filaDePagamentos(u.municipioId),
     historicoDePagamentos(u.municipioId, 90),
     numerosDaSemana(u.municipioId),
+    mapaDasSecretarias(u.municipioId),
   ]);
+  const riscoRep = mapa.repasses.filter((r) => r.risco.emRisco);
 
   const agora = Date.now();
   const itensLote: ItemLote[] = itens.map((i) => {
@@ -84,6 +90,12 @@ export default async function GabinetePage() {
     alertasAltos,
     alertasTotal: painel.alertas.length,
     setorMaisCarregado: semana.setorMaisCarregado,
+    secretarias: mapa.cartoes.map((c) => ({ nome: c.setor.nome, nivel: c.semaforo.nivel })),
+    repassesEmRisco: riscoRep.length,
+    valorRepassesEmRisco: riscoRep.reduce((s, r) => s + r.risco.valorEmRisco, 0),
+    repassesVencidos: riscoRep.filter((r) => r.situacao === "COM_PENDENCIA" || r.prazoCritico?.alerta.nivel === "vencido").length,
+    obrigacoesAreaVencidas: mapa.obrigacoes.filter((o) => o.alerta?.nivel === "vencido").length,
+    pendenciasSecretarios: mapa.cartoes.reduce((s, c) => s + c.numeros.pendencias, 0),
   });
 
   const indicadores = painel.porModulo.flatMap((m) => m.indicadores);
@@ -109,6 +121,33 @@ export default async function GabinetePage() {
           {resumo.paragrafos.map((p, i) => (
             <p key={i}>{p}</p>
           ))}
+        </div>
+      </section>
+
+      {/* Mapa das secretarias */}
+      <section className="mb-6" aria-labelledby="mapa-secretarias">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="mapa-secretarias" className="display text-[19px] font-semibold text-ink">
+              Mapa das secretarias
+            </h2>
+            <p className="text-[13.5px] text-ink-2">Atrasos, execução do orçamento, repasses e assinaturas de cada pasta. Abra o cartão para ver a cabine da secretaria.</p>
+          </div>
+          <Resumo cartoes={mapa.cartoes} />
+        </div>
+        {mapa.cartoes.length === 0 ? (
+          <Vazio>Nenhuma secretaria com cabine. Ligue cada secretaria à sua área e ao órgão orçamentário em Configurações, na seção Setores.</Vazio>
+        ) : (
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {mapa.cartoes.map((c) => (
+              <li key={c.setor.id}>
+                <CartaoMapa c={c} />
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-3">
+          <RegrasSemaforo />
         </div>
       </section>
 
@@ -144,6 +183,56 @@ export default async function GabinetePage() {
                     <Link href={`/processos/${a.id}`} className="btn btn-quiet !py-1.5 text-[13px]">
                       Abrir e assinar
                     </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel
+            title="Repasses e obrigações com prazo crítico"
+            action={
+              <Link href="/repasses?situacao=risco" className="inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-brand-2 hover:underline">
+                Ver repasses em risco <ArrowUpRight size={14} aria-hidden />
+              </Link>
+            }
+          >
+            {mapa.repassesCriticos.length === 0 && mapa.obrigacoesCriticas.length === 0 ? (
+              <Vazio icon={<Timer size={22} className="text-ink-3" aria-hidden />}>
+                Nenhum repasse ou obrigação das secretarias vencido, com pendência ou vencendo nos próximos 15 dias.
+              </Vazio>
+            ) : (
+              <ul className="divide-y divide-line">
+                {mapa.repassesCriticos.map((r) => (
+                  <li key={r.id} className="py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1 basis-60">
+                        <Link href={`/repasses/${r.id}`} className="alvo-toque font-semibold text-brand-2 hover:underline">
+                          {r.rotulo}
+                        </Link>
+                        <span className="text-[13px] text-ink-3"> · {r.setor.nome}</span>
+                        <div className="text-[14px] leading-snug text-ink">{r.objeto}</div>
+                        <div className="tnum text-[12.5px] text-ink-3">
+                          {r.risco.motivo ?? "Com pendência"}
+                          {r.risco.valorEmRisco > 0 && <> · {fmtMoeda(r.risco.valorEmRisco)} em risco</>}
+                        </div>
+                      </div>
+                      {r.prazoCritico ? <ChipPrazo alerta={r.prazoCritico.alerta} data={r.prazoCritico.data} rotulo={r.prazoCritico.rotulo} /> : <Chip tone="bad">Com pendência</Chip>}
+                    </div>
+                  </li>
+                ))}
+                {mapa.obrigacoesCriticas.map((o) => (
+                  <li key={o.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
+                    <div className="min-w-0 flex-1 basis-60">
+                      <Link href={`/obrigacoes-da-area/${o.id}`} className="alvo-toque font-semibold text-brand-2 hover:underline">
+                        {o.nome}
+                      </Link>
+                      <div className="text-[12.5px] text-ink-3">
+                        Obrigação de entrega · {o.setor.nome} · para {o.destinatario}
+                        {o.exemplo && " · exemplo da demonstração"}
+                      </div>
+                    </div>
+                    {o.alerta && <ChipPrazo alerta={o.alerta} data={o.proximoVencimento} />}
                   </li>
                 ))}
               </ul>
@@ -202,20 +291,33 @@ export default async function GabinetePage() {
         </Panel>
       </div>
 
-      <Panel title="Indicadores" className="mb-6" action={<span className="text-[12.5px] text-ink-3">Tendência das últimas 8 semanas</span>}>
+      <Panel title="Indicadores" className="mb-6">
         {indicadores.length === 0 ? (
           <Vazio>Sem indicadores disponíveis.</Vazio>
         ) : (
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {indicadores.map((i) => (
-              <CartaoIndicador key={i.chave} i={i} />
-            ))}
+          <div className="space-y-6">
+            {painel.porModulo
+              .filter((m) => m.indicadores.length > 0)
+              .map((m) => (
+                <div key={m.modulo}>
+                  <h3 className="mb-2 text-[13px] font-semibold tracking-wide text-ink-3 uppercase">{m.modulo}</h3>
+                  <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {m.indicadores.map((i) => (
+                      <CartaoIndicador key={i.chave} i={i} />
+                    ))}
+                  </div>
+                </div>
+              ))}
           </div>
         )}
-        {indisponiveis.length > 0 && <p className="mt-3 text-[13px] text-warn">Fonte indisponível no momento: {indisponiveis.map((m) => m.modulo).join(", ")}.</p>}
+        {indisponiveis.length > 0 && (
+          <p className="mt-3 flex items-start gap-1.5 text-[13px] text-warn">
+            <AlertTriangle size={14} aria-hidden className="mt-0.5 shrink-0" /> Fonte indisponível no momento: {indisponiveis.map((m) => m.modulo).join(", ")}. Os demais indicadores seguem
+            atualizados.
+          </p>
+        )}
         <p className="mt-3 text-[12.5px] text-ink-3">
-          Todos os números são realizados (não projetados) e levam à sua origem. Indicadores de obras, finanças, tributos e serviços urbanos entram aqui à medida que cada módulo é
-          implantado.
+          Cada indicador diz se é realizado (já aconteceu) ou projetado (estimativa), quem responde por ele e leva à sua origem. A tendência aparece nos que têm série semanal.
         </p>
       </Panel>
 
@@ -292,5 +394,59 @@ export default async function GabinetePage() {
         </Panel>
       </div>
     </>
+  );
+}
+
+function Resumo({ cartoes }: { cartoes: CartaoSecretaria[] }) {
+  const n = (nivel: string) => cartoes.filter((c) => c.semaforo.nivel === nivel).length;
+  return (
+    <p className="flex flex-wrap gap-2 text-[13px]">
+      <SeloSemaforo nivel="vermelho" /> <span className="tnum self-center font-semibold text-ink">{n("vermelho")}</span>
+      <SeloSemaforo nivel="amarelo" /> <span className="tnum self-center font-semibold text-ink">{n("amarelo")}</span>
+      <SeloSemaforo nivel="verde" /> <span className="tnum self-center font-semibold text-ink">{n("verde")}</span>
+    </p>
+  );
+}
+
+const BORDA = { vermelho: "border-l-bad", amarelo: "border-l-warn", verde: "border-l-ok" } as const;
+
+function CartaoMapa({ c }: { c: CartaoSecretaria }) {
+  const x = c.numeros;
+  return (
+    <Link
+      href={`/secretaria/${c.setor.sigla}`}
+      className={`group flex h-full flex-col rounded-2xl border border-l-4 border-line bg-white p-4 transition-colors hover:border-line-2 hover:bg-sunken/40 ${BORDA[c.semaforo.nivel]}`}
+    >
+      <span className="flex items-start justify-between gap-3">
+        <span className="min-w-0 font-semibold text-ink group-hover:text-brand-2">{c.setor.nome}</span>
+        <SeloSemaforo nivel={c.semaforo.nivel} />
+      </span>
+      <span className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12.5px] text-ink-3">
+        <span>
+          <span className={`tnum block text-[17px] font-semibold ${x.atrasados ? "text-bad" : "text-ink"}`}>{x.atrasados}</span>
+          {x.atrasados === 1 ? "processo atrasado" : "processos atrasados"} de {x.emAndamento}
+        </span>
+        <span>
+          <span className="tnum block text-[17px] font-semibold text-ink">{x.execucao == null ? "—" : fmtPct(x.execucao, 0)}</span>
+          {x.execucao == null ? "sem orçamento próprio" : "do orçamento liquidado"}
+        </span>
+        <span>
+          <span className={`tnum block text-[17px] font-semibold ${x.repassesEmRisco || x.obrigacoesVencidas ? "text-bad" : "text-ink"}`}>{x.repassesEmRisco}</span>
+          {x.repassesEmRisco === 1 ? "repasse em risco" : "repasses em risco"}
+          {x.obrigacoesVencidas > 0 && `, ${x.obrigacoesVencidas} ${x.obrigacoesVencidas === 1 ? "obrigação vencida" : "obrigações vencidas"}`}
+        </span>
+        <span>
+          <span className={`tnum block text-[17px] font-semibold ${x.pendencias ? "text-warn" : "text-ink"}`}>{x.pendencias}</span>
+          {x.pendencias === 1 ? "espera o(a) secretário(a)" : "esperam o(a) secretário(a)"}
+        </span>
+      </span>
+      <span className="mt-3 border-t border-line pt-2.5 text-[12.5px] leading-snug text-ink-2">
+        <span className="font-semibold text-ink">Por quê: </span>
+        {c.semaforo.porque}
+      </span>
+      <span className="mt-auto inline-flex items-center gap-1 pt-2 text-[13px] font-semibold text-brand-2">
+        Abrir a cabine <ArrowUpRight size={14} aria-hidden />
+      </span>
+    </Link>
   );
 }

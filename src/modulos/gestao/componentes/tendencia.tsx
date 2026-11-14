@@ -6,6 +6,7 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 export function fmtIndicador(v: number | null, formato: Indicador["formato"]) {
   if (v == null) return "—";
   if (formato === "moeda") return fmtMoeda(v);
+  if (formato === "percentual") return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
   if (formato === "dias") return `${v.toLocaleString("pt-BR")} ${v === 1 ? "dia" : "dias"}`;
   return v.toLocaleString("pt-BR");
 }
@@ -42,7 +43,7 @@ export function CartaoIndicador({ i }: { i: Indicador }) {
     <div className="flex flex-col rounded-xl border border-line bg-white p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="text-[13px] leading-snug text-ink-2">{i.rotulo}</div>
-        {i.natureza === "projetado" && <span className="chip bg-warn-soft text-warn">Projetado</span>}
+        {i.natureza === "projetado" ? <span className="chip shrink-0 bg-warn-soft text-warn">Projetado</span> : <span className="chip shrink-0 bg-sunken text-ink-2">Realizado</span>}
       </div>
       <div className="mt-1">
         <div>

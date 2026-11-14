@@ -301,13 +301,15 @@ export async function orcamentoDaPasta(municipioId: string, orgaos: string[]) {
 
 async function blocoInfraestrutura(municipioId: string, cab: Cabine, contratos: ContratoLista[]) {
   const agora = new Date();
+  const concluidaNoPeriodo = sql`${servicosOcorrencias.status} = 'CONCLUIDA' and ${servicosOcorrencias.concluidaEm} is not null and ${servicosOcorrencias.duplicadaDeId} is null and ${servicosOcorrencias.abertaEm} >= ${new Date(agora.getTime() - 30 * DIA)}`;
   const [oc] = await db
     .select({
       abertas: sql<number>`count(*) filter (where ${servicosOcorrencias.status} in ${ESTADOS_ABERTOS_SERVICO})::int`,
       atrasadas: sql<number>`count(*) filter (where ${servicosOcorrencias.status} in ${ESTADOS_ABERTOS_SERVICO} and ${servicosOcorrencias.prazoEm} < ${agora})::int`,
       triagem: sql<number>`count(*) filter (where ${servicosOcorrencias.status} = 'ABERTA')::int`,
-      concluidas30: sql<number>`count(*) filter (where ${servicosOcorrencias.status} = 'CONCLUIDA' and ${servicosOcorrencias.concluidaEm} >= ${new Date(agora.getTime() - 30 * DIA)})::int`,
-      noPrazo30: sql<number>`count(*) filter (where ${servicosOcorrencias.status} = 'CONCLUIDA' and ${servicosOcorrencias.concluidaEm} >= ${new Date(agora.getTime() - 30 * DIA)} and ${servicosOcorrencias.concluidaEm} <= ${servicosOcorrencias.prazoEm})::int`,
+      // mesma regra dos indicadores de serviços: chamados registrados nos últimos 30 dias e já concluídos
+      concluidas30: sql<number>`count(*) filter (where ${concluidaNoPeriodo})::int`,
+      noPrazo30: sql<number>`count(*) filter (where ${concluidaNoPeriodo} and ${servicosOcorrencias.concluidaEm} <= ${servicosOcorrencias.prazoEm})::int`,
     })
     .from(servicosOcorrencias)
     .where(and(eq(servicosOcorrencias.municipioId, municipioId), inArray(servicosOcorrencias.setorId, cab.ids)));
@@ -468,6 +470,13 @@ export async function mapaDasSecretarias(municipioId: string) {
     });
   }
   const peso = { vermelho: 0, amarelo: 1, verde: 2 } as const;
-  return out.sort((a, b) => peso[a.semaforo.nivel] - peso[b.semaforo.nivel] || a.setor.nome.localeCompare(b.setor.nome));
+  const cartoes = out.sort((a, b) => peso[a.semaforo.nivel] - peso[b.semaforo.nivel] || a.setor.nome.localeCompare(b.setor.nome));
+  // Decisões do prefeito: repasses e obrigações com prazo crítico (vencido, pendência ou até 15 dias)
+  const critico = (n?: string) => n === "vencido" || n === "5" || n === "15";
+  const repassesCriticos = reps
+    .filter((r) => r.risco.emRisco && (r.situacao === "COM_PENDENCIA" || critico(r.prazoCritico?.alerta.nivel)))
+    .sort((a, b) => (a.prazoCritico?.alerta.dias ?? -999) - (b.prazoCritico?.alerta.dias ?? -999));
+  const obrigacoesCriticas = obs.filter((o) => critico(o.alerta?.nivel)).sort((a, b) => (a.alerta?.dias ?? 0) - (b.alerta?.dias ?? 0));
+  return { cartoes, repasses: reps, obrigacoes: obs, repassesCriticos, obrigacoesCriticas };
 }
-export type CartaoSecretaria = Awaited<ReturnType<typeof mapaDasSecretarias>>[number];
+export type CartaoSecretaria = Awaited<ReturnType<typeof mapaDasSecretarias>>["cartoes"][number];

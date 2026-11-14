@@ -26,6 +26,12 @@ Desde 13/11/2026 a Civu volta a ser o **sistema único do município** (especifi
 - Alertas de prazo de repasse e obrigação em dias corridos (30, 15, 5, vencido), em `src/modulos/repasses/regras.ts`. As obrigações da demonstração são exemplos e não afirmam prazo legal.
 - Leituras para a cabine e a sala do prefeito em `src/modulos/repasses/dados.ts`; provedor de indicadores em `src/modulos/repasses/indicadores.ts` (registrado em EXTERNOS).
 
+### Sala do prefeito (`/gabinete`)
+
+- Indicadores de todos os provedores (núcleo + `EXTERNOS`), agrupados por módulo, cada um com origem, responsável e realizado/projetado; provedor que falha vira "Fonte indisponível" (`executarProvedores`).
+- **Mapa das secretarias** (`mapaDasSecretarias` em `src/modulos/gestao/cabine.ts`): um cartão por cabine com pasta e o semáforo de `src/modulos/gestao/semaforo.ts` (função pura e testada: atrasos, execução do orçamento contra o ritmo do ano, repasses e obrigações, pendências do(a) secretário(a)). A cor vem sempre com ícone e texto, e o "por quê" e as regras aparecem na tela.
+- Decisões: processos no gabinete, assinaturas do ordenador e repasses e obrigações com prazo crítico (vencido, pendência ou até 15 dias). O resumo da semana (`resumo.ts`, por regras, sem IA) cita o mapa, os repasses em risco, as obrigações vencidas e as pendências dos(as) secretários(as).
+
 ## Divisão de trabalho
 
 A interface (telas, layout, visual) está sendo feita em outra conversa. Antes de mexer em qualquer arquivo de página ou componente visual, faça `git pull` e confirme com o Enzo se a tarefa é sua. Prefira trabalhar em lógica, dados, integrações, segurança e testes. Sempre `git pull --rebase` antes de começar e antes de enviar.
@@ -61,7 +67,7 @@ drizzle/            migrações SQL geradas
 2. Lógica em `src/modulos/<modulo>/` (consultas em `dados.ts`, server actions em `acoes.ts`).
 3. Menu e atalhos do portal em `src/modulos/<modulo>/registro.ts`, importado em `src/lib/modulos.ts`.
 4. Demonstração em `src/modulos/<modulo>/demo.ts` (`ModuloDemo`), registrada em `src/db/demo/index.ts`.
-5. Indicadores para o painel do prefeito: `src/modulos/gestao/indicadores.ts` explica como plugar um provedor (hoje só `repasses` está plugado).
+5. Indicadores para o painel do prefeito: `src/modulos/gestao/indicadores.ts` explica como plugar um provedor. Plugados em `EXTERNOS`: finanças, tributos, contratos e obras, serviços urbanos e repasses (cada um em `src/modulos/<m>/indicadores.ts`).
 
 ## Regras do domínio que não podem quebrar
 
@@ -101,9 +107,9 @@ Acessos de demonstração (senha `123456`): servidores em `/login`, por exemplo 
 
 Uma análise completa (o que existe, o que falta, mercado, preço) foi publicada para o Enzo. Resumo do que mais falta, em ordem:
 
-1. Painel do prefeito (`/gabinete`) recebendo indicadores de finanças, tributos, obras, serviços e contratos, mais economia com memória de cálculo.
+1. Economia com memória de cálculo na Sala do prefeito (os indicadores de finanças, tributos, obras, serviços, contratos e repasses já estão plugados desde 14/11/2026).
 2. Anexos de verdade (PDF e foto): hoje documentos são só texto.
-3. Permissões por atribuição: desde 13/11/2026 o ADMIN não age em processo e cada pessoa vê a sua área (ver "Áreas e acesso por perfil"); ainda falta o recorte dos dados pela pasta (qualquer servidor abre qualquer processo).
+3. Permissões por atribuição: desde 13/11/2026 o ADMIN não age em processo e cada pessoa vê a sua área (ver "Áreas e acesso por perfil"); contratos, orçamento e a cabine já são recortados pela pasta (14/11/2026); falta o recorte dos processos (qualquer servidor ainda abre qualquer processo pelo número).
 4. Notificação ao cidadão e retorno de integrações (banco, PNCP) dentro do fluxo; "enviado ao banco" diferente de "pago".
 5. Página pública sem login (hoje `/` redireciona para `/login`).
 6. Para editais: PNCP real, LicitaCon (e-Validador), gov.br e ICP-Brasil reais, ouvidoria e e-SIC, API REST, 2FA, backup, exportação completa, banco próprio fora do Spherum.

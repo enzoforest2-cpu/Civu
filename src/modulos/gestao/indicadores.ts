@@ -26,6 +26,8 @@ import "server-only";
  * Regras: cada indicador leva à sua origem (href), diz quem responde por ele e se é realizado ou projetado.
  * Use `serie` (mais antigo → mais recente) para a tendência. Um provedor que falhar não derruba o painel:
  * o painel mostra "fonte indisponível" para aquele módulo. Não conte o mesmo benefício em dois provedores.
+ *
+ * Plugados hoje: finanças, tributos, contratos e obras, serviços urbanos e repasses (além dos provedores do núcleo).
  */
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -42,7 +44,7 @@ export type Indicador = {
   chave: string;
   rotulo: string;
   valor: number | null;
-  formato: "numero" | "moeda" | "dias";
+  formato: "numero" | "moeda" | "dias" | "percentual";
   /** tendência, do mais antigo ao mais recente */
   serie?: Ponto[];
   melhorSe: "maior" | "menor" | "neutro";
@@ -355,7 +357,10 @@ const NUCLEO: ProvedorIndicadores[] = [provedorAtendimento, provedorObrigacoes, 
 
 // ---- módulos: cada um acrescenta UMA linha aqui (veja o comentário no topo) ----
 const EXTERNOS: (() => Promise<{ provedor: ProvedorIndicadores }>)[] = [
-  // () => import("@/modulos/servicos/indicadores"),
+  () => import("@/modulos/financas/indicadores"),
+  () => import("@/modulos/tributos/indicadores"),
+  () => import("@/modulos/contratos/indicadores"),
+  () => import("@/modulos/servicos/indicadores"),
   () => import("@/modulos/repasses/indicadores"),
 ];
 
@@ -368,14 +373,22 @@ const ORDEM_GRAV: Record<Gravidade, number> = { ALTA: 0, MEDIA: 1, BAIXA: 2 };
 
 /** Carrega todos os provedores em paralelo; um provedor com erro não derruba os outros. */
 export async function carregarIndicadores(municipioId: string): Promise<ResultadoPainel> {
+  // um módulo que nem carrega também aparece como "fonte indisponível", sem derrubar a sala
   const externos = await Promise.all(
-    EXTERNOS.map((f) =>
+    EXTERNOS.map((f, i) =>
       f()
         .then((m) => m.provedor)
-        .catch(() => null),
+        .catch((e): ProvedorIndicadores => {
+          console.error(`Provedor de indicadores ${i + 1} não carregou:`, e);
+          return { modulo: "Um dos módulos plugados", carregar: () => Promise.reject(e) };
+        }),
     ),
   );
-  const provedores = [...NUCLEO, ...externos.filter((p): p is ProvedorIndicadores => !!p)];
+  return executarProvedores(municipioId, [...NUCLEO, ...externos]);
+}
+
+/** Roda os provedores em paralelo; o que lançar erro vira "Fonte indisponível no momento" e os demais seguem. */
+export async function executarProvedores(municipioId: string, provedores: ProvedorIndicadores[]): Promise<ResultadoPainel> {
   const res = await Promise.all(
     provedores.map(async (p) => {
       try {
