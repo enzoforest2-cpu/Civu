@@ -67,7 +67,7 @@ export const provedor: ProvedorIndicadores = {
       alertas.push({
         chave: `repasses.${r.id}`,
         gravidade: urgente ? "ALTA" : "MEDIA",
-        titulo: `${r.rotulo} (${r.setor.sigla}): ${r.risco.motivo?.toLowerCase() ?? "com pendência"}`,
+        titulo: `${r.rotulo} (${r.setor.nome}): ${r.risco.motivo?.toLowerCase() ?? "com pendência"}`,
         motivo: `${r.objeto}. ${p ? `${p.rotulo} em ${dataBr(p.data)}. ` : ""}Pago ${fmtMoeda(r.execucao.pago)} de ${fmtMoeda(r.valorPrevisto)} (${r.execucao.percentual.toLocaleString("pt-BR")}%).`,
         impacto: r.risco.valorEmRisco > 0 ? `${fmtMoeda(r.risco.valorEmRisco)} em risco de devolução ou perda.` : undefined,
         responsavel: r.setor.nome,
@@ -81,7 +81,7 @@ export const provedor: ProvedorIndicadores = {
         titulo: `${obVencidas.length} ${obVencidas.length === 1 ? "obrigação de entrega vencida" : "obrigações de entrega vencidas"}`,
         motivo: obVencidas
           .slice(0, 3)
-          .map((o) => `${o.nome} (${o.setor.sigla})`)
+          .map((o) => `${o.nome} (${o.setor.nome})`)
           .join("; "),
         responsavel: "Secretarias responsáveis",
         acao: { rotulo: "Ver obrigações", href: "/obrigacoes-da-area?situacao=vencidas" },

@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { eventos, processos, servicosOcorrencias, servicosOrdens, setores, tiposProcesso, usuarios } from "@/db/schema";
 import type { SessaoUsuario } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { cabineDoSetor, ehCabine, podeAbrirCabine, setoresDaCabine, veTodasAsPastas, type SetorDaCabine } from "@/lib/areas";
+import { cabineDoSetor, ehCabine, podeAbrirCabine, podeVerPasta, setoresDaCabine, veTodasAsPastas, type SetorDaCabine } from "@/lib/areas";
 import { obrigacoes as obrigacoesLegais } from "@/lib/conformidade";
 import { historicoDePagamentos } from "@/lib/pagamentos";
 import { DOCUMENTO_TIPOS, avancosDisponiveis, getEstado, nomeDaEtapa, type EstadoDef, type Gate, type Papel, type WorkflowDef } from "@/lib/workflow";
@@ -79,19 +79,34 @@ export function semAcessoCabine(sigla: string, area: string | null, de = `/secre
   return `/sem-acesso?${q}`;
 }
 
+/**
+ * Pode filtrar uma lista pela pasta da sigla? Regra única (`podeVerPasta`) para `/processos?pasta=`, `/contratos?pasta=`
+ * e o orçamento: quem vê todas as pastas filtra qualquer uma; os demais, só a própria.
+ */
+export async function autorizarPasta(u: SessaoUsuario, sigla: string): Promise<Autorizacao> {
+  const todos = await setoresDoMunicipio(u.municipioId);
+  const s = todos.find((x) => x.sigla === sigla.toUpperCase());
+  if (!s || !ehCabine(s)) return { ok: false, motivo: "inexistente", area: null };
+  if (!podeVerPasta(u, s, todos)) return { ok: false, motivo: "sem-acesso", area: s.area };
+  return { ok: true, cabine: montar(todos, s) };
+}
+
 export type Recorte = { cabine: Cabine | null; forcado: boolean };
 
 /**
  * Recorte "da pasta" das listas de contratos e orçamento. Gabinete, controle, administrador, Fazenda e Compras veem todas as
  * pastas e podem filtrar por uma (`?pasta=SIGLA`); as demais secretarias veem só a própria, sempre (o filtro é imposto no
- * servidor). Pedir a pasta de outra secretaria leva a "Sem acesso a esta área".
+ * servidor). Pedir a pasta de outra secretaria leva a "Sem acesso a esta área" (mesma regra de `autorizarPasta`).
  */
 export async function recorteDaPasta(u: SessaoUsuario, siglaPedida?: string | null): Promise<Recorte> {
   const todos = await setoresDoMunicipio(u.municipioId);
-  const pedida = siglaPedida ? todos.find((x) => x.sigla === siglaPedida.toUpperCase() && ehCabine(x)) : undefined;
-  if (veTodasAsPastas(u)) return { cabine: pedida ? montar(todos, pedida) : null, forcado: false };
+  if (siglaPedida) {
+    const a = await autorizarPasta(u, siglaPedida);
+    if (!a.ok && a.motivo === "sem-acesso") redirect(semAcessoCabine(siglaPedida.toUpperCase(), a.area));
+    if (a.ok && veTodasAsPastas(u)) return { cabine: a.cabine, forcado: false };
+  }
+  if (veTodasAsPastas(u)) return { cabine: null, forcado: false };
   const propria = cabineDoSetor(todos, u.setorId);
-  if (pedida && pedida.id !== propria?.id) redirect(semAcessoCabine(pedida.sigla, pedida.area));
   return { cabine: propria ? montar(todos, propria) : { setor: { id: "", sigla: "", nome: "sua secretaria", area: null, orgaoOrcamentario: null }, ids: [], setores: todos, orgaos: [] }, forcado: true };
 }
 
@@ -135,7 +150,15 @@ export type Pendencia = {
   aprovar: { para: string; rotulo: string } | null;
   /** por que não dá para resolver daqui (documento não juntado, por exemplo) */
   bloqueio: string | null;
+  /**
+   * Aprovação que o motor não deixa o(a) secretário(a) da cabine fazer (o pedido foi aberto por outro setor da área, e a
+   * etapa é do(a) secretário(a) do setor de quem pediu): de quem depende, para a tela informar sem botão.
+   */
+  dependeDe: string | null;
 };
+
+/** "Secretaria de Serviços Urbanos" → "Serviços Urbanos"; outros setores ficam com o nome inteiro. */
+const assuntoDoSetor = (nome: string) => nome.replace(/^Secretaria (Municipal )?(de |da |do |das |dos )?/i, "") || nome;
 
 /** O gate pede a assinatura do secretário? (sozinho ou entre outros papéis) */
 const pedeSecretario = (g: Gate): g is Extract<Gate, { tipo: "documento" }> =>
@@ -168,6 +191,7 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
         recebido: processos.recebidoEm,
         metadados: processos.metadados,
         abertoEm: processos.abertoEm,
+        abertoPorSetorId: usuarios.setorId,
         chegouEm: sql<Date | null>`(select max(${eventos.criadoEm}) from ${eventos} where ${eventos.processoId} = ${processos.id} and ${eventos.paraSetorId} is not distinct from ${processos.setorAtualId} and ${eventos.paraSetorId} is not null)`,
       })
       .from(processos)
@@ -179,7 +203,7 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
   const tipoDe = new Map(tipos.map((t) => [t.id, t]));
   const setorDe = new Map(cab.setores.map((s) => [s.id, s]));
 
-  const itens: (ProcessoDaPasta & { def: WorkflowDef | null })[] = lista.map((p) => {
+  const itens: (ProcessoDaPasta & { def: WorkflowDef | null; abertoPorSetorId: string | null })[] = lista.map((p) => {
     const t = tipoDe.get(p.tipoId);
     const def = (t?.definicao as WorkflowDef | undefined) ?? null;
     const ordem = def ? def.estados.findIndex((e) => e.chave === p.estado) : -1;
@@ -205,6 +229,7 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
       ordem,
       antesDoContrato: t?.chave === "COMPRA" && iContrato >= 0 && ordem >= 0 && ordem < iContrato,
       def,
+      abertoPorSetorId: p.abertoPorSetorId,
     };
   });
 
@@ -223,6 +248,8 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
       })
     : [];
   const pendencias: Pendencia[] = [];
+  /** aprovações da pasta que dependem de outro(a) secretário(a) (do setor de quem pediu): aparecem só para informar */
+  const aguardandoOutros: Pendencia[] = [];
   for (const p of candidatos) {
     const e = getEstado(p.def!, p.estado)!;
     const faltam: { id: string; nome: string }[] = [];
@@ -241,7 +268,9 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
     const aprovacao = etapaDoSecretario(e) && p.naPasta;
     if (!aprovacao && faltam.length === 0) continue;
     const av = aprovacao ? avancosDisponiveis(p.def!, e, null)[0] : undefined;
-    pendencias.push({
+    // a etapa de aprovação é do setor de quem pediu (podeAgir): o(a) secretário(a) da cabine só aprova o que a cabine abriu
+    const outroSetor = aprovacao && e.setor === null && p.abertoPorSetorId !== cab.setor.id ? setorDe.get(p.abertoPorSetorId ?? "") : undefined;
+    (outroSetor || (aprovacao && e.setor === null && !p.abertoPorSetorId) ? aguardandoOutros : pendencias).push({
       tipo: aprovacao ? "APROVACAO" : "ASSINATURA",
       processoId: p.id,
       numero: p.numero,
@@ -252,10 +281,11 @@ export async function processosDaPasta(municipioId: string, cab: Cabine) {
       documentos: faltam,
       aprovar: av ? { para: av.para, rotulo: av.rotulo } : null,
       bloqueio,
+      dependeDe: outroSetor ? `aprovação do(a) secretário(a) de ${assuntoDoSetor(outroSetor.nome)}` : aprovacao && e.setor === null && !p.abertoPorSetorId ? "aprovação do(a) secretário(a) do setor de quem pediu" : null,
     });
   }
   pendencias.sort((a, b) => Number(b.vencida) - Number(a.vencida) || (a.prazo?.getTime() ?? Infinity) - (b.prazo?.getTime() ?? Infinity));
-  return { processos: itens.map(({ def, ...x }) => (void def, x)), pendencias };
+  return { processos: itens.map(({ def, abertoPorSetorId, ...x }) => (void def, void abertoPorSetorId, x)), pendencias, aguardandoOutros };
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +452,7 @@ export async function carregarCabine(municipioId: string, cab: Cabine) {
 export type DadosCabine = Awaited<ReturnType<typeof carregarCabine>>;
 
 function semaforoDe(
-  pp: { processos: ProcessoDaPasta[]; pendencias: Pendencia[] },
+  pp: { processos: ProcessoDaPasta[]; pendencias: Pendencia[] }, // só as que dependem do(a) secretário(a) da cabine
   orc: Awaited<ReturnType<typeof orcamentoDaPasta>>,
   repasses: RepasseResumo[],
   obrigacoes: ObrigacaoResumo[],

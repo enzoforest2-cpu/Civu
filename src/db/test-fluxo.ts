@@ -487,6 +487,22 @@ async function main() {
       try { await fn(); } catch (e) { if (e instanceof rep.ErroRepasse) { ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
       falha("deveria falhar: " + m);
     };
+    // Execução sem contar duas vezes (demonstração): a compra da merenda e o pagamento da NF 412, do contrato que saiu dela,
+    // estão no mesmo repasse "PNAE 2026". Contratado vem da compra; liquidado e pago, do pagamento do contrato.
+    {
+      const pnae = (await repDados.repassesDoMunicipio(requisitante.municipioId)).find((r) => r.identificacao === "PNAE 2026") ?? falha("repasse PNAE 2026 ausente na demonstração");
+      const det0 = (await repDados.carregarRepasse(requisitante.municipioId, pnae.id)) ?? falha("repasse sumiu");
+      const compraPnae = det0.processos.find((x) => !x.origemId) ?? falha("PNAE sem a compra de origem");
+      const pagsPnae = det0.processos.filter((x) => x.origemId === compraPnae.id);
+      if (!pagsPnae.length) falha("PNAE sem pagamento do contrato que saiu da compra");
+      const pagoPnae = pagsPnae.filter((x) => x.pago).reduce((a, x) => a + (x.valor ?? 0), 0);
+      if (pnae.execucao.contratado !== compraPnae.valor) falha(`PNAE: contratado deve ser o da compra (${compraPnae.valor}), veio ${pnae.execucao.contratado}`);
+      if (pnae.execucao.pago !== pagoPnae || pnae.execucao.liquidado !== pagsPnae.filter((x) => x.liquidado).reduce((a, x) => a + (x.valor ?? 0), 0))
+        falha("PNAE: liquidado e pago vêm dos pagamentos do contrato: " + JSON.stringify(pnae.execucao));
+      if (pnae.execucao.contratado !== 298400 || pnae.execucao.pago !== 48620) falha("PNAE 2026 na demonstração: 298.400 contratados e 48.620 pagos, veio " + JSON.stringify(pnae.execucao));
+      ok(`repasse com a compra e o pagamento do contrato dela: contratado ${pnae.execucao.contratado} (não 347.020), liquidado ${pnae.execucao.liquidado}, pago ${pnae.execucao.pago}`);
+    }
+
     const entrada = {
       setorId: secretario.setorId!, tipo: "CONVENIO", concedente: "Fundo de teste", objeto: "TESTE FLUXO — convênio da saúde",
       valorPrevisto: "60.000,00", valorRecebido: "30.000", prazoExecucao: "2027-12-31", situacao: "EM_EXECUCAO",
@@ -509,7 +525,21 @@ async function main() {
     await esperaRecusa("educação vincula processo ao repasse da saúde", () => rep.vincularProcesso(secEducacao, repId, p.id));
     await esperaRecusa("papel ADMIN vincula processo", () => rep.vincularProcesso(adminCompras, repId, p.id));
     await rep.vincularProcesso(secretario, repId, p.id);
-    await rep.vincularProcesso(secretario, repId, naFila.processoId, "Despesa prevista no plano de trabalho.");
+    // só processo da pasta responsável pelo repasse; o Gabinete vincula de qualquer pasta
+    const pastaFila = (await repDados.pastasDosProcessos(requisitante.municipioId, [naFila.processoId])).get(naFila.processoId);
+    const pastaSaude = await repDados.pastaDoSetor(requisitante.municipioId, secretario.setorId!);
+    if (pastaFila !== pastaSaude) {
+      await esperaRecusa("saúde vincula ao seu repasse processo de outra pasta", () => rep.vincularProcesso(secretario, repId, naFila.processoId));
+      await rep.vincularProcesso(prefeita, repId, naFila.processoId, "Despesa prevista no plano de trabalho.");
+    } else await rep.vincularProcesso(secretario, repId, naFila.processoId, "Despesa prevista no plano de trabalho.");
+    {
+      const outro = (await repDados.processosParaVincular(secretario, { setorId: secretario.setorId! })).length;
+      const gab = await repDados.processosParaVincular(prefeita, { setorId: secretario.setorId! });
+      const daPasta = await repDados.pastasDosProcessos(requisitante.municipioId, gab.map((x) => x.id));
+      if (!gab.some((x) => !x.daArea) || gab.filter((x) => x.daArea).length !== outro) falha("o Gabinete vê os processos de todas as pastas; a saúde, só os da pasta");
+      if (gab.some((x) => x.daArea !== (daPasta.get(x.id) === pastaSaude))) falha("daArea marca os processos da pasta do repasse");
+      ok(`vincular: a saúde vê ${outro} processos da própria pasta para vincular; o Gabinete vê também os de outras pastas`);
+    }
     await esperaErro("vincular de novo ao mesmo repasse", () => rep.vincularProcesso(secretario, repId, p.id), "O processo já está vinculado a este repasse.");
     // aberto já vinculado (sem contratação ainda: não conta valor)
     const ab = await engine.abrirProcesso(requisitante, {
@@ -532,6 +562,16 @@ async function main() {
     if (!cp.eventos.some((e) => e.tipo === "VINCULO_REPASSE") || !engine.verificarCadeia(cp.eventos).ok) falha("o vínculo entra no livro do processo pelo motor, com a cadeia íntegra");
     ok(`repasse soma a execução dos processos vinculados: contratado ${det.execucao.contratado}, liquidado ${det.execucao.liquidado}, pago ${det.execucao.pago} (14,5%)`);
 
+    // a pasta dona do processo também desvincula; uma terceira pasta, não
+    {
+      const secInfra = await sessao("16161616161");
+      const pInfra = (await repDados.processosParaVincular(prefeita, { setorId: secInfra.setorId! })).find((x) => x.daArea) ?? falha("o teste precisa de um processo da infraestrutura para vincular");
+      await esperaRecusa("saúde vincula processo da infraestrutura ao repasse da saúde", () => rep.vincularProcesso(secretario, repId, pInfra.id));
+      await rep.vincularProcesso(prefeita, repId, pInfra.id, "Gabinete atribui a despesa ao convênio da saúde.");
+      await esperaRecusa("educação desvincula processo da infraestrutura do repasse da saúde", () => rep.desvincularProcesso(secEducacao, pInfra.id, "Não é desta pasta, tirar do repasse."));
+      await rep.desvincularProcesso(secInfra, pInfra.id, "A obra é paga com recurso próprio da infraestrutura.");
+      ok("vínculo: Gabinete vincula processo de outra pasta; a pasta dona do processo desvincula; outra pasta não");
+    }
     await esperaRecusa("desvincular sem motivo", () => rep.desvincularProcesso(secretario, naFila.processoId, "curto"));
     await rep.desvincularProcesso(secretario, naFila.processoId, "Despesa paga com recurso próprio, não com o convênio.");
     det = (await repDados.carregarRepasse(requisitante.municipioId, repId)) ?? falha("repasse sumiu");
@@ -544,6 +584,7 @@ async function main() {
     // obrigações da área: mesma regra de edição
     const ob = { setorId: secretario.setorId!, nome: "TESTE FLUXO — relatório", destinatario: "Conselho de teste", periodicidade: "MENSAL", proximoVencimento: "2026-01-31" };
     await esperaRecusa("educação cadastra obrigação da saúde", () => rep.criarObrigacao(secEducacao, ob));
+    await esperaRecusa("obrigação da saúde com responsável da educação", () => rep.criarObrigacao(prefeita, { ...ob, responsavelId: secEducacao.id }));
     const { id: obId } = await rep.criarObrigacao(requisitante, ob);
     await esperaRecusa("controle interno registra entrega", () => rep.registrarEntrega(controladora, obId, { entregueEm: "2026-01-30", comprovante: "REC-1" }));
     const ent = await rep.registrarEntrega(prefeita, obId, { entregueEm: "2026-01-30", comprovante: "REC-1" });
@@ -717,6 +758,87 @@ async function main() {
     if (!pAprov?.aprovar) falha("a cabine da infraestrutura deve trazer a aprovação pendente do secretário");
     if (!dInfra.pendencias.some((p) => p.tipo === "ASSINATURA" && p.documentos.length)) falha("a cabine da infraestrutura deve trazer o TR para o secretário assinar");
     ok(`cabine da saúde: ${d.processos.length} processos, ${d.contratos.length} contratos e ${d.repasses.length} repasses, todos da pasta; pendências do secretário de infraestrutura encontradas`);
+  }
+
+  // ---- aprovação de pedido aberto por setor de apoio da área: depende do(a) secretário(a) desse setor, não da cabine
+  {
+    const cab = await import("../modulos/gestao/cabine");
+    const secSmsu = await sessao("30303030303"); // Serviços Urbanos (área de Infraestrutura, sem cabine própria)
+    const secInfra = await sessao("16161616161");
+    const ps = await engine.abrirProcesso(secSmsu, { tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: assunto("pedido dos serviços urbanos"), metadados: dadosCompra });
+    const dfdS = await engine.juntarDocumento(secSmsu, ps.id, "DFD", "DFD", "Demanda dos serviços urbanos.");
+    await engine.assinarDocumento(secSmsu, dfdS.id, "SECRETARIO");
+    await engine.avancar(secSmsu, ps.id, "APROVACAO_SECRETARIO");
+    if (engine.podeAgir(secInfra, await carregar(ps.id))) falha("o motor não deixa o secretário de infraestrutura aprovar pedido aberto pelos serviços urbanos");
+    const aInfra = await cab.autorizarCabine(secInfra, "SEINFRA");
+    if (!aInfra.ok) throw new Error("cabine da infraestrutura");
+    const dInfra = await cab.processosDaPasta(secInfra.municipioId, aInfra.cabine);
+    if (dInfra.pendencias.some((x) => x.processoId === ps.id)) falha("a cabine não oferece 'Aprovar' que o motor recusa");
+    const fora = dInfra.aguardandoOutros.find((x) => x.processoId === ps.id);
+    if (!fora || fora.dependeDe !== "aprovação do(a) secretário(a) de Serviços Urbanos") falha("a cabine informa de quem depende a aprovação: " + JSON.stringify(fora?.dependeDe));
+    const cartao = (await cab.mapaDasSecretarias(secInfra.municipioId)).cartoes.find((c) => c.setor.sigla === "SEINFRA")!;
+    if (cartao.numeros.pendencias !== dInfra.pendencias.length) falha("o sinal de assinaturas conta só o que depende do(a) secretário(a) da cabine");
+    ok(`cabine: aprovação de pedido dos serviços urbanos aparece como "${fora!.dependeDe}", sem botão e fora do semáforo`);
+  }
+
+  // ---- serviços urbanos (I4): a ação confere a área no servidor, como a página
+  {
+    const sv = await import("../modulos/servicos/dados");
+    const { exigirAreaNaAcao } = await import("../lib/acesso");
+    const { setores: tSetores } = await import("./schema");
+    const secInfra = await sessao("16161616161");
+    const sigla = async (x: string) => (await db.query.setores.findFirst({ where: and(eq(tSetores.municipioId, requisitante.municipioId), eq(tSetores.sigla, x)) }))!.id;
+    const novo = (setorId: string) => ({ nome: "TESTE FLUXO — poda de árvores", descricao: "", categoria: "VIAS", setorId, slaDiasUteis: 10, exigeFoto: false, ativo: false });
+    const recusa = async (m: string, fn: () => unknown) => {
+      try { await fn(); } catch (e) { if (e instanceof sv.ErroServico) { ok(`${m} → bloqueado: "${e.message}"`); return; } throw e; }
+      falha("deveria falhar: " + m);
+    };
+    await recusa("secretário de saúde entra na ação de serviços urbanos", () => exigirAreaNaAcao(secretario, ["INFRAESTRUTURA"], sv.ErroServico));
+    await recusa("secretário de saúde cadastra serviço urbano", () => sv.salvarServico(secretario, novo(secretario.setorId!)));
+    await recusa("infraestrutura cadastra serviço para a saúde", () => sv.salvarServico(secInfra, novo(secretario.setorId!)));
+    await sv.salvarServico(secInfra, novo(await sigla("SMSU")));
+    ok("serviços urbanos: só a área de Infraestrutura cadastra, e só para setores da própria área");
+  }
+
+  // ---- processo por pasta (C1): só quem participa abre e age; ADMIN lê; consulta pública não muda
+  {
+    const ap = await import("../lib/acesso-processo");
+    const secEdu = await sessao("10101010101");
+    const adminEdu = { ...secEdu, papeis: ["ADMIN"] as never };
+    // pedido da saúde (aberto pela requisitante) que a educação não acompanha
+    const pSaude = await engine.abrirProcesso(requisitante, { tipoId: tipo.id, unidadeGestoraId: ug.id, assunto: assunto("pedido só da saúde"), metadados: dadosCompra });
+    if ((await ap.acessoAoProcesso(secEdu, pSaude.id)) !== null) falha("servidor da educação não abre processo da saúde em que a educação não participa");
+    if ((await ap.acessoAoProcesso(requisitante, pSaude.id)) !== "agir") falha("a requisitante abre o que pediu");
+    if ((await ap.acessoAoProcesso(secretario, pSaude.id)) !== "agir") falha("o secretário da pasta abre o pedido da pasta");
+    if ((await ap.acessoAoProcesso(compras, pSaude.id)) !== "agir") falha("compras abre qualquer compra");
+    if ((await ap.acessoAoProcesso(contador, pSaude.id)) !== "agir") falha("a contabilidade abre a compra que vai passar por ela");
+    if ((await ap.acessoAoProcesso(prefeita, pSaude.id)) !== "agir" || (await ap.acessoAoProcesso(controladora, pSaude.id)) !== "agir") falha("gabinete e controle abrem todos");
+    if ((await ap.acessoAoProcesso(adminEdu, pSaude.id)) !== "ler") falha("o administrador lê, mas não age");
+    let recusou = 0;
+    for (const quem of [secEdu, adminEdu]) {
+      try { await ap.exigirAcaoNoProcesso(quem, pSaude.id); } catch (e) { if (e instanceof engine.ErroFluxo) recusou++; else throw e; }
+    }
+    if (recusou !== 2) falha("educação e administrador não agem no processo da saúde");
+    // a lista e a busca mostram só o que a pessoa abre
+    const visivel = async (u: typeof secEdu, id: string) => {
+      const c = await ap.condicaoDeVisibilidade(u);
+      return (await db.select({ id: processos.id }).from(processos).where(and(eq(processos.id, id), ...(c ? [c] : [])))).length === 1;
+    };
+    if (await visivel(secEdu, pSaude.id)) falha("a lista de processos da educação não mostra o pedido da saúde");
+    // a mesma condição na consulta relacional da página /processos (a tabela ganha apelido)
+    const condEdu = await ap.condicaoDeVisibilidade(secEdu);
+    const listaEdu = await db.query.processos.findMany({ where: and(eq(processos.municipioId, secEdu.municipioId), condEdu), columns: { id: true }, with: { abertoPor: true } });
+    if (!listaEdu.length || listaEdu.some((x) => x.id === pSaude.id)) falha("a lista relacional de processos da educação segue a regra de participação");
+    if (!(await visivel(compras, pSaude.id)) || !(await visivel(adminEdu, pSaude.id)) || !(await visivel(requisitante, pSaude.id))) falha("compras, administrador e requisitante veem o pedido na lista");
+    // quando o processo passa pela educação (enviado ao setor), ela passa a abrir
+    const req = await db.query.tiposProcesso.findFirst({ where: and(eq(tiposProcesso.municipioId, requisitante.municipioId), eq(tiposProcesso.chave, "REQUERIMENTO")) });
+    if (req) {
+      const r = await engine.abrirProcesso(protocolo, { tipoId: req.id, unidadeGestoraId: ug.id, assunto: assunto("ofício que passa pela educação"), metadados: { interessado: "Conselho de teste" } });
+      if ((await ap.acessoAoProcesso(secEdu, r.id)) !== null) falha("ofício do protocolo não é da educação antes de chegar a ela");
+      await engine.tramitar(protocolo, r.id, secEdu.setorId!, "Para manifestação da educação.");
+      if ((await ap.acessoAoProcesso(secEdu, r.id)) !== "agir") falha("o setor para onde o processo foi enviado abre e age");
+    }
+    ok("processo por pasta: educação não abre pedido da saúde; requisitante, pasta, compras, contabilidade, gabinete e controle abrem; ADMIN só lê; a lista segue a mesma regra");
   }
 
   // ---- sala do prefeito (Parte 4): provedores plugados e um provedor que falha não derruba a sala

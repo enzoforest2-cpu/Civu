@@ -132,20 +132,40 @@ export const prazoCritico = (r: DatasRepasse, hoje: string): PrazoRepasse | null
 
 /**
  * Um processo vinculado, já classificado. `valor` é metadados.contratacao.valor (null se a contratação ainda não foi registrada).
- * `liquidado`: chegou à fila cronológica (a liquidação é o que põe o processo na fila). `pago`: chegou a PAGO (retorno do banco aceito).
- * `cancelado`: encerrado sem pagamento (não conta como contratado).
+ * `liquidado`: está liquidado agora (na fila cronológica, enviado ao banco ou pago); uma liquidação devolvida não conta.
+ * `pago`: chegou a PAGO (retorno do banco aceito). `cancelado`: encerrado sem pagamento (não conta como contratado).
+ * `origemId`: num pagamento de contrato, o processo de compra de onde o contrato saiu (metadados.contrato.processoOrigemId).
  */
-export type ProcessoExecucao = { valor: number | null; liquidado: boolean; pago: boolean; cancelado: boolean };
+export type ProcessoExecucao = { id?: string; valor: number | null; liquidado: boolean; pago: boolean; cancelado: boolean; origemId?: string | null };
 export type Execucao = { contratado: number; liquidado: number; pago: number };
 
-/** Soma da execução: contratado ⊇ liquidado ⊇ pago (um processo pago também conta como liquidado e contratado). */
+/**
+ * Soma da execução: contratado ⊇ liquidado ⊇ pago (um processo pago também conta como liquidado e contratado).
+ * Compra e pagamentos do mesmo contrato no mesmo repasse contam uma vez só: o contratado vem da compra de origem; o
+ * liquidado e o pago vêm dos pagamentos do contrato quando existirem, senão do fluxo da própria compra. Pagamento cuja
+ * compra de origem não está no repasse conta sozinho (contratado = valor da nota).
+ */
 export function somarExecucao(processos: ProcessoExecucao[]): Execucao {
   const e: Execucao = { contratado: 0, liquidado: 0, pago: 0 };
+  const conta = (p: ProcessoExecucao) => p.valor != null && Number.isFinite(p.valor) && !(p.cancelado && !p.pago);
+  const ids = new Set(processos.map((p) => p.id).filter(Boolean));
+  const pagamentosDe = new Map<string, ProcessoExecucao[]>();
+  for (const p of processos)
+    if (p.origemId && ids.has(p.origemId) && p.origemId !== p.id) pagamentosDe.set(p.origemId, [...(pagamentosDe.get(p.origemId) ?? []), p]);
   for (const p of processos) {
-    if (p.valor == null || !Number.isFinite(p.valor) || (p.cancelado && !p.pago)) continue;
-    e.contratado += p.valor;
-    if (p.liquidado || p.pago) e.liquidado += p.valor;
-    if (p.pago) e.pago += p.valor;
+    if (p.origemId && ids.has(p.origemId) && p.origemId !== p.id) continue; // já entra pela compra de origem
+    const pags = (p.id ? pagamentosDe.get(p.id) : undefined)?.filter(conta) ?? [];
+    if (conta(p)) e.contratado += p.valor!;
+    else if (pags.length) e.contratado += pags.reduce((s, x) => s + x.valor!, 0); // compra sem valor registrado: vale o que foi pago
+    if (pags.length) {
+      for (const x of pags) {
+        if (x.liquidado || x.pago) e.liquidado += x.valor!;
+        if (x.pago) e.pago += x.valor!;
+      }
+    } else if (conta(p)) {
+      if (p.liquidado || p.pago) e.liquidado += p.valor!;
+      if (p.pago) e.pago += p.valor!;
+    }
   }
   const r2 = (n: number) => Math.round(n * 100) / 100;
   return { contratado: r2(e.contratado), liquidado: r2(e.liquidado), pago: r2(e.pago) };

@@ -13,18 +13,23 @@ import { descreverRegra, GATILHO_ROTULO, GRAVIDADE_ROTULO, NIVEL_ROTULO, type Ga
 import { alternarRegraAction, rodarRegraAction, tratarAlertaAction } from "@/modulos/gestao/acoes";
 import { NovaRegra } from "@/modulos/gestao/componentes/nova-regra";
 
+import { processosVisiveisEntre } from "@/lib/acesso-processo";
+
 export const metadata = { title: "Automações · Civu" };
 
 const TOM_GRAV: Record<Gravidade, "bad" | "warn" | "neutral"> = { ALTA: "bad", MEDIA: "warn", BAIXA: "neutral" };
 
 export default async function AutomacoesPage() {
   const u = await exigirRota("/automacoes", pode.verAutomacoes);
-  const [regras, execucoes, alertas, setores] = await Promise.all([
+  const [regras, execucoes, alertasTodos, setores] = await Promise.all([
     listarRegras(u.municipioId),
     listarExecucoes(u.municipioId),
     alertasAbertos(u.municipioId),
     db.query.setores.findMany({ where: eq(tSetores.municipioId, u.municipioId), orderBy: (s, { asc }) => [asc(s.nome)] }),
   ]);
+  // alertas sobre processos: cada pessoa vê os dos processos que pode abrir (o protocolo vê todos)
+  const visiveis = u.papeis.includes("PROTOCOLO") ? null : await processosVisiveisEntre(u, alertasTodos.flatMap((a) => (a.processoId ? [a.processoId] : [])));
+  const alertas = visiveis ? alertasTodos.filter((a) => !a.processoId || visiveis.has(a.processoId)) : alertasTodos;
   const nomeSetor = (sigla: string) => setores.find((s) => s.sigla === sigla)?.nome ?? sigla;
   const podeRodar = pode.rodarAutomacoes(u);
   const podeConfigurar = pode.configurarAutomacoes(u);

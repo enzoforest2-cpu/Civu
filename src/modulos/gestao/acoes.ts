@@ -17,6 +17,7 @@ import { registrarAuditoria, verificarIntegridade } from "./auditoria";
 import { configurarConector, testarConector, type StatusIntegracao } from "./integracoes";
 import { MODELOS } from "./modelos";
 import { CPF_ATENDIMENTO_DIGITAL } from "@/lib/engine";
+import { exigirAcaoNoProcesso } from "@/lib/acesso-processo";
 import type { Gatilho, Gravidade, Nivel, TipoAcao } from "./avaliador";
 
 function trata(e: unknown): ActionState {
@@ -38,7 +39,7 @@ function exigir(ok: boolean, msg = "Você não tem permissão para esta ação."
 export async function decidirLoteAction(input: { ids: string[]; modo: "AVANCAR" | "DESPACHAR"; texto: string; senha: string }): Promise<{ erro?: string; resultados?: ResultadoLote }> {
   try {
     const u = await requireUser();
-    exigir(pode.decidirEmLote(u), "Só o ordenador de despesa decide em lote.");
+    exigir(pode.verGabinete(u) && pode.decidirEmLote(u), "Só o ordenador de despesa, na Sala do prefeito, decide em lote.");
     if (input.modo !== "AVANCAR" && input.modo !== "DESPACHAR") throw new ErroFluxo("Ação inválida.");
     const resultados = await decidirEmLote(u, { ids: input.ids.slice(0, 30).map(String), modo: input.modo, texto: String(input.texto ?? ""), senha: String(input.senha ?? "") });
     revalidatePath("/gabinete");
@@ -175,6 +176,8 @@ export async function tratarAlertaAction(_: ActionState, fd: FormData): Promise<
     const a = await db.query.gestaoAlertas.findFirst({ where: and(eq(gestaoAlertas.id, str(fd, "alertaId")), eq(gestaoAlertas.municipioId, u.municipioId)) });
     if (!a) throw new ErroFluxo("Alerta não encontrado.");
     if (a.situacao !== "ABERTO") throw new ErroFluxo("Este alerta já foi tratado.");
+    // alerta sobre um processo: trata quem participa dele (o protocolo trata os alertas de todos)
+    if (a.processoId && !u.papeis.includes("PROTOCOLO")) await exigirAcaoNoProcesso(u, a.processoId);
     await db.update(gestaoAlertas).set({ situacao, encerradoEm: new Date(), encerradoPorId: u.id }).where(eq(gestaoAlertas.id, a.id));
     await registrarAuditoria({
       municipioId: u.municipioId,
@@ -202,6 +205,7 @@ export async function juntarRedacaoAction(_: ActionState, fd: FormData): Promise
     if (!processoId) throw new ErroFluxo("Escolha o processo ao qual o texto será juntado.");
     const texto = String(fd.get("texto") ?? "");
     if (texto.includes("[a preencher")) throw new ErroFluxo("Ainda há campos [a preencher] no texto. Complete antes de juntar.");
+    await exigirAcaoNoProcesso(u, processoId);
     await juntarDocumento(u, processoId, modelo.documentoTipo, `${modelo.titulo}`, texto);
     revalidatePath(`/processos/${processoId}`);
     return { ok: "Texto juntado ao processo como documento. Ele pode ser assinado na página do processo." };

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { cabinesDoMunicipio, recorteDaPasta, semAcessoCabine } from "@/modulos/gestao/cabine";
 import { AlertTriangle, ArrowLeft, ExternalLink, HardHat } from "lucide-react";
 import { temPapel } from "@/lib/auth";
+import { areaDoUsuario } from "@/lib/areas";
 import { fmtData, fmtDataHora, fmtMoeda } from "@/lib/dates";
 import { fmtCnpj, nomeFonte } from "@/lib/pagamentos";
 import { Chip, Panel, Vazio } from "@/components/ui";
@@ -35,7 +36,9 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
   if (!c) notFound();
   // Recorte pela pasta: secretaria finalística abre só os contratos dela (ou aqueles em que a pessoa é fiscal ou gestora)
   const recorte = await recorteDaPasta(u);
-  if (recorte.forcado && !(c.setorId && recorte.cabine?.ids.includes(c.setorId)) && c.fiscalId !== u.id && c.gestorId !== u.id) {
+  // Infraestrutura acompanha a execução de todas as obras (a lista de /contratos/obras): abre o detalhe de contrato de obra
+  const acompanhaObra = !!c.obra && areaDoUsuario(u) === "INFRAESTRUTURA";
+  if (recorte.forcado && !(c.setorId && recorte.cabine?.ids.includes(c.setorId)) && c.fiscalId !== u.id && c.gestorId !== u.id && !acompanhaObra) {
     const dono = (await cabinesDoMunicipio(u.municipioId)).find((x) => !!c.setorId && x.ids.includes(c.setorId));
     redirect(semAcessoCabine(dono?.setor.sigla ?? "", dono?.setor.area ?? c.setor?.area ?? null, `/contratos/${id}`));
   }
@@ -246,7 +249,7 @@ export default async function ContratoPage({ params }: { params: Promise<{ id: s
                     <strong className="font-semibold">Motivo informado na página pública:</strong> {c.obraMotivo}
                   </div>
                 )}
-                <div className="mt-6 overflow-x-auto">
+                <div className="mt-6 overflow-x-auto" tabIndex={0} role="region" aria-label="Etapas da obra: executado e previsto">
                   <table className="lista">
                     <thead>
                       <tr>

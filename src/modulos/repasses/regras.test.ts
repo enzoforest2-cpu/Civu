@@ -67,6 +67,16 @@ test("repasse soma a execução dos processos vinculados: contratado ⊇ liquida
   ]);
   assert.deepEqual(e, { contratado: 308650.5, liquidado: 10250.5, pago: 9000 });
   assert.deepEqual(somarExecucao([]), { contratado: 0, liquidado: 0, pago: 0 });
+  // compra e pagamento do contrato que saiu dela no mesmo repasse: contratado da compra; liquidado e pago dos pagamentos
+  const compra = { id: "c1", valor: 298400, liquidado: false, pago: false, cancelado: false };
+  const pag1 = { id: "p1", valor: 48620, liquidado: true, pago: true, cancelado: false, origemId: "c1" };
+  const pag2 = { id: "p2", valor: 1000, liquidado: true, pago: false, cancelado: false, origemId: "c1" };
+  assert.deepEqual(somarExecucao([compra, pag1]), { contratado: 298400, liquidado: 48620, pago: 48620 });
+  assert.deepEqual(somarExecucao([pag2, compra, pag1]), { contratado: 298400, liquidado: 49620, pago: 48620 });
+  // sem pagamento do contrato no repasse, vale o fluxo da própria compra
+  assert.deepEqual(somarExecucao([{ ...compra, liquidado: true, pago: true }]), { contratado: 298400, liquidado: 298400, pago: 298400 });
+  // pagamento cuja compra de origem não está no repasse conta sozinho
+  assert.deepEqual(somarExecucao([pag1]), { contratado: 48620, liquidado: 48620, pago: 48620 });
   assert.equal(percentualExecutado(9000, 60000), 15);
   assert.equal(percentualExecutado(1, 3), 33.3);
   assert.equal(percentualExecutado(500, 0), 0);

@@ -18,7 +18,7 @@ export default async function RepassePage({ params }: { params: Promise<{ id: st
   // leitura conforme a área da secretaria responsável: secretário de outra pasta não abre por URL
   if (!podeVerNaArea(u, r.area)) redirect(urlSemAcesso(`/repasses/${id}`));
   const pode = podeEditarNaArea(u, r.area);
-  const candidatos = pode && r.situacao !== "PRESTADO" ? await processosParaVincular(u.municipioId, r.area) : [];
+  const candidatos = pode && r.situacao !== "PRESTADO" ? await processosParaVincular(u, { setorId: r.setor.id }) : [];
   const datas: [string, string | null][] = [
     ["Assinatura ou publicação", r.assinadoEm],
     ["Fim da vigência", r.vigenciaFim],

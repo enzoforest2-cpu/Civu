@@ -67,7 +67,10 @@ export default async function GabinetePage() {
   const obsProximas = obsAbertas.filter((o) => o.situacao !== "vencida" && o.prazo && o.prazo.getTime() < agora + 7 * 86400_000);
   const naFila = filas.reduce((s, f) => s + f.fila.length, 0);
   const valorNaFila = filas.reduce((s, f) => s + f.total, 0);
-  const alertasAltos = painel.alertas.filter((a) => a.gravidade === "ALTA").length;
+  // Alertas de repasse e obrigação da área ficam só no bloco "Repasses e obrigações com prazo crítico" (sem repetir em "Alertas")
+  const alertasGerais = painel.alertas.filter((a) => !a.chave.startsWith("repasses."));
+  const alertasDeRepasse = painel.alertas.length - alertasGerais.length;
+  const alertasAltos = alertasGerais.filter((a) => a.gravidade === "ALTA").length;
 
   const resumo = gerarResumoSemanal({
     municipio: u.municipio.nome,
@@ -88,7 +91,7 @@ export default async function GabinetePage() {
     valorNaFila,
     quebrasOrdem: hist.quebras.length,
     alertasAltos,
-    alertasTotal: painel.alertas.length,
+    alertasTotal: alertasGerais.length,
     setorMaisCarregado: semana.setorMaisCarregado,
     secretarias: mapa.cartoes.map((c) => ({ nome: c.setor.nome, nivel: c.semaforo.nivel })),
     repassesEmRisco: riscoRep.length,
@@ -100,7 +103,7 @@ export default async function GabinetePage() {
 
   const indicadores = painel.porModulo.flatMap((m) => m.indicadores);
   const indisponiveis = painel.porModulo.filter((m) => m.erro);
-  const grupos = (["ALTA", "MEDIA", "BAIXA"] as Gravidade[]).map((g) => ({ g, itens: painel.alertas.filter((a) => a.gravidade === g) })).filter((x) => x.itens.length);
+  const grupos = (["ALTA", "MEDIA", "BAIXA"] as Gravidade[]).map((g) => ({ g, itens: alertasGerais.filter((a) => a.gravidade === g) })).filter((x) => x.itens.length);
 
   return (
     <>
@@ -241,6 +244,11 @@ export default async function GabinetePage() {
         </div>
 
         <Panel title="Alertas">
+          {alertasDeRepasse > 0 && (
+            <p className="mb-3 text-[13px] text-ink-2">
+              Os {alertasDeRepasse === 1 ? "alerta" : "alertas"} de repasses e obrigações das secretarias {alertasDeRepasse === 1 ? "está" : "estão"} no bloco “Repasses e obrigações com prazo crítico”.
+            </p>
+          )}
           {grupos.length === 0 ? (
             <Vazio>Nenhum alerta aberto.</Vazio>
           ) : (

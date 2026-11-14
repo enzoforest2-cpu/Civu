@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, type SessaoUsuario } from "@/lib/auth";
+import { exigirAreaNaAcao } from "@/lib/acesso";
 import { ErroAcesso, requirePortal } from "@/lib/portal";
 import type { ActionState } from "@/app/actions";
 import * as d from "./dados";
@@ -25,6 +26,13 @@ function revalidaGestao(ocorrenciaId?: string, ordemId?: string) {
   revalidatePath("/portal/servicos", "layout");
   if (ocorrenciaId) revalidatePath(`/servicos/${ocorrenciaId}`);
   if (ordemId) revalidatePath(`/servicos/ordens/${ordemId}`);
+}
+
+/** Ações da gestão de serviços urbanos: a página é da área de Infraestrutura e a ação confere o mesmo no servidor. */
+async function requireInfra(): Promise<SessaoUsuario> {
+  const u = await requireUser();
+  exigirAreaNaAcao(u, ["INFRAESTRUTURA"], d.ErroServico);
+  return u;
 }
 
 // ---------------------------------------------------------------- portal
@@ -69,7 +77,7 @@ export async function triagemAction(_: ActionState, fd: FormData): Promise<Actio
   const acao = str(fd, "acao");
   let ok = "";
   try {
-    const u = await requireUser();
+    const u = await requireInfra();
     if (acao === "aceitar") {
       await d.aceitar(u, id);
       ok = "Ocorrência aceita. Ela já pode entrar numa ordem de serviço.";
@@ -98,7 +106,7 @@ export async function triagemAction(_: ActionState, fd: FormData): Promise<Actio
 export async function criarOrdemAction(_: ActionState, fd: FormData): Promise<ActionState> {
   let id: string;
   try {
-    const u = await requireUser();
+    const u = await requireInfra();
     const os = await d.criarOrdem(u, {
       ocorrenciaIds: fd.getAll("ids").map(String),
       equipeId: str(fd, "equipeId"),
@@ -118,7 +126,7 @@ export async function ordemAction(_: ActionState, fd: FormData): Promise<ActionS
   const acao = str(fd, "acao");
   let ok = "";
   try {
-    const u = await requireUser();
+    const u = await requireInfra();
     if (acao === "iniciar") {
       await d.iniciarOrdem(u, id);
       ok = "Execução iniciada. Os cidadãos veem que a equipe está no local.";
@@ -146,7 +154,7 @@ export async function ordemAction(_: ActionState, fd: FormData): Promise<ActionS
 
 export async function salvarServicoAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
-    const u = await requireUser();
+    const u = await requireInfra();
     await d.salvarServico(u, {
       id: str(fd, "id") || undefined,
       nome: str(fd, "nome"),
@@ -166,7 +174,7 @@ export async function salvarServicoAction(_: ActionState, fd: FormData): Promise
 
 export async function criarEquipeAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
-    const u = await requireUser();
+    const u = await requireInfra();
     await d.criarEquipe(u, { nome: str(fd, "nome"), setorId: str(fd, "setorId"), membros: str(fd, "membros") });
   } catch (e) {
     return trata(e);

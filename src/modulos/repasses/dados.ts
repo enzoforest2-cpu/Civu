@@ -3,12 +3,13 @@ import "server-only";
 // prefeito (Parte 4): funções por município, por secretaria (setor), por área e "o que a pessoa pode ver".
 //
 // Execução de um repasse = soma dos processos vinculados (metadados.repasseId, gravado pelo motor), com o valor da mesma fonte
-// que a fila de pagamentos usa (metadados.contratacao.valor): contratado (contratação registrada), liquidado (chegou à fila
-// cronológica) e pago (chegou a PAGO). O percentual executado é pago ÷ valor previsto.
+// que a fila de pagamentos usa (metadados.contratacao.valor): contratado (contratação registrada), liquidado (está na fila
+// cronológica, no envio ao banco ou pago) e pago (chegou a PAGO). Compra e pagamentos do contrato que saiu dela contam uma
+// vez só (`somarExecucao`). O percentual executado é pago ÷ valor previsto.
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { eventos, obrigacaoEntregas, obrigacoesArea, processos, repasseHistorico, repasses, setores, tiposProcesso } from "@/db/schema";
-import { ehArea, type Area, type UsuarioComArea } from "@/lib/areas";
+import { contratos, eventos, obrigacaoEntregas, obrigacoesArea, processos, repasseHistorico, repasses, setores, tiposProcesso } from "@/db/schema";
+import { areaDoUsuario, cabineDoSetor, ehArea, type Area, type UsuarioComArea } from "@/lib/areas";
 import { estadosDeFila, type Contratacao } from "@/lib/pagamentos";
 import { nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import {
@@ -79,6 +80,8 @@ export type ProcessoVinculado = {
   liquidado: boolean;
   pago: boolean;
   cancelado: boolean;
+  /** pagamento de contrato: a compra de onde o contrato saiu (a execução não conta os dois) */
+  origemId: string | null;
 };
 
 export type EventoRepasse = { id: string; quando: Date; titulo: string; detalhe: string | null; autor: string | null; processo?: { id: string; numero: string } };
@@ -152,9 +155,11 @@ async function vinculados(municipioId: string, repasseIds?: string[]): Promise<M
     if (!rid) continue;
     const c = (meta.contratacao ?? {}) as Contratacao;
     const cfg = cfgs.get(p.tipoId);
-    // mesmas definições da fila de pagamentos (src/lib/pagamentos.ts): liquidado = entrou na fila; pago = entrou em PAGO vindo do envio (ou da fila)
-    const liquidado = !!cfg && p.eventos.some((e) => e.paraEstado === cfg.fila);
+    // mesmas definições da fila de pagamentos (src/lib/pagamentos.ts): pago = entrou em PAGO vindo do envio (ou da fila);
+    // liquidado = está agora na fila, no envio ao banco ou pago (uma liquidação devolvida à etapa anterior deixa de contar)
     const pago = !!cfg && p.eventos.some((e) => e.deEstado === (cfg.enviado ?? cfg.fila) && e.paraEstado === cfg.pago);
+    const liquidado = !!cfg && (pago || p.estadoAtual === cfg.fila || (!!cfg.enviado && p.estadoAtual === cfg.enviado));
+    const origem = (meta.contrato as { processoOrigemId?: unknown } | undefined)?.processoOrigemId;
     const valor = c.fornecedor && c.valor != null && c.valor !== "" ? Number(c.valor) : null;
     const arr = m.get(rid) ?? [];
     arr.push({
@@ -168,6 +173,7 @@ async function vinculados(municipioId: string, repasseIds?: string[]): Promise<M
       liquidado,
       pago,
       cancelado: !!p.encerradoEm && !pago,
+      origemId: typeof origem === "string" ? origem : null,
     });
     m.set(rid, arr);
   }
@@ -319,23 +325,67 @@ export async function repassesParaVincular(u: UsuarioComArea & { municipioId: st
 }
 
 /**
- * Processos que podem ser vinculados a um repasse: com pagamento (fila cronológica), sem repasse, e não encerrados sem pagamento.
- * `daArea`: aberto por setor da mesma área do repasse (a tela lista estes primeiro).
+ * Pasta (cabine da secretaria) dona de cada processo: num pagamento de contrato, a do setor responsável pelo contrato; nos
+ * demais, a do setor de quem abriu (mesmo recorte da cabine). Setor sem cabine fica com o próprio setor.
  */
-export async function processosParaVincular(municipioId: string, area: Area | null): Promise<{ id: string; numero: string; assunto: string; etapa: string; daArea: boolean }[]> {
+export async function pastasDosProcessos(municipioId: string, processoIds: string[]): Promise<Map<string, string | null>> {
+  const m = new Map<string, string | null>();
+  if (!processoIds.length) return m;
+  const [todos, lista] = await Promise.all([
+    db.select({ id: setores.id, sigla: setores.sigla, nome: setores.nome, area: setores.area, orgaoOrcamentario: setores.orgaoOrcamentario }).from(setores).where(eq(setores.municipioId, municipioId)),
+    db.query.processos.findMany({
+      where: and(eq(processos.municipioId, municipioId), inArray(processos.id, processoIds)),
+      columns: { id: true, metadados: true },
+      with: { abertoPor: { columns: { setorId: true } } },
+    }),
+  ]);
+  const contratoDe = (meta: unknown) => {
+    const c = ((meta ?? {}) as { contrato?: { id?: unknown } }).contrato?.id;
+    return typeof c === "string" ? c : null;
+  };
+  const cids = [...new Set(lista.map((p) => contratoDe(p.metadados)).filter((x): x is string => !!x))];
+  const setorDoContrato = new Map(
+    cids.length ? (await db.select({ id: contratos.id, setorId: contratos.setorId }).from(contratos).where(and(eq(contratos.municipioId, municipioId), inArray(contratos.id, cids)))).map((c) => [c.id, c.setorId]) : [],
+  );
+  for (const p of lista) {
+    const cid = contratoDe(p.metadados);
+    const setorId = (cid ? setorDoContrato.get(cid) : null) ?? p.abertoPor.setorId;
+    m.set(p.id, setorId ? (cabineDoSetor(todos, setorId)?.id ?? setorId) : null);
+  }
+  return m;
+}
+
+/** Pasta (cabine) do setor responsável por um repasse. */
+export async function pastaDoSetor(municipioId: string, setorId: string): Promise<string> {
+  const todos = await db.select({ id: setores.id, sigla: setores.sigla, nome: setores.nome, area: setores.area, orgaoOrcamentario: setores.orgaoOrcamentario }).from(setores).where(eq(setores.municipioId, municipioId));
+  return cabineDoSetor(todos, setorId)?.id ?? setorId;
+}
+
+/**
+ * Processos que podem ser vinculados a um repasse: com pagamento (fila cronológica), sem repasse, e não encerrados sem pagamento.
+ * Só os da pasta responsável pelo repasse; o Gabinete vê também os das outras pastas (`daArea` marca os da pasta, listados primeiro).
+ */
+export async function processosParaVincular(
+  u: UsuarioComArea & { municipioId: string },
+  repasse: { setorId: string },
+): Promise<{ id: string; numero: string; assunto: string; etapa: string; daArea: boolean }[]> {
+  const municipioId = u.municipioId;
   const tipos = await db.query.tiposProcesso.findMany({ where: eq(tiposProcesso.municipioId, municipioId), columns: { id: true, definicao: true } });
   const comFila = tipos.filter((t) => (t.definicao as WorkflowDef).estados.some((e) => e.filaCronologica));
   if (!comFila.length) return [];
   const defs = new Map(comFila.map((t) => [t.id, t.definicao as WorkflowDef]));
-  const lista = await db.query.processos.findMany({
-    where: and(eq(processos.municipioId, municipioId), inArray(processos.tipoId, [...defs.keys()]), sql`not coalesce(${processos.metadados} ? 'repasseId', false)`),
-    columns: { id: true, numero: true, assunto: true, tipoId: true, estadoAtual: true, encerradoEm: true },
-    with: { abertoPor: { columns: { id: true }, with: { setor: { columns: { area: true } } } } },
-    orderBy: (p, { desc: d }) => [d(p.abertoEm)],
-  });
+  const lista = (
+    await db.query.processos.findMany({
+      where: and(eq(processos.municipioId, municipioId), inArray(processos.tipoId, [...defs.keys()]), sql`not coalesce(${processos.metadados} ? 'repasseId', false)`),
+      columns: { id: true, numero: true, assunto: true, tipoId: true, estadoAtual: true, encerradoEm: true },
+      orderBy: (p, { desc: d }) => [d(p.abertoEm)],
+    })
+  ).filter((p) => !p.encerradoEm || p.estadoAtual === "ARQUIVADO");
+  const [pastas, pastaRepasse] = await Promise.all([pastasDosProcessos(municipioId, lista.map((p) => p.id)), pastaDoSetor(municipioId, repasse.setorId)]);
+  const gabinete = areaDoUsuario(u) === "GABINETE";
   return lista
-    .filter((p) => !p.encerradoEm || p.estadoAtual === "ARQUIVADO")
-    .map((p) => ({ id: p.id, numero: p.numero, assunto: p.assunto, etapa: nomeDaEtapa(defs.get(p.tipoId)!, p.estadoAtual), daArea: !!area && p.abertoPor.setor?.area === area }));
+    .map((p) => ({ id: p.id, numero: p.numero, assunto: p.assunto, etapa: nomeDaEtapa(defs.get(p.tipoId)!, p.estadoAtual), daArea: pastas.get(p.id) === pastaRepasse }))
+    .filter((p) => p.daArea || gabinete);
 }
 
 // ---------------------------------------------------------------------------

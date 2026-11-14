@@ -145,6 +145,28 @@ export function VisaoCabine({ cab, d, euSouSecretario, veOutras }: { cab: Cabine
             </ul>
           </>
         )}
+        {d.aguardandoOutros.length > 0 && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h3 className="text-[14px] font-semibold text-ink">Pedidos da área que esperam outro(a) secretário(a)</h3>
+            <p className="mt-0.5 text-[13.5px] text-ink-2">A aprovação é de quem responde pelo setor que fez o pedido. Aparecem aqui para acompanhar; não contam como pendência desta cabine.</p>
+            <ul className="divide-y divide-line">
+              {d.aguardandoOutros.map((p) => (
+                <li key={p.processoId} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3">
+                  <div className="min-w-0 flex-1 basis-64">
+                    <Link href={`/processos/${p.processoId}`} className="alvo-toque tnum font-semibold text-brand-2 hover:underline">
+                      {p.numero}
+                    </Link>
+                    <div className="mt-0.5 text-[15px] leading-snug text-ink">{p.assunto}</div>
+                    <div className="mt-0.5 text-[13.5px] text-ink-2">
+                      {p.etapa} · depende da {p.dependeDe}
+                    </div>
+                  </div>
+                  <Prazo prazo={p.prazo} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Panel>
 
       {/* 3. Processos da pasta */}

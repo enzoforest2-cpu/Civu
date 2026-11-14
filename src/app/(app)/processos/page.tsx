@@ -8,7 +8,8 @@ import { requireUser } from "@/lib/auth";
 import { WORKFLOW_COMPRA, nomeDaEtapa, type WorkflowDef } from "@/lib/workflow";
 import { Cabecalho, Panel } from "@/components/ui";
 import { TabelaProcessos } from "@/components/tabela-processos";
-import { autorizarCabine, semAcessoCabine } from "@/modulos/gestao/cabine";
+import { autorizarPasta, semAcessoCabine } from "@/modulos/gestao/cabine";
+import { condicaoDeVisibilidade } from "@/lib/acesso-processo";
 
 /** Etapas da compra entre o pedido e o contrato (filtro "fase=compra", usado pela cabine da secretaria). */
 const ETAPAS_ATE_CONTRATO = WORKFLOW_COMPRA.estados.slice(0, WORKFLOW_COMPRA.estados.findIndex((e) => e.chave === "CONTRATADO")).map((e) => e.chave);
@@ -32,16 +33,18 @@ export default async function ProcessosPage({ searchParams }: { searchParams: Pr
   const fase = sp.fase === "compra" ? "compra" : "";
 
   // Recorte "da pasta" (vindo da cabine): processos abertos pelos setores da secretaria. Conferido no servidor:
-  // quem não abre a cabine daquela pasta também não lê a lista dela por aqui.
+  // mesma regra de contratos e orçamento (`autorizarPasta`).
   let pasta: { sigla: string; nome: string; ids: string[] } | null = null;
   if (sp.pasta) {
-    const a = await autorizarCabine(u, sp.pasta);
+    const a = await autorizarPasta(u, sp.pasta);
     if (!a.ok) redirect(a.motivo === "inexistente" ? "/processos" : semAcessoCabine(sp.pasta.toUpperCase(), a.area, "/processos"));
     pasta = { sigla: a.cabine.setor.sigla, nome: a.cabine.setor.nome, ids: a.cabine.ids };
   }
   const fora = !!pasta && sp.fora === "1";
 
-  const base: SQL[] = [eq(processos.municipioId, u.municipioId)];
+  // Só o que a pessoa pode abrir: os processos de que participa (src/lib/acesso-processo.ts)
+  const visiveis = await condicaoDeVisibilidade(u);
+  const base: SQL[] = [eq(processos.municipioId, u.municipioId), ...(visiveis ? [visiveis] : [])];
   if (pasta) base.push(inArray(processos.abertoPorId, db.select({ id: usuarios.id }).from(usuarios).where(inArray(usuarios.setorId, pasta.ids))));
   if (fora && pasta) base.push(or(isNull(processos.setorAtualId), notInArray(processos.setorAtualId, pasta.ids))!);
   if (etapa) base.push(eq(processos.estadoAtual, etapa));
@@ -99,7 +102,9 @@ export default async function ProcessosPage({ searchParams }: { searchParams: Pr
             ? `Resultado da busca por “${q}”.`
             : pasta
               ? `Processos abertos pela ${pasta.nome}, com a etapa em que cada um está e o prazo.`
-              : "Todos os processos da prefeitura, com a etapa em que cada um está e o prazo."
+              : visiveis
+                ? "Os processos da sua pasta e os que passam pelo seu setor, com a etapa em que cada um está e o prazo."
+                : "Todos os processos da prefeitura, com a etapa em que cada um está e o prazo."
         }
       />
       {(pasta || etapa || fase) && (

@@ -6,7 +6,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { obrigacaoEntregas, obrigacoesArea, repasseHistorico, repasses, setores, usuarios } from "@/db/schema";
 import type { SessaoUsuario } from "@/lib/auth";
-import { AREA_NOME, ehArea } from "@/lib/areas";
+import { AREA_NOME, areaDoUsuario, ehArea } from "@/lib/areas";
+import { pastaDoSetor, pastasDosProcessos } from "./dados";
 import { fmtMoeda } from "@/lib/dates";
 import { vincularRepasse } from "@/lib/engine";
 import { numeroBr } from "@/lib/numeros";
@@ -167,29 +168,61 @@ async function repasseEditavel(u: SessaoUsuario, repasseId: string) {
   return { r, rotulo: r.identificacao ? `${tipoNome} ${r.identificacao}` : tipoNome };
 }
 
-/** Confere o repasse escolhido na abertura de um processo: existe, não está encerrado e a pessoa pode vinculá-lo. */
+/** Confere o repasse escolhido: existe, não está encerrado e a pessoa pode vinculá-lo (área da secretaria ou Gabinete). */
 export async function repasseParaVincular(u: SessaoUsuario, repasseId: string): Promise<{ id: string; rotulo: string }> {
   const { r, rotulo } = await repasseEditavel(u, repasseId);
   if (r.situacao === "PRESTADO") throw new ErroRepasse("Este repasse já teve as contas prestadas: não recebe novos processos.");
   return { id: r.id, rotulo };
 }
 
-/** Vincula um processo de compra (ou de pagamento) ao repasse. O motor grava o vínculo e o evento no livro do processo. */
+/** O processo é da pasta responsável pelo repasse? O Gabinete vincula processo de qualquer pasta. */
+async function exigirPastaDoRepasse(u: SessaoUsuario, repasseId: string, pastaDoProcesso: string | null) {
+  if (areaDoUsuario(u) === "GABINETE") return;
+  const r = await db.query.repasses.findFirst({ where: and(eq(repasses.id, repasseId), eq(repasses.municipioId, u.municipioId)), with: { setor: true } });
+  if (!r) throw new ErroRepasse("Repasse não encontrado.");
+  if (pastaDoProcesso !== (await pastaDoSetor(u.municipioId, r.setorId)))
+    throw new ErroRepasse(`Só processos da ${r.setor.nome} se vinculam a este repasse. Se a despesa de outra pasta é paga com este recurso, peça o vínculo ao Gabinete.`);
+}
+
+/** Repasse escolhido ao abrir um processo de compra: além de `repasseParaVincular`, o processo novo (da pasta de quem abre) precisa ser da pasta do repasse. */
+export async function repasseParaAbrir(u: SessaoUsuario, repasseId: string): Promise<{ id: string; rotulo: string }> {
+  const alvo = await repasseParaVincular(u, repasseId);
+  await exigirPastaDoRepasse(u, repasseId, u.setorId ? await pastaDoSetor(u.municipioId, u.setorId) : null);
+  return alvo;
+}
+
+/**
+ * Vincula um processo de compra (ou de pagamento) ao repasse. O motor grava o vínculo e o evento no livro do processo.
+ * Só processo da pasta responsável pelo repasse; o Gabinete vincula de qualquer pasta.
+ */
 export async function vincularProcesso(u: SessaoUsuario, repasseId: string, processoId: string, motivo?: string) {
   const alvo = await repasseParaVincular(u, repasseId);
   const p = await db.query.processos.findFirst({ where: (x, { and: e, eq: igual }) => e(igual(x.id, processoId), igual(x.municipioId, u.municipioId)), columns: { id: true, metadados: true } });
   if (!p) throw new ErroRepasse("Escolha o processo a vincular.");
   const atual = (p.metadados as Record<string, unknown> | null)?.repasseId;
   if (typeof atual === "string" && atual !== repasseId) throw new ErroRepasse("Este processo já está vinculado a outro repasse. Desvincule-o lá antes.");
+  await exigirPastaDoRepasse(u, repasseId, (await pastasDosProcessos(u.municipioId, [p.id])).get(p.id) ?? null);
   await vincularRepasse(u, processoId, alvo, motivo);
 }
 
-/** Desfaz o vínculo do processo com o repasse atual, com motivo (fica no livro do processo). */
+/**
+ * Desfaz o vínculo do processo com o repasse atual, com motivo (fica no livro do processo). Desvincula quem edita o repasse
+ * (área da secretaria responsável ou Gabinete) e também a pasta dona do processo.
+ */
 export async function desvincularProcesso(u: SessaoUsuario, processoId: string, motivo: string) {
   const p = await db.query.processos.findFirst({ where: (x, { and: e, eq: igual }) => e(igual(x.id, processoId), igual(x.municipioId, u.municipioId)), columns: { id: true, metadados: true } });
   const atual = (p?.metadados as Record<string, unknown> | null)?.repasseId;
   if (!p || typeof atual !== "string") throw new ErroRepasse("Este processo não está vinculado a repasse.");
-  await repasseEditavel(u, atual);
+  try {
+    await repasseEditavel(u, atual);
+  } catch (e) {
+    if (!(e instanceof ErroRepasse)) throw e;
+    // a pasta dona do processo também desfaz o vínculo (quem é da área dela; o ADMIN não edita)
+    const pasta = (await pastasDosProcessos(u.municipioId, [p.id])).get(p.id) ?? null;
+    const dono = pasta ? await db.query.setores.findFirst({ where: and(eq(setores.id, pasta), eq(setores.municipioId, u.municipioId)) }) : null;
+    const minha = u.setorId ? await pastaDoSetor(u.municipioId, u.setorId) : null;
+    if (!dono || minha !== dono.id || !podeEditarNaArea(u, dono.area)) throw e;
+  }
   const m = texto(motivo, "o motivo de desvincular (pelo menos 10 caracteres)", 10);
   await vincularRepasse(u, processoId, null, m);
 }
@@ -209,7 +242,7 @@ export type EntradaObrigacao = {
   observacao?: string | null;
 };
 
-async function validarObrigacao(u: SessaoUsuario, e: EntradaObrigacao) {
+async function validarObrigacao(u: SessaoUsuario, e: EntradaObrigacao, setor: Setor) {
   if (!Object.hasOwn(PERIODICIDADES, e.periodicidade)) throw new ErroRepasse("Escolha a periodicidade.");
   const situacao = e.situacao || "PENDENTE";
   if (!Object.hasOwn(SITUACOES_OBRIGACAO, situacao)) throw new ErroRepasse("Escolha a situação.");
@@ -217,8 +250,11 @@ async function validarObrigacao(u: SessaoUsuario, e: EntradaObrigacao) {
   if (!venc) throw new ErroRepasse("Informe o próximo vencimento.");
   const responsavelId = opcional(e.responsavelId);
   if (responsavelId) {
-    const r = await db.query.usuarios.findFirst({ where: and(eq(usuarios.id, responsavelId), eq(usuarios.municipioId, u.municipioId)), columns: { id: true } });
+    const r = await db.query.usuarios.findFirst({ where: and(eq(usuarios.id, responsavelId), eq(usuarios.municipioId, u.municipioId)), columns: { id: true }, with: { setor: { columns: { area: true } } } });
     if (!r) throw new ErroRepasse("Escolha o responsável entre os servidores do município.");
+    // o responsável é da área da secretaria (ou do Gabinete), como na lista do formulário (`pessoasResponsaveis`)
+    if (r.setor?.area !== setor.area && r.setor?.area !== "GABINETE")
+      throw new ErroRepasse(`Escolha como responsável alguém da área de ${ehArea(setor.area) ? AREA_NOME[setor.area] : "da secretaria"} ou do Gabinete.`);
   }
   return {
     nome: texto(e.nome, "o nome da obrigação"),
@@ -234,7 +270,7 @@ async function validarObrigacao(u: SessaoUsuario, e: EntradaObrigacao) {
 export async function criarObrigacao(u: SessaoUsuario, e: EntradaObrigacao): Promise<{ id: string }> {
   const s = await setorDoMunicipio(u, e.setorId);
   exigirEdicao(u, s);
-  const v = await validarObrigacao(u, e);
+  const v = await validarObrigacao(u, e, s);
   const [o] = await db
     .insert(obrigacoesArea)
     .values({ municipioId: u.municipioId, setorId: s.id, ...v, criadoPorId: u.id })
@@ -248,7 +284,7 @@ export async function editarObrigacao(u: SessaoUsuario, id: string, e: EntradaOb
   exigirEdicao(u, atual.setor);
   const s = e.setorId && e.setorId !== atual.setorId ? await setorDoMunicipio(u, e.setorId) : atual.setor;
   if (s.id !== atual.setorId) exigirEdicao(u, s);
-  const v = await validarObrigacao(u, e);
+  const v = await validarObrigacao(u, e, s);
   // um exemplo editado passa a ser do município: o rótulo de exemplo sai
   await db.update(obrigacoesArea).set({ ...v, setorId: s.id, exemplo: false, atualizadoEm: new Date() }).where(eq(obrigacoesArea.id, id));
 }

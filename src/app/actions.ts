@@ -7,7 +7,9 @@ import { ErroFluxo, abrirProcesso, avancar, devolver, tramitar, receber, juntarD
 import { analisarFracionamento, type AnaliseFracionamento } from "@/lib/conformidade";
 import type { Papel } from "@/lib/workflow";
 import { paginaInicial } from "@/lib/areas";
-import { ErroRepasse, repasseParaVincular } from "@/modulos/repasses/operacoes";
+import { ErroRepasse, repasseParaAbrir } from "@/modulos/repasses/operacoes";
+import { exigirAcaoNoProcesso } from "@/lib/acesso-processo";
+import { db } from "@/db";
 
 export type ActionState = { erro?: string; ok?: string } | null;
 
@@ -38,7 +40,7 @@ export async function abrirProcessoAction(_: ActionState, fd: FormData): Promise
     const metadados: Record<string, unknown> = {};
     for (const [k, v] of fd.entries()) if (k.startsWith("meta.") && String(v).trim()) metadados[k.slice(5)] = String(v).trim();
     const repasseId = str(fd, "repasseId");
-    const repasse = repasseId ? await repasseParaVincular(u, repasseId) : undefined;
+    const repasse = repasseId ? await repasseParaAbrir(u, repasseId) : undefined;
     const p = await abrirProcesso(u, {
       repasse,
       tipoId: str(fd, "tipoId"),
@@ -59,6 +61,7 @@ export async function abrirProcessoAction(_: ActionState, fd: FormData): Promise
 export async function avancarAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await avancar(u, str(fd, "processoId"), str(fd, "para"), str(fd, "despacho"));
   } catch (e) {
     return trata(e);
@@ -70,6 +73,7 @@ export async function avancarAction(_: ActionState, fd: FormData): Promise<Actio
 export async function devolverAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await devolver(u, str(fd, "processoId"), str(fd, "para"), str(fd, "motivo"));
   } catch (e) {
     return trata(e);
@@ -81,6 +85,7 @@ export async function devolverAction(_: ActionState, fd: FormData): Promise<Acti
 export async function tramitarAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"), { reencaminhar: true });
     await tramitar(u, str(fd, "processoId"), str(fd, "paraSetorId"), str(fd, "despacho"));
   } catch (e) {
     return trata(e);
@@ -92,6 +97,7 @@ export async function tramitarAction(_: ActionState, fd: FormData): Promise<Acti
 export async function receberAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await receber(u, str(fd, "processoId"));
   } catch (e) {
     return trata(e);
@@ -104,6 +110,7 @@ export async function receberAction(_: ActionState, fd: FormData): Promise<Actio
 export async function juntarDocumentoAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await juntarDocumento(u, str(fd, "processoId"), str(fd, "tipo"), str(fd, "titulo"), str(fd, "conteudo"));
   } catch (e) {
     return trata(e);
@@ -115,6 +122,10 @@ export async function juntarDocumentoAction(_: ActionState, fd: FormData): Promi
 export async function assinarAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    // o processo é o do documento (não o que veio no formulário)
+    const doc = await db.query.documentos.findFirst({ where: (d, { eq }) => eq(d.id, str(fd, "documentoId")), columns: { processoId: true } });
+    if (!doc) throw new ErroFluxo("Documento não encontrado.");
+    await exigirAcaoNoProcesso(u, doc.processoId);
     const ok = await confirmarSenha(u.id, str(fd, "senha"));
     if (!ok) return { erro: "Senha incorreta. A assinatura exige reautenticação." };
     await assinarDocumento(u, str(fd, "documentoId"), str(fd, "papel") as Papel);
@@ -128,6 +139,7 @@ export async function assinarAction(_: ActionState, fd: FormData): Promise<Actio
 export async function despacharAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await despachar(u, str(fd, "processoId"), str(fd, "texto"));
   } catch (e) {
     return trata(e);
@@ -140,6 +152,7 @@ export async function despacharAction(_: ActionState, fd: FormData): Promise<Act
 export async function contratacaoAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await registrarContratacao(u, str(fd, "processoId"), { fornecedor: str(fd, "fornecedor"), cnpj: str(fd, "cnpj"), valor: str(fd, "valor"), fonte: str(fd, "fonte") });
   } catch (e) {
     return trata(e);
@@ -151,6 +164,7 @@ export async function contratacaoAction(_: ActionState, fd: FormData): Promise<A
 export async function remessaTceAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await registrarRemessaTce(u, str(fd, "processoId"), str(fd, "recibo"));
   } catch (e) {
     return trata(e);
@@ -170,6 +184,7 @@ export async function checarFracionamentoAction(input: { unidadeGestoraId: strin
 export async function abrirExigenciaAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requireUser();
+    await exigirAcaoNoProcesso(u, str(fd, "processoId"));
     await abrirExigencia(u, str(fd, "processoId"), str(fd, "texto"), Number(str(fd, "prazo")) || 10);
   } catch (e) {
     return trata(e);

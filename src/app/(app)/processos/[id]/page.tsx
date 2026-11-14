@@ -25,6 +25,7 @@ import { PainelDaEtapa } from "./etapas";
 import { CorrecaoContratacao } from "./etapas/correcao-contratacao";
 import { repasseBasico } from "@/modulos/repasses/dados";
 import { podeVerNaArea } from "@/modulos/repasses/regras";
+import { exigirLeituraDoProcesso } from "@/lib/acesso-processo";
 
 const SITUACAO_OBRIG: Record<SituacaoObrigacao, { tone: "ok" | "bad" | "warn" | "neutral"; texto: string }> = {
   cumprida: { tone: "ok", texto: "Cumprida" },
@@ -41,6 +42,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const { doc: docSugerido, abrir, papel: papelSugerido } = await searchParams;
   const p = await carregarProcesso(u.municipioId, id);
   if (!p) notFound();
+  // Só quem participa do processo abre; o administrador, sem participar, só consulta (src/lib/acesso-processo.ts)
+  const consulta = (await exigirLeituraDoProcesso(u, p.id)) === "ler";
   const feriados = await feriadosDo(u.municipioId);
   const gates = avaliarGates(p, feriados);
   const avancos = avancosDisponiveis(p.def, p.estado, p.metadados as Record<string, unknown> | null);
@@ -51,7 +54,8 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
   const camposMeta = p.def.camposAbertura ?? [];
   const repasse = typeof meta.repasseId === "string" ? await repasseBasico(u.municipioId, meta.repasseId) : null;
   const noMeuSetor = p.setorAtualId === u.setorId;
-  const podeTramitarLivre = !p.encerradoEm && (p.estado.setor === "LIVRE" || u.papeis.includes("PROTOCOLO"));
+  const foraDoFluxo = !p.def.estados.some((e) => e.chave === p.estadoAtual);
+  const podeTramitarLivre = !p.encerradoEm && (consulta ? foraDoFluxo : p.estado.setor === "LIVRE" || u.papeis.includes("PROTOCOLO"));
   // Trilho: só as etapas que valem para a modalidade do processo; o ramo escolhido conta como caminho normal
   const caminho = caminhoDoProcesso(p.def, meta);
   const ordemCaminho = caminho.map((e) => e.chave);
@@ -161,6 +165,11 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
           Aberto por {p.abertoPor.nome}
           {p.abertoPor.setor ? ` (${p.abertoPor.setor.nome})` : ""} em {fmtDataHora(p.abertoEm)} · {p.unidadeGestora.nome}
         </p>
+        {consulta && (
+          <p className="mt-3 max-w-3xl rounded-xl border border-line bg-sunken/60 px-4 py-3 text-[14px] text-ink-2">
+            Modo consulta: o administrador do sistema vê o processo para auditoria e configuração, mas não age nele. Quem age é quem participa do fluxo.
+          </p>
+        )}
       </header>
 
       {/* Trilho: onde o processo está */}
@@ -342,7 +351,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                       <strong className="font-semibold text-ink">
                         {p.estado.setor === "LIVRE" ? "qualquer setor envolvido" : p.estado.setor === null ? "quem abriu a demanda" : (p.setorAtual?.nome ?? p.estado.setor)}
                       </strong>{" "}
-                      ({p.estado.papeis.map((x) => PAPEL_NOME[x]).join(", ")}). Você pode consultar e juntar documentos.
+                      ({p.estado.papeis.map((x) => PAPEL_NOME[x]).join(", ")}). {consulta ? "Você pode consultar." : "Você pode consultar e juntar documentos."}
                       {podeTramitarLivre && (
                         <div className="mt-3">
                           <EnviarSetor processoId={p.id} setores={listaSetores.filter((s) => s.id !== p.setorAtualId)} />
@@ -400,7 +409,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                           <div className="doc-texto">{d.conteudo}</div>
                           <div className="mt-4 text-[12px] break-all text-ink-3">Impressão digital do documento (SHA-256): {d.hash}</div>
                         </div>
-                        {!p.encerradoEm && u.papeis.some((x) => x !== "ADMIN") && (
+                        {!p.encerradoEm && !consulta && u.papeis.some((x) => x !== "ADMIN") && (
                           <ActionForm action={assinarAction} className="mt-3">
                             <input type="hidden" name="processoId" value={p.id} />
                             <input type="hidden" name="documentoId" value={d.id} />
@@ -438,7 +447,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               </ul>
             )}
 
-            {!p.encerradoEm && (
+            {!p.encerradoEm && !consulta && (
               <details id="juntar" className="border-t border-line" open={!!docSugerido || abrir === "juntar"}>
                 <summary className="flex items-center gap-2 px-6 py-4 text-[14.5px] font-semibold text-brand-2 hover:text-brand-ink">
                   <Plus size={17} /> Juntar documento
@@ -560,7 +569,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
                   <strong className="font-semibold">Aguardando o interessado até {fmtData(exigencia.prazo)}:</strong> {exigencia.texto}
                 </div>
               ) : (
-                !p.encerradoEm && (
+                !p.encerradoEm && !consulta && (
                   <details className="mt-4 rounded-xl border border-line open:bg-sunken/50">
                     <summary className="px-4 py-3 text-[14px] font-semibold text-brand-2">Pedir complemento ao interessado</summary>
                     <ActionForm action={abrirExigenciaAction} className="space-y-3 px-4 pb-4">
@@ -730,7 +739,7 @@ export default async function ProcessoPage({ params, searchParams }: { params: P
               )
             }
           >
-            {!p.encerradoEm && (
+            {!p.encerradoEm && !consulta && (
               <ActionForm action={despacharAction} className="mb-5">
                 <input type="hidden" name="processoId" value={p.id} />
                 <div className="flex items-start gap-2.5">

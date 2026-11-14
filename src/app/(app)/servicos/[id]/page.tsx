@@ -17,7 +17,7 @@ export default async function OcorrenciaGestao({ params }: { params: Promise<{ i
   if (!o) notFound();
   const pode = podeAtuar(u, o.setorId);
   const triavel = o.status === "ABERTA" || o.status === "ACEITA";
-  const [candidatas, setores] = pode && triavel ? await Promise.all([candidatasDuplicidade(o), todosSetores(u.municipioId)]) : [[], []];
+  const [candidatas, setores] = pode && triavel ? await Promise.all([candidatasDuplicidade(o), todosSetores(u.municipioId).then((l) => l.filter((s) => s.area === u.setor?.area))]) : [[], []];
   const solicitante = o.empresa ? o.empresa.razaoSocial : (o.pessoa?.nome ?? o.solicitanteNome ?? "Não identificado");
 
   return (

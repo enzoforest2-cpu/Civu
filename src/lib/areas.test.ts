@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { AREAS, AREA_CHAVES, AREA_DA_SIGLA, cabineDoSetor, ehArea, ehCabine, paginaInicial, podeAbrirCabine, setoresDaCabine, veTodasAsPastas, type SetorDaCabine, podeVerArea, podeVerRota, regraDaRota, urlSemAcesso, veTudo, type Area, type UsuarioComArea } from "./areas";
+import { AREAS, AREA_CHAVES, AREA_DA_SIGLA, cabineDoSetor, ehArea, ehCabine, paginaInicial, podeAbrirCabine, podeVerPasta, setoresDaCabine, veTodasAsPastas, type SetorDaCabine, podeVerArea, podeVerRota, regraDaRota, urlSemAcesso, veTudo, type Area, type UsuarioComArea } from "./areas";
 
 const pessoa = (papeis: string[], area: Area | null): UsuarioComArea => ({ papeis, setor: area === null ? null : { area } });
 
@@ -136,7 +136,7 @@ test("migração 0003 preenche a área pela mesma tabela de siglas de areas.ts",
 // ---------------------------------------------------------------------------
 // Cabine da secretaria (Parte 2)
 // ---------------------------------------------------------------------------
-const ORGAO: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "03", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
+const ORGAO: Record<string, string> = { GAB: "02", SEMAD: "03", SEFAZ: "04", SEDUC: "05", SESAU: "06", SEMAS: "07", SEINFRA: "08" };
 const SETORES: SetorDaCabine[] = Object.entries(AREA_DA_SIGLA).map(([sigla, area]) => ({ id: sigla, sigla, nome: sigla, area, orgaoOrcamentario: ORGAO[sigla] ?? null }));
 const comSetor = (u: UsuarioComArea, setorId: string | null) => ({ ...u, setorId });
 const cab = (sigla: string) => SETORES.find((s) => s.sigla === sigla)!;
@@ -176,4 +176,17 @@ test("cabines: secretário de uma pasta não abre a de outra; gabinete, controle
 test("recorte por pasta: Fazenda, Compras e visão total veem todas; secretarias finalísticas só a sua", () => {
   for (const k of ["prefeita", "controladora", "administradorTi", "secretarioFazenda", "contador", "compras"] as const) assert.equal(veTodasAsPastas(PERFIS[k]), true, k);
   for (const k of ["secretarioSaude", "secretarioInfra", "secretariaAssistencia", "ordenadoraAdministracao", "requisitanteSaude"] as const) assert.equal(veTodasAsPastas(PERFIS[k]), false, k);
+});
+
+test("ver outra pasta: uma regra só para processos, contratos e orçamento filtrados por ?pasta=", () => {
+  const saude = comSetor(PERFIS.secretarioSaude, "SESAU");
+  assert.equal(podeVerPasta(saude, cab("SESAU"), SETORES), true);
+  assert.equal(podeVerPasta(saude, cab("SEINFRA"), SETORES), false);
+  // Fazenda e Compras filtram qualquer pasta (o que cada processo mostra segue a regra de participação)
+  assert.equal(podeVerPasta(comSetor(PERFIS.contador, "CONTAB"), cab("SESAU"), SETORES), true);
+  assert.equal(podeVerPasta(comSetor(PERFIS.compras, "COMPRAS"), cab("SEDUC"), SETORES), true);
+  assert.equal(podeVerPasta(comSetor(PERFIS.prefeita, "GAB"), cab("SEMAS"), SETORES), true);
+  assert.equal(podeVerPasta(comSetor(PERFIS.procurador, "PGM"), cab("SESAU"), SETORES), false);
+  // o Gabinete não é pasta de lista (é a Sala do prefeito)
+  assert.equal(podeVerPasta(comSetor(PERFIS.prefeita, "GAB"), cab("GAB"), SETORES), false);
 });

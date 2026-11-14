@@ -11,7 +11,9 @@ type Setor = { id: string; nome: string };
 
 export default async function CatalogoServicos() {
   const u = await exigirRota("/servicos/catalogo");
-  const [cat, eqs, setores] = await Promise.all([catalogo(u.municipioId, false), listarEquipes(u.municipioId), todosSetores(u.municipioId)]);
+  const [cat, eqs, todos] = await Promise.all([catalogo(u.municipioId, false), listarEquipes(u.municipioId), todosSetores(u.municipioId)]);
+  // serviços e equipes ficam com setores de Infraestrutura e Obras (o servidor confere o mesmo em salvarServico)
+  const setores = todos.filter((s) => s.area === "INFRAESTRUTURA" && (temPapel(u, "ADMIN") || s.area === u.setor?.area));
   const configura = temPapel(u, "ADMIN", "SECRETARIO");
   const editavel = (setorId: string) => configura && (temPapel(u, "ADMIN") || u.setorId === setorId);
 

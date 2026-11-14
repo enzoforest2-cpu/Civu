@@ -55,11 +55,14 @@ export function Timeline({ eventos, def }: { eventos: Ev[]; def: WorkflowDef }) 
             const rep = (e.dados as { repasse?: { rotulo: string } } | null)?.repasse;
             if (rep) detalhe = `Vinculado ao repasse ${rep.rotulo}.`;
             const al = (e.dados as { alertaFracionamento?: { situacao: string; total: number; limite: number } } | null)?.alertaFracionamento;
-            if (al)
-              detalhe =
+            if (al) {
+              const alerta =
                 al.situacao === "excede"
                   ? `Alerta de fracionamento: dispensas da mesma natureza somariam ${fmtMoeda(al.total)}, acima do limite de ${fmtMoeda(al.limite)}.`
                   : `Atenção: dispensas da mesma natureza somariam ${fmtMoeda(al.total)}, perto do limite de ${fmtMoeda(al.limite)}.`;
+              // com repasse e alerta, os dois textos aparecem
+              detalhe = detalhe ? `${detalhe} ${alerta}` : alerta;
+            }
             break;
           }
           case "MUDANCA_ESTADO": {

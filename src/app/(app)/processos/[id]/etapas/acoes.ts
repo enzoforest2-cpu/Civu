@@ -22,6 +22,7 @@ import {
 import { PRAZO_MINIMO_EDITAL, aberturaMinima, tipoObjetoValido, type ResultadoSessao, type TipoObjetoEdital } from "@/lib/regras-fluxo";
 import { numeroBr } from "@/lib/numeros";
 import type { ActionState } from "@/app/actions";
+import { exigirAcaoNoProcesso } from "@/lib/acesso-processo";
 
 /**
  * Estado dos formulários que precisam manter o que foi digitado quando há erro (o React limpa o formulário depois da action):
@@ -49,6 +50,7 @@ async function executar(fd: FormData, ok: string, fn: (u: Awaited<ReturnType<typ
   const processoId = str(fd, "processoId");
   if (!UUID.test(processoId)) return { erro: ERRO_PROCESSO };
   try {
+    await exigirAcaoNoProcesso(u, processoId);
     await fn(u, processoId);
   } catch (e) {
     return trata(e);

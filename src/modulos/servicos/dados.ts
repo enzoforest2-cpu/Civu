@@ -112,6 +112,9 @@ export async function salvarServico(
     throw new ErroServico("O prazo-alvo deve ficar entre 1 e 120 dias úteis.");
   const setor = await db.query.setores.findFirst({ where: and(eq(setores.id, input.setorId), eq(setores.municipioId, u.municipioId)) });
   if (!setor) throw new ErroServico("Escolha a secretaria responsável.");
+  // o catálogo é de Infraestrutura e Obras; quem não é administrador só cadastra para setores da própria área
+  if (setor.area !== "INFRAESTRUTURA") throw new ErroServico("Os serviços urbanos ficam com um setor da área de Infraestrutura e Obras.");
+  if (!temPapel(u, "ADMIN") && setor.area !== u.setor?.area) throw new ErroServico("Escolha um setor da sua área.");
   if (input.id) {
     const atual = await db.query.servicosCatalogo.findFirst({ where: and(eq(servicosCatalogo.id, input.id), eq(servicosCatalogo.municipioId, u.municipioId)) });
     if (!atual) throw new ErroServico("Serviço não encontrado.");
@@ -457,6 +460,7 @@ export async function encaminhar(u: SessaoUsuario, id: string, setorId: string, 
   if (!["ABERTA", "ACEITA"].includes(o.status)) throw new ErroServico("Só é possível encaminhar ocorrências que ainda não estão numa ordem de serviço.");
   const destino = await db.query.setores.findFirst({ where: and(eq(setores.id, setorId), eq(setores.municipioId, u.municipioId)) });
   if (!destino) throw new ErroServico("Escolha a secretaria de destino.");
+  if (destino.area !== u.setor?.area) throw new ErroServico("Encaminhe para um setor da sua área. Fora dela, peça ao Gabinete ou ao setor responsável.");
   if (destino.id === o.setorId) throw new ErroServico("A ocorrência já está nesta secretaria.");
   await db.transaction(async (tx) => {
     await tx.update(servicosOcorrencias).set({ setorId: destino.id, status: "ABERTA" }).where(eq(servicosOcorrencias.id, o.id));

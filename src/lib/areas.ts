@@ -209,6 +209,15 @@ export function veTodasAsPastas(u: UsuarioComArea): boolean {
   return a === "FAZENDA" || a === "COMPRAS";
 }
 
+/**
+ * Regra única de "ver outra pasta" nas listas filtradas (`/processos?pasta=`, `/contratos?pasta=`, `/contratos/atestos`,
+ * orçamento): quem vê todas as pastas (`veTodasAsPastas`) filtra por qualquer uma; os demais, só pela própria.
+ */
+export function podeVerPasta(u: UsuarioComArea & { setorId: string | null }, cabine: SetorDaCabine, setores: readonly SetorDaCabine[]): boolean {
+  if (!ehCabine(cabine)) return false;
+  return veTodasAsPastas(u) || cabineDoSetor(setores, u.setorId)?.id === cabine.id;
+}
+
 /** Endereço da página "Sem acesso a esta área" para uma tela bloqueada. */
 export function urlSemAcesso(caminho: string): string {
   const area = areaDaRota(caminho);
